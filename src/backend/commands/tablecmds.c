@@ -70,6 +70,7 @@
 #include "commands/copy.h"
 #include "commands/comment.h"
 #include "commands/defrem.h"
+#include "commands/event_trigger.h"
 #include "commands/sequence.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -191,7 +192,7 @@ typedef struct AlteredTableInfo
 	List	   *constraints;	/* List of NewConstraint */
 	List	   *newvals;		/* List of NewColumnValue */
 	bool		new_notnull;	/* T if we added new NOT NULL constraints */
-	bool		rewrite;		/* T if a rewrite is forced */
+	int			rewrite;		/* Reason for forced rewrite, if any */
 	bool		aocs_write_new_columns_only; /* T for ADD COLUMN on AOCS relation */
 	bool		dist_opfamily_changed; /* T if changing datatype of distribution key column and new opclass is in different opfamily than old one */
 	Oid			new_opclass;		/* new opclass, if changing a distribution key column */
@@ -329,7 +330,8 @@ static void validateForeignKeyConstraint(char *conname,
 static void createForeignKeyTriggers(Relation rel, Oid refRelOid,
 						 Constraint *fkconstraint,
 						 Oid constraintOid, Oid indexOid);
-static void ATController(Relation rel, List *cmds, bool recurse, LOCKMODE lockmode);
+static void ATController(AlterTableStmt *parsetree,
+						 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode);
 static void prepSplitCmd(Relation rel, PgPartRule *prule, bool is_at);
 static void ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		  bool recurse, bool recursing, LOCKMODE lockmode);
@@ -337,7 +339,8 @@ static void ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode);
 static void ATAddToastIfNeeded(List **wqueue, LOCKMODE lockmode);
 static void ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation *rel_p,
 		  AlterTableCmd *cmd, LOCKMODE lockmode);
-static void ATRewriteTables(List **wqueue, LOCKMODE lockmode);
+static void ATRewriteTables(AlterTableStmt *parsetree,
+							List **wqueue, LOCKMODE lockmode);
 static void ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode);
 static void ATAocsWriteSegFileNewColumns(
 		AOCSAddColumnDesc idesc, AOCSHeaderScanDesc sdesc,
@@ -3784,7 +3787,8 @@ AlterTable(Oid relid, LOCKMODE lockmode, AlterTableStmt *stmt)
 
 	CheckTableNotInUse(rel, "ALTER TABLE");
 
-	ATController(rel, stmt->cmds, interpretInhOption(stmt->relation->inhOpt),
+	ATController(stmt,
+				 rel, stmt->cmds, interpretInhOption(stmt->relation->inhOpt),
 				 lockmode);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -3827,7 +3831,7 @@ AlterTableInternal(Oid relid, List *cmds, bool recurse)
 
 	rel = relation_open(relid, lockmode);
 
-	ATController(rel, cmds, recurse, lockmode);
+	ATController(NULL, rel, cmds, recurse, lockmode);
 }
 
 /*
@@ -4112,8 +4116,15 @@ AlterTableGetLockLevel(List *cmds)
 	return lockmode;
 }
 
+/*
+ * ATController provides top level control over the phases.
+ *
+ * parsetree is passed in to allow it to be passed to event triggers
+ * when requested.
+ */
 static void
-ATController(Relation rel, List *cmds, bool recurse, LOCKMODE lockmode)
+ATController(AlterTableStmt *parsetree,
+			 Relation rel, List *cmds, bool recurse, LOCKMODE lockmode)
 {
 	List	   *wqueue = NIL;
 	ListCell   *lcmd;
@@ -4227,7 +4238,7 @@ ATController(Relation rel, List *cmds, bool recurse, LOCKMODE lockmode)
 	 */
 	if (!is_external)
 	{
-		ATRewriteTables(&wqueue, lockmode);
+		ATRewriteTables(parsetree, &wqueue, lockmode);
 
 		ATAddToastIfNeeded(&wqueue, lockmode);
 	}
@@ -5804,7 +5815,7 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation *rel_p,
  * ATRewriteTables: ALTER TABLE phase 3
  */
 static void
-ATRewriteTables(List **wqueue, LOCKMODE lockmode)
+ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode)
 {
 	ListCell   *ltab;
 	char        relstorage;
@@ -5832,7 +5843,7 @@ ATRewriteTables(List **wqueue, LOCKMODE lockmode)
 		 * constraints, so it's not necessary/appropriate to enforce them just
 		 * during ALTER.)
 		 */
-		if (tab->newvals != NIL || tab->rewrite)
+		if (tab->newvals != NIL || tab->rewrite > 0)
 		{
 			Relation	rel;
 
@@ -5912,11 +5923,41 @@ ATRewriteTables(List **wqueue, LOCKMODE lockmode)
 		 * We only need to rewrite the table if at least one column needs to
 		 * be recomputed, or we are removing the OID column.
 		 */
-		if (tab->rewrite)
+		if (tab->rewrite > 0)
 		{
 			/* Build a temporary relation and copy data */
 			Oid         OIDNewHeap;
 
+			/*
+			 * Fire off an Event Trigger now, before actually rewriting the
+			 * table.
+			 *
+			 * We don't support Event Trigger for nested commands anywhere,
+			 * here included, and parsetree is given NULL when coming from
+			 * AlterTableInternal.
+			 *
+			 * And fire it only once.
+			 */
+			if (parsetree)
+				EventTriggerTableRewrite((Node *)parsetree,
+										 tab->relid,
+										 tab->rewrite);
+
+			/*
+			 * Create transient table that will receive the modified data.
+			 *
+			 * Ensure it is marked correctly as logged or unlogged.  We have
+			 * to do this here so that buffers for the new relfilenode will
+			 * have the right persistence set, and at the same time ensure
+			 * that the original filenode's buffers will get read in with the
+			 * correct setting (i.e. the original one).  Otherwise a rollback
+			 * after the rewrite would possibly result with buffers for the
+			 * original filenode having the wrong persistence setting.
+			 *
+			 * NB: This relies on swap_relation_files() also swapping the
+			 * persistence. That wouldn't work for pg_class, but that can't be
+			 * unlogged anyway.
+			 */
 			/* Create transient table that will receive the modified data */
 			OIDNewHeap = make_new_heap(tab->relid, newTableSpace, false,
 									   lockmode, hasIndexes, false);
@@ -6561,7 +6602,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 
 			while ((htuple = heap_getnext(heapscan, ForwardScanDirection)) != NULL)
 			{
-				if (tab->rewrite)
+				if (tab->rewrite > 0)
 				{
 					Oid			tupOid = InvalidOid;
 
@@ -7810,7 +7851,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			 */
 			Assert(tab);
 			tab->newvals = lappend(tab->newvals, newval);
-			tab->rewrite = true;
+			tab->rewrite |= AT_REWRITE_DEFAULT_VAL;
 		}
 
 		/*
@@ -7830,7 +7871,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * table to fix that.
 	 */
 	if (isOid)
-		tab->rewrite = true;
+		tab->rewrite |= AT_REWRITE_ALTER_OID;
 
 	/*
 	 * Add needed dependency entries for the new column.
@@ -8886,7 +8927,7 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 		tab = ATGetQueueEntry(wqueue, rel);
 
 		/* Tell Phase 3 to physically remove the OID column */
-		tab->rewrite = true;
+		tab->rewrite |= AT_REWRITE_ALTER_OID;
 	}
 
 	/* MPP-6929: metadata tracking */
@@ -8923,7 +8964,7 @@ ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 	/* suppress schema rights check when rebuilding existing index */
 	check_rights = !is_rebuild;
 	/* skip index build if phase 3 will do it or we're reusing an old one */
-	skip_build = tab->rewrite || OidIsValid(stmt->oldNode);
+	skip_build = tab->rewrite > 0 || OidIsValid(stmt->oldNode);
 	/* suppress notices when rebuilding existing index */
 	quiet = is_rebuild;
 
@@ -11146,7 +11187,7 @@ ATPrepAlterColumnType(List **wqueue,
 
 		tab->newvals = lappend(tab->newvals, newval);
 		if (ATColumnChangeRequiresRewrite(transform, attnum))
-			tab->rewrite = true;
+			tab->rewrite |= AT_REWRITE_COLUMN_REWRITE;
 
 		/*
 		 * If the column is part of the distribution key, and the new opclass is not
@@ -11156,7 +11197,7 @@ ATPrepAlterColumnType(List **wqueue,
 		 * the table randomly distributed.)
 		 */
 		if (old_opfamily != new_opfamily && new_opfamily != InvalidOid)
-			tab->rewrite = true;
+			tab->rewrite |= AT_REWRITE_COLUMN_REWRITE;
 	}
 	else if (transform &&
 			 rel->rd_rel->relstorage == RELSTORAGE_EXTERNAL)
@@ -12136,7 +12177,7 @@ ATPostAlterTypeParse(Oid oldId, Oid oldRelId, Oid refRelId, char *cmd,
 								con->old_pktable_oid = refRelId;
 								/* rewriting neither side of a FK */
 								if (con->contype == CONSTR_FOREIGN &&
-									!rewrite && !tab->rewrite)
+									!rewrite && tab->rewrite == 0)
 									TryReuseForeignKey(oldId, con);
 								cmd->subtype = AT_ReAddConstraint;
 								tab->subcmds[AT_PASS_OLD_CONSTR] =
