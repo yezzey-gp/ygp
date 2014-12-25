@@ -122,9 +122,9 @@ inline static void
 PRINT_LWDEBUG(const char *where, const volatile LWLock *lock)
 {
 	if (Trace_lwlocks)
-		elog(LOG, "%s(%s %d): excl %d shared %d head %p rOK %d",
+		elog(LOG, "%s(%s %d): excl %d shared %d rOK %d",
 			 where, T_NAME(lock), T_ID(lock),
-			 (int) lock->exclusive, lock->shared, lock->head,
+			 (int) lock->exclusive, lock->shared,
 			 (int) lock->releaseOK);
 }
 
@@ -491,8 +491,7 @@ LWLockInitialize(LWLock *lock, int tranche_id)
 	lock->exclusive = 0;
 	lock->shared = 0;
 	lock->tranche = tranche_id;
-	lock->head = NULL;
-	lock->tail = NULL;
+	dlist_init(&lock->waiters);
 }
 
 
@@ -634,12 +633,7 @@ LWLockAcquireCommon(LWLock *l, LWLockMode mode, uint64 *valptr, uint64 val)
 
 		proc->lwWaiting = true;
 		proc->lwWaitMode = mode;
-		proc->lwWaitLink = NULL;
-		if (lock->head == NULL)
-			lock->head = proc;
-		else
-			lock->tail->lwWaitLink = proc;
-		lock->tail = proc;
+		dlist_push_head(&lock->waiters, &proc->lwWaitLink);
 
 		/* Can release the mutex now */
 		SpinLockRelease(&lock->mutex);
@@ -867,12 +861,7 @@ LWLockAcquireOrWait(LWLock *l, LWLockMode mode)
 
 		proc->lwWaiting = true;
 		proc->lwWaitMode = LW_WAIT_UNTIL_FREE;
-		proc->lwWaitLink = NULL;
-		if (lock->head == NULL)
-			lock->head = proc;
-		else
-			lock->tail->lwWaitLink = proc;
-		lock->tail = proc;
+		dlist_push_head(&lock->waiters, &proc->lwWaitLink);
 
 		/* Can release the mutex now */
 		SpinLockRelease(&lock->mutex);
@@ -1027,10 +1016,7 @@ LWLockWaitForVar(LWLock *l, uint64 *valptr, uint64 oldval, uint64 *newval)
 		proc->lwWaiting = true;
 		proc->lwWaitMode = LW_WAIT_UNTIL_FREE;
 		/* waiters are added to the front of the queue */
-		proc->lwWaitLink = lock->head;
-		if (lock->head == NULL)
-			lock->tail = proc;
-		lock->head = proc;
+		dlist_push_head(&lock->waiters, &proc->lwWaitLink);
 
 		/*
 		 * Set releaseOK, to make sure we get woken up as soon as the lock is
@@ -1112,9 +1098,12 @@ LWLockUpdateVar(LWLock *l, uint64 *valptr, uint64 val)
 {
 	volatile LWLock *lock = l;
 	volatile uint64 *valp = valptr;
-	PGPROC	   *head;
-	PGPROC	   *proc;
-	PGPROC	   *next;
+	dlist_head	wakeup;
+	dlist_mutable_iter iter;
+
+	dlist_head * ptr = &lock->waiters;
+
+	dlist_init(&wakeup);
 
 	/* Acquire mutex.  Time spent holding mutex should be short! */
 	SpinLockAcquire(&lock->mutex);
@@ -1129,24 +1118,16 @@ LWLockUpdateVar(LWLock *l, uint64 *valptr, uint64 val)
 	 * See if there are any LW_WAIT_UNTIL_FREE waiters that need to be woken
 	 * up. They are always in the front of the queue.
 	 */
-	head = lock->head;
-
-	if (head != NULL && head->lwWaitMode == LW_WAIT_UNTIL_FREE)
+	dlist_foreach_modify(iter, ptr)
 	{
-		proc = head;
-		next = proc->lwWaitLink;
-		while (next && next->lwWaitMode == LW_WAIT_UNTIL_FREE)
-		{
-			proc = next;
-			next = next->lwWaitLink;
-		}
+		PGPROC *waiter = dlist_container(PGPROC, lwWaitLink, iter.cur);
 
-		/* proc is now the last PGPROC to be released */
-		lock->head = next;
-		proc->lwWaitLink = NULL;
+		if (waiter->lwWaitMode != LW_WAIT_UNTIL_FREE)
+			break;
+
+		dlist_delete(&waiter->lwWaitLink);
+		dlist_push_tail(&wakeup, &waiter->lwWaitLink);
 	}
-	else
-		head = NULL;
 
 	/* We are done updating shared state of the lock itself. */
 	SpinLockRelease(&lock->mutex);
@@ -1154,15 +1135,14 @@ LWLockUpdateVar(LWLock *l, uint64 *valptr, uint64 val)
 	/*
 	 * Awaken any waiters I removed from the queue.
 	 */
-	while (head != NULL)
+	dlist_foreach_modify(iter, &wakeup)
 	{
-		proc = head;
-		head = proc->lwWaitLink;
-		proc->lwWaitLink = NULL;
+		PGPROC *waiter = dlist_container(PGPROC, lwWaitLink, iter.cur);
+		dlist_delete(&waiter->lwWaitLink);
 		/* check comment in LWLockRelease() about this barrier */
 		pg_write_barrier();
-		proc->lwWaiting = false;
-		PGSemaphoreUnlock(&proc->sem);
+		waiter->lwWaiting = false;
+		PGSemaphoreUnlock(&waiter->sem);
 	}
 }
 
@@ -1174,9 +1154,13 @@ void
 LWLockRelease(LWLock *l)
 {
 	volatile LWLock *lock = l;
-	PGPROC	   *head;
-	PGPROC	   *proc;
+	dlist_head	wakeup;
+	dlist_mutable_iter iter;
 	int			i;
+
+	dlist_head * ptr = &lock->waiters;
+
+	dlist_init(&wakeup);
 
 	PRINT_LWDEBUG("LWLockRelease", lock);
 
@@ -1220,58 +1204,39 @@ LWLockRelease(LWLock *l)
 	 * if someone has already awakened waiters that haven't yet acquired the
 	 * lock.
 	 */
-	head = lock->head;
-	if (head != NULL)
+	if (lock->exclusive == 0 && lock->shared == 0 && lock->releaseOK)
 	{
-		if (lock->exclusive == 0 && lock->shared == 0 && lock->releaseOK)
+		/*
+		 * Remove the to-be-awakened PGPROCs from the queue.
+		 */
+		bool		releaseOK = true;
+		bool		wokeup_somebody = false;
+
+		dlist_foreach_modify(iter, ptr)
 		{
-			/*
-			 * Remove the to-be-awakened PGPROCs from the queue.
-			 */
-			bool		releaseOK = true;
+			PGPROC *waiter = dlist_container(PGPROC, lwWaitLink, iter.cur);
 
-			proc = head;
+			if (wokeup_somebody && waiter->lwWaitMode == LW_EXCLUSIVE)
+				continue;
 
-			/*
-			 * First wake up any backends that want to be woken up without
-			 * acquiring the lock.
-			 */
-			while (proc->lwWaitMode == LW_WAIT_UNTIL_FREE && proc->lwWaitLink)
-				proc = proc->lwWaitLink;
+			dlist_delete(&waiter->lwWaitLink);
+			dlist_push_tail(&wakeup, &waiter->lwWaitLink);
 
 			/*
-			 * If the front waiter wants exclusive lock, awaken him only.
-			 * Otherwise awaken as many waiters as want shared access.
+			 * Prevent additional wakeups until retryer gets to
+			 * run. Backends that are just waiting for the lock to become
+			 * free don't retry automatically.
 			 */
-			if (proc->lwWaitMode != LW_EXCLUSIVE)
+			if (waiter->lwWaitMode != LW_WAIT_UNTIL_FREE)
 			{
-				while (proc->lwWaitLink != NULL &&
-					   proc->lwWaitLink->lwWaitMode != LW_EXCLUSIVE)
-				{
-					if (proc->lwWaitMode != LW_WAIT_UNTIL_FREE)
-						releaseOK = false;
-					proc = proc->lwWaitLink;
-				}
-			}
-			/* proc is now the last PGPROC to be released */
-			lock->head = proc->lwWaitLink;
-			proc->lwWaitLink = NULL;
-
-			/*
-			 * Prevent additional wakeups until retryer gets to run. Backends
-			 * that are just waiting for the lock to become free don't retry
-			 * automatically.
-			 */
-			if (proc->lwWaitMode != LW_WAIT_UNTIL_FREE)
 				releaseOK = false;
+				wokeup_somebody = true;
+			}
 
-			lock->releaseOK = releaseOK;
+			if(waiter->lwWaitMode == LW_EXCLUSIVE)
+				break;
 		}
-		else
-		{
-			/* lock is still held, can't awaken anything */
-			head = NULL;
-		}
+		lock->releaseOK = releaseOK;
 	}
 
 	/* We are done updating shared state of the lock itself. */
@@ -1282,12 +1247,12 @@ LWLockRelease(LWLock *l)
 	/*
 	 * Awaken any waiters I removed from the queue.
 	 */
-	while (head != NULL)
+	dlist_foreach_modify(iter, &wakeup)
 	{
-		LOG_LWDEBUG("LWLockRelease", T_NAME(l), T_ID(l), "release waiter");
-		proc = head;
-		head = proc->lwWaitLink;
-		proc->lwWaitLink = NULL;
+		PGPROC *waiter = dlist_container(PGPROC, lwWaitLink, iter.cur);
+		LOG_LWDEBUG("LWLockRelease", T_NAME(lock), T_ID(lock),
+					"release waiter");
+		dlist_delete(&waiter->lwWaitLink);
 		/*
 		 * Guarantee that lwWaiting being unset only becomes visible once the
 		 * unlink from the link has completed. Otherwise the target backend
@@ -1299,8 +1264,8 @@ LWLockRelease(LWLock *l)
 		 * another lock.
 		 */
 		pg_write_barrier();
-		proc->lwWaiting = false;
-		PGSemaphoreUnlock(&proc->sem);
+		waiter->lwWaiting = false;
+		PGSemaphoreUnlock(&waiter->sem);
 	}
 
 	/*
