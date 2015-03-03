@@ -135,13 +135,14 @@ cdb_sequence_nextval_qe(Relation seqrel,
  * DefineSequence
  *				Creates a new sequence relation
  */
-Oid
+ObjectAddress
 DefineSequence(CreateSeqStmt *seq)
 {
 	FormData_pg_sequence new;
 	List	   *owned_by;
 	CreateStmt *stmt = makeNode(CreateStmt);
 	Oid			seqoid;
+	ObjectAddress address;
 	Relation	rel;
 	HeapTuple	tuple;
 	TupleDesc	tupDesc;
@@ -157,6 +158,24 @@ DefineSequence(CreateSeqStmt *seq)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("unlogged sequences are not supported")));
+
+	/*
+	 * If if_not_exists was given and a relation with the same name already
+	 * exists, bail out. (Note: we needn't check this when not if_not_exists,
+	 * because DefineRelation will complain anyway.)
+	 */
+	if (seq->if_not_exists)
+	{
+		RangeVarGetAndCheckCreationNamespace(seq->sequence, NoLock, &seqoid);
+		if (OidIsValid(seqoid))
+		{
+			ereport(NOTICE,
+					(errcode(ERRCODE_DUPLICATE_TABLE),
+					 errmsg("relation \"%s\" already exists, skipping",
+							seq->sequence->relname)));
+			return InvalidObjectAddress;
+		}
+	}
 
 	/* Check and set all option values */
 	init_params(seq->options, true, &new, &owned_by);
@@ -252,7 +271,8 @@ DefineSequence(CreateSeqStmt *seq)
 	stmt->relKind = RELKIND_SEQUENCE;
 	stmt->ownerid = GetUserId();
 
-	seqoid = DefineRelation(stmt, RELKIND_SEQUENCE, seq->ownerId, RELSTORAGE_HEAP, false, true, NULL);
+	address = DefineRelation(stmt, RELKIND_SEQUENCE, seq->ownerId, NULL, RELSTORAGE_HEAP, false, true, NULL);
+	seqoid = address.objectId;
 	Assert(seqoid != InvalidOid);
 
 	/*
@@ -287,7 +307,7 @@ DefineSequence(CreateSeqStmt *seq)
 
 	heap_close(rel, NoLock);
 
-	return seqoid;
+	return address;
 }
 
 /*
@@ -443,7 +463,7 @@ fill_seq_with_data(Relation rel, HeapTuple tuple)
  *
  * Modify the definition of a sequence relation
  */
-Oid
+ObjectAddress
 AlterSequence(AlterSeqStmt *stmt)
 {
 	Oid			relid;
@@ -458,6 +478,7 @@ AlterSequence(AlterSeqStmt *stmt)
 	int			numopts;
 	char	   *alter_subtype = "";		/* metadata tracking: kind of
 										   redundant to say "role" */
+	ObjectAddress address;
 
 	/* Open and lock sequence. */
 	relid = RangeVarGetRelid(stmt->sequence, AccessShareLock, stmt->missing_ok);
@@ -466,7 +487,7 @@ AlterSequence(AlterSeqStmt *stmt)
 		ereport(NOTICE,
 				(errmsg("relation \"%s\" does not exist, skipping",
 						stmt->sequence->relname)));
-		return InvalidOid;
+		return InvalidObjectAddress;
 	}
 
 	init_sequence(relid, &elm, &seqrel);
@@ -576,9 +597,11 @@ AlterSequence(AlterSeqStmt *stmt)
 									NULL);
 	InvokeObjectPostAlterHook(RelationRelationId, relid, 0);
 
+	ObjectAddressSet(address, RelationRelationId, relid);
+
 	relation_close(seqrel, NoLock);
 
-	return relid;
+	return address;
 }
 
 

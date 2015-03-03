@@ -51,7 +51,7 @@ Datum pg_import_system_collations(PG_FUNCTION_ARGS);
 /*
  * CREATE COLLATION
  */
-Oid
+ObjectAddress
 DefineCollation(List *names, List *parameters, bool if_not_exists)
 {
 	char	   *collName;
@@ -65,6 +65,7 @@ DefineCollation(List *names, List *parameters, bool if_not_exists)
 	char	   *collcollate = NULL;
 	char	   *collctype = NULL;
 	Oid			newoid;
+	ObjectAddress address;
 
 	collNamespace = QualifiedNameGetCreationNamespace(names, &collName);
 
@@ -156,6 +157,8 @@ DefineCollation(List *names, List *parameters, bool if_not_exists)
 	if (!OidIsValid(newoid))
 		return InvalidOid;
 
+	ObjectAddressSet(address, CollationRelationId, newoid);
+
 	/* check that the locales can be loaded */
 	CommandCounterIncrement();
 	(void) pg_newlocale_from_collation(newoid);
@@ -177,7 +180,7 @@ DefineCollation(List *names, List *parameters, bool if_not_exists)
 		                            NULL);
 	}
 
-	return newoid;
+	return address;
 }
 
 /*

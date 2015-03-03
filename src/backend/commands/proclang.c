@@ -55,7 +55,7 @@ typedef struct
 	char	   *tmpllibrary;	/* path of shared library */
 } PLTemplate;
 
-static Oid create_proc_lang(const char *languageName, bool replace,
+static ObjectAddress create_proc_lang(const char *languageName, bool replace,
 				 Oid languageOwner, Oid handlerOid, Oid inlineOid,
 				 Oid valOid, bool trusted);
 static PLTemplate *find_language_template(const char *languageName);
@@ -64,10 +64,11 @@ static PLTemplate *find_language_template(const char *languageName);
  * CREATE PROCEDURAL LANGUAGE
  * ---------------------------------------------------------------------
  */
-static Oid
+static ObjectAddress
 CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 {
 	PLTemplate *pltemplate;
+	ObjectAddress tmpAddr;
 	Oid			handlerOid,
 				inlineOid,
 				valOid;
@@ -124,7 +125,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 		}
 		else
 		{
-			handlerOid = ProcedureCreate(pltemplate->tmplhandler,
+			tmpAddr = ProcedureCreate(pltemplate->tmplhandler,
 										 PG_CATALOG_NAMESPACE,
 										 false, /* replace */
 										 false, /* returnsSet */
@@ -151,6 +152,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 										 0,
 										 PRODATAACCESS_NONE,
 										 PROEXECLOCATION_ANY);
+			handlerOid = tmpAddr.objectId;
 		}
 
 		/*
@@ -164,7 +166,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 			inlineOid = LookupFuncName(funcname, 1, funcargtypes, true);
 			if (!OidIsValid(inlineOid))
 			{
-				inlineOid = ProcedureCreate(pltemplate->tmplinline,
+				tmpAddr = ProcedureCreate(pltemplate->tmplinline,
 											PG_CATALOG_NAMESPACE,
 											false,		/* replace */
 											false,		/* returnsSet */
@@ -192,6 +194,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 											PRODATAACCESS_NONE,
 											PROEXECLOCATION_ANY);
 
+				inlineOid = tmpAddr.objectId;
 			}
 		}
 		else
@@ -208,7 +211,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 			valOid = LookupFuncName(funcname, 1, funcargtypes, true);
 			if (!OidIsValid(valOid))
 			{
-				valOid = ProcedureCreate(pltemplate->tmplvalidator,
+				tmpAddr = ProcedureCreate(pltemplate->tmplvalidator,
 										 PG_CATALOG_NAMESPACE,
 										 false, /* replace */
 										 false, /* returnsSet */
@@ -235,6 +238,7 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 										 0,
 										 PRODATAACCESS_NONE,
 										 PROEXECLOCATION_ANY);
+				valOid = tmpAddr.objectId;
 			}
 		}
 		else
@@ -323,10 +327,10 @@ CreateProceduralLanguage_internal(CreatePLangStmt *stmt)
 	}
 }
 
-Oid
+ObjectAddress
 CreateProceduralLanguage(CreatePLangStmt *stmt)
 {
-	Oid			result;
+	ObjectAddress			result;
 
 	result = CreateProceduralLanguage_internal(stmt);
 
@@ -346,7 +350,7 @@ CreateProceduralLanguage(CreatePLangStmt *stmt)
 /*
  * Guts of language creation.
  */
-static Oid
+static ObjectAddress
 create_proc_lang(const char *languageName, bool replace,
 				 Oid languageOwner, Oid handlerOid, Oid inlineOid,
 				 Oid valOid, bool trusted)
@@ -470,7 +474,7 @@ create_proc_lang(const char *languageName, bool replace,
 
 	heap_close(rel, RowExclusiveLock);
 
-	return myself.objectId;
+	return myself;
 }
 
 /*

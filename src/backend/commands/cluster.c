@@ -799,7 +799,8 @@ make_new_heap(Oid OIDOldHeap, Oid NewTableSpace, bool forcetemp,
 										  true,
 										  /* valid_opts */ true,
 										  is_part_child,
-										  is_part_parent);
+										  is_part_parent,
+										  NULL);
 	Assert(OIDNewHeap != InvalidOid);
 
 	ReleaseSysCache(tuple);

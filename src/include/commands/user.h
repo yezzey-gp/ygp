@@ -25,7 +25,7 @@ extern Oid	AlterRole(AlterRoleStmt *stmt);
 extern Oid	AlterRoleSet(AlterRoleSetStmt *stmt);
 extern void DropRole(DropRoleStmt *stmt);
 extern void GrantRole(GrantRoleStmt *stmt);
-extern Oid	RenameRole(const char *oldname, const char *newname);
+extern ObjectAddress RenameRole(const char *oldname, const char *newname);
 extern void DropOwnedObjects(DropOwnedStmt *stmt);
 extern void ReassignOwnedObjects(ReassignOwnedStmt *stmt);
 extern List *roleNamesToIds(List *memberNames);

@@ -14,14 +14,15 @@
 #ifndef PG_TYPE_FN_H
 #define PG_TYPE_FN_H
 
+#include "catalog/objectaddress.h"
 #include "nodes/nodes.h"
 
 
-extern Oid TypeShellMake(const char *typeName,
+extern ObjectAddress TypeShellMake(const char *typeName,
 			  Oid typeNamespace,
 			  Oid ownerId);
 
-extern Oid TypeCreate(Oid newTypeOid,
+extern ObjectAddress TypeCreate(Oid newTypeOid,
 		   const char *typeName,
 		   Oid typeNamespace,
 		   Oid relationOid,
@@ -53,7 +54,7 @@ extern Oid TypeCreate(Oid newTypeOid,
 		   bool typeNotNull,
 		   Oid typeCollation);
 
-extern Oid TypeCreateWithOptions(Oid newtypeOid,
+extern ObjectAddress TypeCreateWithOptions(Oid newtypeOid,
 		   const char *typeName,
 		   Oid typeNamespace,
 		   Oid relationOid,

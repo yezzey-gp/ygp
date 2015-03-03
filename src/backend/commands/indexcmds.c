@@ -395,9 +395,9 @@ CheckIndexCompatible(Oid oldId,
  * 'skip_build': make the catalog entries but don't create the index files
  * 'quiet': suppress the NOTICE chatter ordinarily provided for constraints.
  *
- * Returns the OID of the created index.
+ * Returns the object address of the created index.
  */
-Oid
+ObjectAddress
 DefineIndex(Oid relationId,
 			IndexStmt *stmt,
 			Oid indexRelationId,
@@ -430,6 +430,7 @@ DefineIndex(Oid relationId,
 	int			numberOfAttributes;
 	TransactionId limitXmin;
 	VirtualTransactionId *old_snapshots;
+	ObjectAddress address;
 	int			n_old_snapshots;
 	LockRelId	heaprelid;
 	LOCKTAG		heaplocktag;
@@ -909,6 +910,14 @@ DefineIndex(Oid relationId,
 			cdb_sync_indcheckxmin_with_segments(indexRelationId);
 	}
 
+	ObjectAddressSet(address, RelationRelationId, indexRelationId);
+
+	if (!OidIsValid(indexRelationId))
+	{
+		heap_close(rel, NoLock);
+		return address;
+	}
+
 	/*
 	 * Roll back any GUC changes executed by index functions, and keep
 	 * subsequent changes local to this command.  It's barely possible that
@@ -1158,7 +1167,8 @@ DefineIndex(Oid relationId,
 		 * finish up here?
 		 */
 		else
-		{
+		{ 
+			/* Close the heap and we're done, in the non-concurrent case */
 			if (need_longlock)
 				heap_close(rel, NoLock);
 			else
@@ -1168,7 +1178,7 @@ DefineIndex(Oid relationId,
 		 * Indexes on partitioned tables are not themselves built, so we're
 		 * done here.
 		 */
-		return indexRelationId;
+		return address;
 	}
 
 	if (!concurrent)
@@ -1468,7 +1478,7 @@ DefineIndex(Oid relationId,
 	 */
 	UnlockRelationIdForSession(&heaprelid, ShareUpdateExclusiveLock);
 
-	return indexRelationId;
+	return address;
 }
 
 

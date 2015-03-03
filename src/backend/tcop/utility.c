@@ -1023,7 +1023,7 @@ standard_ProcessUtility(Node *parsetree,
 									   context, params,
 									   dest, completionTag);
 				else
-					ExecAlterObjectSchemaStmt(stmt);
+					ExecAlterObjectSchemaStmt(stmt, NULL);
 			}
 			break;
 
@@ -1069,6 +1069,7 @@ ProcessUtilitySlow(Node *parsetree,
 	bool		isTopLevel = (context == PROCESS_UTILITY_TOPLEVEL);
 	bool		isCompleteQuery = (context <= PROCESS_UTILITY_QUERY);
 	bool		needCleanup;
+	ObjectAddress address;
 
 	/* All event trigger calls are done only when isCompleteQuery is true */
 	needCleanup = isCompleteQuery && EventTriggerBeginCompleteQuery();
@@ -1094,7 +1095,6 @@ ProcessUtilitySlow(Node *parsetree,
 				{
 					List	   *stmts;
 					ListCell   *l;
-					Oid			relOid;
 
 					/* Run parse analysis ... */
 					/*
@@ -1126,6 +1126,7 @@ ProcessUtilitySlow(Node *parsetree,
 							char		relStorage = RELSTORAGE_HEAP;
 							Datum		toast_options;
 							static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
+							Oid         relOid;
 
 							/*
 							 * If this T_CreateStmt was dispatched and we're a QE
@@ -1160,11 +1161,14 @@ ProcessUtilitySlow(Node *parsetree,
 							 * Create the table itself. Don't dispatch it yet, as we haven't
 							 * created the toast and other auxiliary tables yet.
 							 */
-							relOid = DefineRelation((CreateStmt *) stmt,
+							address = DefineRelation((CreateStmt *) stmt,
 													relKind,
 													((CreateStmt *) stmt)->ownerid,
+													NULL,
 													relStorage, false, true,
 													cstmt->intoPolicy);
+
+							relOid = address.objectId;
 
 							/*
 							 * Let NewRelationCreateToastTable decide if this
@@ -1264,15 +1268,16 @@ ProcessUtilitySlow(Node *parsetree,
 						else if (IsA(stmt, CreateForeignTableStmt))
 						{
 							/* Create the table itself */
-							relOid = DefineRelation((CreateStmt *) stmt,
+							address = DefineRelation((CreateStmt *) stmt,
 													RELKIND_FOREIGN_TABLE,
 													((CreateStmt *) stmt)->ownerid,
+													NULL,
 													RELSTORAGE_FOREIGN,
 													true,
 													true,
 													NULL);
 							CreateForeignTable((CreateForeignTableStmt *) stmt,
-											   relOid);
+											   address.objectId);
 						}
 						else
 						{
@@ -1385,7 +1390,8 @@ ProcessUtilitySlow(Node *parsetree,
 							break;
 						case 'C':		/* ADD CONSTRAINT */
 							AlterDomainAddConstraint(stmt->typeName,
-													 stmt->def);
+													 stmt->def,
+													 NULL);
 							break;
 						case 'X':		/* DROP CONSTRAINT */
 							AlterDomainDropConstraint(stmt->typeName,
@@ -1570,7 +1576,8 @@ ProcessUtilitySlow(Node *parsetree,
 				break;
 
 			case T_AlterExtensionContentsStmt:
-				ExecAlterExtensionContentsStmt((AlterExtensionContentsStmt *) parsetree);
+				ExecAlterExtensionContentsStmt((AlterExtensionContentsStmt *) parsetree,
+											   NULL);
 				break;
 
 			case T_CreateFdwStmt:
@@ -1728,7 +1735,8 @@ ProcessUtilitySlow(Node *parsetree,
 				break;
 
 			case T_AlterObjectSchemaStmt:
-				ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
+				ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree,
+										  NULL);
 				break;
 
 			case T_AlterOwnerStmt:

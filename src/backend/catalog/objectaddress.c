@@ -423,7 +423,6 @@ static const ObjectPropertyType ObjectProperty[] =
 		true
 	}
 
-
 	/* GPDB additions */
 	,
 	{
@@ -438,6 +437,13 @@ static const ObjectPropertyType ObjectProperty[] =
 		ACL_KIND_EXTPROTOCOL,
 		true
 	},
+};
+
+const ObjectAddress InvalidObjectAddress =
+{
+	InvalidOid,
+	InvalidOid,
+	0
 };
 
 static ObjectAddress get_object_address_unqualified(ObjectType objtype,
