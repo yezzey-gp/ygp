@@ -116,7 +116,7 @@ ExecUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 
 	InitTriggerData(&triggerData, eventFlags, relinfo->ri_RelationDesc);
 
-	modifiedCols = GetModifiedColumns(relinfo, estate);
+	GetModifiedColumns(relinfo, estate, modifiedCols);
 	/* Executes all update triggers one by one. The resulting tuple from a
 	* trigger is given to the following one */
 	for (int i = 0; i < trigdesc->numtriggers; i++)
