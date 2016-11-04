@@ -533,6 +533,7 @@ typedef enum NodeTag
 	T_WithClause,
 	T_CommonTableExpr,
 	T_ColumnReferenceStorageDirective,
+	T_TriggerTransition,
 
 	/*
 	 * TAGS FOR REPLICATION GRAMMAR PARSE NODES (replnodes.h)
