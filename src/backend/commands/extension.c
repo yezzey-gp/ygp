@@ -840,8 +840,7 @@ is_begin_state(const Node *stmt)
 #endif
 
 /*
- * Policy function: is the given extension trusted for installation by a
- * non-superuser?
+ * Execute the appropriate script file for installing or updating the extension
  *
  * (Update the errhint logic below if you change this.)
  */
