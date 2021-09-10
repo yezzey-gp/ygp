@@ -5281,6 +5281,17 @@ select_best_grantor(Oid roleId, AclMode privileges,
 		return;
 	}
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleId, mdb_admin))
+		{
+			*grantorId = ownerId;
+			*grantOptions = needed_goptions;
+			return;
+		}
+	}
+
 	/*
 	 * Otherwise we have to do a careful search to see if roleId has the
 	 * privileges of any suitable role.  Note: we can hang onto the result of
