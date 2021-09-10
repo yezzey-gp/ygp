@@ -4196,6 +4196,16 @@ pg_class_aclmask(Oid table_oid, Oid roleid,
 	 */
 	ownerId = classForm->relowner;
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
+
 	aclDatum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relacl,
 							   &isNull);
 	if (isNull)
@@ -4311,6 +4321,16 @@ pg_proc_aclmask(Oid proc_oid, Oid roleid,
 				 errmsg("function with OID %u does not exist", proc_oid)));
 
 	ownerId = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
 
 	aclDatum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proacl,
 							   &isNull);
@@ -4529,6 +4549,16 @@ pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
 				 errmsg("schema with OID %u does not exist", nsp_oid)));
 
 	ownerId = ((Form_pg_namespace) GETSTRUCT(tuple))->nspowner;
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
 
 	aclDatum = SysCacheGetAttr(NAMESPACEOID, tuple, Anum_pg_namespace_nspacl,
 							   &isNull);
@@ -5171,6 +5201,13 @@ pg_class_ownercheck(Oid class_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
+
 	return has_privs_of_role(roleid, ownerId);
 }
 
@@ -5248,6 +5285,13 @@ pg_proc_ownercheck(Oid proc_oid, Oid roleid)
 	ownerId = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }
@@ -5346,6 +5390,13 @@ pg_namespace_ownercheck(Oid nsp_oid, Oid roleid)
 	ownerId = ((Form_pg_namespace) GETSTRUCT(tuple))->nspowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }
@@ -5509,6 +5560,13 @@ pg_foreign_data_wrapper_ownercheck(Oid srv_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
+
 	return has_privs_of_role(roleid, ownerId);
 }
 
@@ -5535,6 +5593,13 @@ pg_foreign_server_ownercheck(Oid srv_oid, Oid roleid)
 	ownerId = ((Form_pg_foreign_server) GETSTRUCT(tuple))->srvowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }
