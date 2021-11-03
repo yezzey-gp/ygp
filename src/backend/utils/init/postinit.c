@@ -638,6 +638,7 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 {
 	bool		bootstrap = IsBootstrapProcessingMode();
 	bool		am_superuser;
+	bool		am_mdb_admin = false;
 	char	   *fullpath;
 	char		dbname[NAMEDATALEN];
 
@@ -826,6 +827,11 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		{
 			InitializeSessionUserId(username, useroid);
 			am_superuser = superuser();
+			if (!am_superuser)
+			{
+				Oid	mdb_admin = get_role_oid("mdb_admin", true);
+				am_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+			}
 		}
 	}
 	else if (am_mirror)
@@ -847,6 +853,11 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		PerformAuthentication(MyProcPort);
 		InitializeSessionUserId(username, useroid);
 		am_superuser = superuser();
+		if (!am_superuser)
+		{
+			Oid	mdb_admin = get_role_oid("mdb_admin", true);
+			am_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+		}
 		BackendCancelInit(MyBackendId);
 	}
 
@@ -891,6 +902,18 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * walsender anyways so we should allow the connection to happen. This may
 	 * need to be reviewed later when we start supporting multiple mirrors.
 	 */
+
+	/*
+	 * mdb_admin reserved extra ReservedBackends above already reserved ReservedBackends for superuser.
+	 */
+
+	if ((!am_superuser && !am_mdb_admin) &&
+		ReservedBackends > 0 &&
+		!HaveNFreeProcs(ReservedBackends * 2))
+		ereport(FATAL,
+				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
+				 errmsg("remaining connection slots are reserved for non-replication superuser connections or mdb_admin")));
+
 	if ((!am_superuser /* || am_walsender */) &&
 		ReservedBackends > 0 &&
 		!HaveNFreeProcs(ReservedBackends))
