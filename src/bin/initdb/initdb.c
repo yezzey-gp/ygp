@@ -3495,7 +3495,7 @@ create_data_directory(void)
 				   pg_data);
 			fflush(stdout);
 
-			if (pg_mkdir_p(pg_data, S_IRWXU) != 0)
+			if (pg_mkdir_p(pg_data, S_IRWXU | S_IRGRP | S_IXGRP) != 0)
 			{
 				fprintf(stderr, _("%s: could not create directory \"%s\": %s\n"),
 						progname, pg_data, strerror(errno));
@@ -3513,7 +3513,7 @@ create_data_directory(void)
 				   pg_data);
 			fflush(stdout);
 
-			if (chmod(pg_data, S_IRWXU) != 0)
+			if (chmod(pg_data, S_IRWXU | S_IRGRP | S_IXGRP) != 0)
 			{
 				fprintf(stderr, _("%s: could not change permissions of directory \"%s\": %s\n"),
 						progname, pg_data, strerror(errno));
@@ -3685,7 +3685,7 @@ initialize_data_directory(void)
 
 	setup_signals();
 
-	umask(S_IRWXG | S_IRWXO);
+	umask(S_IWGRP | S_IRWXO);
 
 	create_data_directory();
 
@@ -3695,11 +3695,33 @@ initialize_data_directory(void)
 	printf(_("creating subdirectories ... "));
 	fflush(stdout);
 
+	/*
+	 * MDB-15383: expand permitions for pg_log directory to g+rx
+	 */
+	char			*pg_log;
+
+	pg_log = psprintf("%s/%s", pg_data, "pg_log");
+	if (mkdir(pg_log, S_IRWXU | S_IRGRP | S_IXGRP) < 0)
+	{
+		fprintf(stderr, _("%s: could not create directory \"%s\": %s\n"),
+				progname, pg_log, strerror(errno));
+		exit_nicely();
+	}
+
 	for (i = 0; i < lengthof(subdirs); i++)
 	{
 		char	   *path;
 
 		path = psprintf("%s/%s", pg_data, subdirs[i]);
+
+		if (strcmp(path, pg_log) == 0)
+		{
+			fprintf(stderr, _("%s: directory \"%s\": %s, skipping directory creation\n"),
+					progname, path, strerror(errno));
+			free(path);
+			free(pg_log);
+			continue;
+		}
 
 		/*
 		 * The parent directory already exists, so we only need mkdir() not

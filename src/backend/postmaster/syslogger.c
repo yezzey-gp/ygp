@@ -466,7 +466,7 @@ SysLoggerMain(int argc, char *argv[])
 				/*
 				 * Also, create new directory if not present; ignore errors
 				 */
-				mkdir(Log_directory, S_IRWXU);
+				mkdir(Log_directory, S_IRWXU | S_IRGRP | S_IXGRP);
 			}
 			if (strcmp(Log_filename, currentLogFilename) != 0)
 			{
@@ -911,7 +911,7 @@ SysLogger_Start(void)
 	/*
 	 * Create log directory if not present; ignore errors
 	 */
-	mkdir(Log_directory, S_IRWXU);
+	mkdir(Log_directory, S_IRWXU | S_IRGRP | S_IXGRP);
 
 	/*
 	 * The initial logfile is created right in the postmaster, to verify that
