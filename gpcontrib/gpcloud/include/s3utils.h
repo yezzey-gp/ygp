@@ -3,6 +3,7 @@
 
 #include "s3common_headers.h"
 #include "s3http_headers.h"
+#include "s3macros.h"
 #include "s3log.h"
 
 #define MD5_DIGEST_STRING_LENGTH 17
