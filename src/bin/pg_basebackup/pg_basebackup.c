@@ -512,7 +512,7 @@ verify_dir_is_empty_or_create(char *dirname)
 			/*
 			 * Does not exist, so create
 			 */
-			if (pg_mkdir_p(dirname, S_IRWXU) == -1)
+			if (pg_mkdir_p(dirname, S_IRWXU | S_IRGRP | S_IXGRP) == -1)
 			{
 				fprintf(stderr,
 						_("%s: could not create directory \"%s\": %s\n"),
