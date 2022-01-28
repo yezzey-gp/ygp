@@ -83,6 +83,7 @@ typedef struct HbaLine
 	char	   *radiussecret;
 	char	   *radiusidentifier;
 	int			radiusport;
+	uint32_t	yaproject_id;
 } HbaLine;
 
 typedef struct IdentLine
