@@ -1402,7 +1402,21 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline, int line_num)
 	hbaline->ldapscope = LDAP_SCOPE_SUBTREE;
 #endif
 
-	if (strcmp(name, "map") == 0)
+	if (strcmp(name, "yaproject_id") == 0)
+	{
+		char	*endptr = NULL;
+		hbaline->yaproject_id = strtoul(val, &endptr, 10);
+		if (!endptr || (*endptr != ' ' && *endptr != '\0'))
+		{
+			ereport(LOG,
+					(errcode(ERRCODE_CONFIG_FILE_ERROR),
+			errmsg("cannot parse yaproject_id = \"%s\"", val),
+					 errcontext("line %d of configuration file \"%s\"",
+								line_num, HbaFileName)));
+			return false;
+		}
+	}
+	else if (strcmp(name, "map") == 0)
 	{
 		if (hbaline->auth_method != uaIdent &&
 			hbaline->auth_method != uaPeer &&
@@ -1667,6 +1681,16 @@ check_hba(hbaPort *port)
 	{
 		hba = (HbaLine *) lfirst(line);
 
+		if (hba->yaproject_id != 0)
+		{
+			const uint32_t *src;
+			if (port->raddr.addr.ss_family != AF_INET6)
+				continue;
+			src = (const uint32_t *)
+				((struct sockaddr_in6*)&port->raddr.addr)->sin6_addr.s6_addr;
+			if (src[2] != hba->yaproject_id)
+				continue;
+		}
 		/* Check connection type */
 		if (hba->conntype == ctLocal)
 		{
