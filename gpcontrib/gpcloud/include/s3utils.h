@@ -49,8 +49,8 @@ class MD5Calc {
 
 class Config {
    public:
-    Config(const string& filename, const string& url, const char *datadir);
-    Config(const string& filename);
+    Config(const string& filename, const string& urlWithOptions, const string& url, const char *datadir);
+    Config(const string& filename, const string& urlWithOptions);
     ~Config();
     bool SectionExist(const string& sec);
     string Get(const string& sec, const string& key, const string& defaultvalue);
@@ -65,6 +65,7 @@ class Config {
 
    private:
     ini_t* _conf;
+    string _urlWithOptions;
 };
 
 bool ToBool(string str);

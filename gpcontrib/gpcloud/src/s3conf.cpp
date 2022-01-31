@@ -68,9 +68,9 @@ S3Params InitConfig(const string& urlWithOptions) {
     // read configurations from file
 
 #if !defined(S3_STANDALONE)
-    Config s3Cfg(configPath, httpUrl, DataDir);
+    Config s3Cfg(configPath, urlWithOptions, httpUrl, DataDir);
 #else
-    Config s3Cfg(configPath);
+    Config s3Cfg(configPath, urlWithOptions);
 #endif
 
     S3_CHECK_OR_DIE(s3Cfg.Handle() != NULL, S3RuntimeError,
