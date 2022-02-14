@@ -124,7 +124,11 @@ sub configure_test_server_for_ssl
 	open my $sslconf, '>', "$pgdata/sslconfig.conf";
 	close $sslconf;
 
-# Copy all server certificates and keys, and client root cert, to the data dir
+    # ssl configuration will be placed here
+    	open SSLCONF, ">$pgdata/sslconfig.conf";
+    	close SSLCONF;
+
+    	# Copy all server certificates and keys, and client root cert, to the data dir
 	copy_files("ssl/server-*.crt", $pgdata);
 	copy_files("ssl/server-*.key", $pgdata);
 	chmod(0600, glob "$pgdata/server-*.key") or die $!;
@@ -139,7 +143,7 @@ sub configure_test_server_for_ssl
 	configure_hba_for_ssl($node, $serverhost, $authmethod);
 }
 
-# Change the configuration to use given server cert file, and restart
+# Change the configuration to use given server cert file, and reload
 # the server so that the configuration takes effect.
 sub switch_server_cert
 {
@@ -148,7 +152,7 @@ sub switch_server_cert
 	my $cafile = $_[2] || "root+client_ca";
 	my $pgdata   = $node->data_dir;
 
-	note "Restarting server with certfile \"$certfile\" and cafile \"$cafile\"...";
+	note "Reloading server with certfile \"$certfile\" and cafile \"$cafile\"...";
 
 	open SSLCONF, ">$pgdata/sslconfig.conf";
 	print SSLCONF "ssl=on\n";
@@ -158,8 +162,31 @@ sub switch_server_cert
 	print SSLCONF "ssl_crl_file='root+client.crl'\n";
 	close SSLCONF;
 
-	# Stop and restart server to reload the new config.
-	$node->restart;
+    $node->reload;
+}
+
+sub configure_hba_for_ssl
+{
+    my $node       = $_[0];
+    my $serverhost = $_[1];
+    my $pgdata     = $node->data_dir;
+
+    # Only accept SSL connections from localhost. Our tests don't depend on this
+    # but seems best to keep it as narrow as possible for security reasons.
+    #
+    # When connecting to certdb, also check the client certificate.
+    open HBA, ">$pgdata/pg_hba.conf";
+    print HBA
+"# TYPE  DATABASE        USER            ADDRESS                 METHOD\n";
+    print HBA
+"hostssl trustdb         ssltestuser     $serverhost/32            trust\n";
+    print HBA
+"hostssl trustdb         ssltestuser     ::1/128                 trust\n";
+    print HBA
+"hostssl certdb          ssltestuser     $serverhost/32            cert\n";
+    print HBA
+"hostssl certdb          ssltestuser     ::1/128                 cert\n";
+    close HBA;
 }
 
 sub configure_hba_for_ssl
