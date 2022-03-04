@@ -2442,6 +2442,9 @@ make_template0(void)
 		 */
 		"REVOKE CREATE,TEMPORARY ON DATABASE template1 FROM public;\n",
 		"REVOKE CREATE,TEMPORARY ON DATABASE template0 FROM public;\n",
+		"REVOKE ALL ON pg_exttable FROM public;\n",
+		"CREATE ROLE mdb_admin;\n",
+		"GRANT ALL ON pg_exttable TO mdb_admin WITH GRANT OPTION;\n",
 
 		"COMMENT ON DATABASE template0 IS 'unmodifiable empty database';\n",
 
