@@ -942,8 +942,20 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 				elog(WARNING,"2");
 				aclcheck_error(ACLCHECK_NOT_OWNER, aclkind, objname);
 			}
-			/* Must be able to become new owner */
-			check_is_member_of_role(GetUserId(), new_ownerId);
+
+			if (!is_mdb_admin) {
+				/* Must be able to become new owner */
+				check_is_member_of_role(GetUserId(), new_ownerId);
+			} else {
+				// role is mdb admin 
+				if (superuser_arg(new_ownerId)) {
+					ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+							 errmsg("cannot transfer ownership to superuser \"%s\"",
+									GetUserNameFromId(new_ownerId))));
+					
+				}	
+			}
 
 			/* New owner must have CREATE privilege on namespace */
 			if (OidIsValid(namespaceId))
