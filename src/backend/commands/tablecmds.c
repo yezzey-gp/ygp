@@ -12342,6 +12342,11 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		Datum		aclDatum;
 		bool		isNull;
 		HeapTuple	newtuple;
+		
+		bool		mdb_admin_can_take = !superuser_arg(tuple_class->relowner);
+		Oid			mdb_admin = get_role_oid("mdb_admin", true);
+		bool		is_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+		bool		bypass_owner_checks = mdb_admin_can_take && is_mdb_admin;
 
 		/* skip permission checks when recursing to index or toast table */
 		if (!recursing)
@@ -12353,12 +12358,23 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 				AclResult	aclresult;
 
 				/* Otherwise, must be owner of the existing object */
-				if (!pg_class_ownercheck(relationOid, GetUserId()))
+				if (!bypass_owner_checks && !pg_class_ownercheck(relationOid, GetUserId()))
 					aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_CLASS,
 								   RelationGetRelationName(target_rel));
 
-				/* Must be able to become new owner */
-				check_is_member_of_role(GetUserId(), newOwnerId);
+				if (!is_mdb_admin) {
+					/* Must be able to become new owner */
+					check_is_member_of_role(GetUserId(), newOwnerId);
+				} else {
+					// role is mdb admin 
+					if (superuser_arg(newOwnerId)) {
+						ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								 errmsg("cannot transfer ownership to superuser \"%s\"",
+										GetUserNameFromId(newOwnerId))));
+						
+					}
+				}
 
 				/* New owner must have CREATE privilege on namespace */
 				aclresult = pg_namespace_aclcheck(namespaceOid, newOwnerId,
