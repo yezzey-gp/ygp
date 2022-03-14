@@ -1,0 +1,11 @@
+# ----------
+# src/test/regress/mdb_admi_schedule
+#
+# By convention, we put no more than twenty tests in any one parallel group;
+# this limits the number of connections needed to run the tests.
+# ----------
+
+# mdb admin simple checks
+
+test: mdb_admin
+
