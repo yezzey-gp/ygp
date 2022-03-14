@@ -209,6 +209,9 @@ check-tests: all tablespace-setup
 #	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/serial_schedule $(EXTRA_TESTS)
 installcheck: installcheck-good
 
+installcheck-mdb_admin: all
+	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/mdb_admin_schedule $(EXTRA_TESTS)
+
 installcheck-small: all
 	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/parallel_schedule $(EXTRA_TESTS)
 
