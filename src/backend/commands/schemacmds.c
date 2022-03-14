@@ -443,6 +443,10 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 	 */
 	if (nspForm->nspowner != newOwnerId)
 	{
+		bool		mdb_admin_can_take = !superuser_arg(nspForm->nspowner);
+		Oid		mdb_admin = get_role_oid("mdb_admin", true);
+		bool		is_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+		bool		bypass_owner_checks = mdb_admin_can_take && is_mdb_admin;
 		Datum		repl_val[Natts_pg_namespace];
 		bool		repl_null[Natts_pg_namespace];
 		bool		repl_repl[Natts_pg_namespace];
@@ -455,12 +459,23 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 
 		/* Otherwise, must be owner of the existing object */
 		nsoid = HeapTupleGetOid(tup);
-		if (!pg_namespace_ownercheck(nsoid, GetUserId()))
+		if (!bypass_owner_checks && !pg_namespace_ownercheck(HeapTupleGetOid(tup), GetUserId()))
 			aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_NAMESPACE,
 						   NameStr(nspForm->nspname));
+		if (!is_mdb_admin) {
+			/* Must be able to become new owner */
+			check_is_member_of_role(GetUserId(), newOwnerId);
+		} else {
+			/* role is mdb admin */
+			if (!superuser() && superuser_arg(newOwnerId)) {
+				ereport(ERROR,
+						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						 errmsg("cannot transfer ownership to superuser \"%s\"",
+								GetUserNameFromId(newOwnerId))));
 
-		/* Must be able to become new owner */
-		check_is_member_of_role(GetUserId(), newOwnerId);
+			}
+		}
+
 
 		/*
 		 * must have create-schema rights
@@ -473,6 +488,12 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 		 */
 		aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(),
 										 ACL_CREATE);
+		if (!bypass_owner_checks) {
+			aclresult = pg_database_aclcheck(MyDatabaseId, GetUserId(),
+										 ACL_CREATE);
+		} else {
+			aclresult = ACLCHECK_OK;
+		}
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, ACL_KIND_DATABASE,
 						   get_database_name(MyDatabaseId));
