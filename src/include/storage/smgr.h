@@ -69,6 +69,7 @@ typedef struct SMgrRelationData
 	 */
 	/* Obsolete storage manager selector, should not be used for any particular purpose */
 	int			smgr_which;
+	const struct f_smgr *smgr; /* storage manager selector */
 
 	/* for md.c; NULL for forks that are not open */
 	struct _MdfdVec *md_fd[MAX_FORKNUM + 1];
