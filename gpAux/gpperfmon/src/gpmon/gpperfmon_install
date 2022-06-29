@@ -6,14 +6,14 @@ USAGE:   gpperfmon_install --port GPDB_PORT [--enable --password GPMON_PASSWORD]
          where this script will install the gpperfmon database and schema
 
          --enable option will also do the following tasks as a convenience:
-              1) create a gpmon super user
-              2) add a line to pg_hba.conf to allow access from master host for user gpmon
+              1) create a user (default is gpmon)
+              2) add a line to pg_hba.conf to allow access from master host for user
               3) add a line to pg pass file
               4) set gucs to enable gpperfmon
 
          when using --enable, --password must be specified
 
-        --password will set the password for gpmon superuser
+        --password will set the password for user
         --port is the port used by gpperfmon to connect to GPDB
         --pgpass is an option to allow overriding default path of $HOME/.pgpass
         --gpperfmonport sets the guc 'gpperfmon_port' for gpperfmon communication (default is 8888)
@@ -39,6 +39,13 @@ class Command:
         self.cmd = cmdstr
         self.verbose = showOutput
 
+def on_error(command, exc=None):
+    logger.error("error on command: %s" % command.cmd)
+    if exc:
+        logger.error(exc)
+    logger.error("gpperfmon not successfully installed")
+    sys.exit(1)
+
 def run_command(cmd, verbose=False):
 
     cmdstr = cmd.cmd
@@ -49,9 +56,9 @@ def run_command(cmd, verbose=False):
     if bool(re.search('CREATE ROLE.*ENCRYPTED PASSWORD',cmdstr)):
         regex = re.compile('ENCRYPTED\sPASSWORD\s\'(.*)\'')
         logger.info(regex.sub('ENCRYPTED PASSWORD \'********\'',cmdstr))
-    elif bool(re.search('echo.*:gpperfmon:gpmon:',cmdstr)):
-        regex = re.compile(':gpperfmon:gpmon:(.*)\"')
-        logger.info(regex.sub(':gpperfmon:gpmon:********',cmdstr))
+    elif bool(re.search('echo.*:gpperfmon:{0}:'.format(options.role),cmdstr)):
+        regex = re.compile(':gpperfmon:{0}:(.*)\"'.format(options.role))
+        logger.info(regex.sub(':gpperfmon:{0}:********'.format(options.role),cmdstr))
     else:
         logger.info(cmdstr)
     p = Popen(cmdstr, shell=True, executable="/bin/bash")
@@ -103,10 +110,13 @@ if __name__ == '__main__':
     parser.add_option('-h', '-?', '--help', action='store_true')
     parser.add_option('-e', '--enable', action='store_true')
     parser.add_option('-v', '--verbose', action='store_true')
+    parser.add_option('--do-not-edit-configs', action='store_true')
     parser.add_option('-p', '--password', type='string')
     parser.add_option('-P', '--port', type='int')
     parser.add_option('-r', '--gpperfmonport', type='int', default=8888)
     parser.add_option('--pgpass', type='string')
+    parser.add_option('--role', type='string', default="gpmon")
+    parser.add_option('--do-not-create-role', action='store_true')
     (options, args) = parser.parse_args()
 
     if options.help:
@@ -117,7 +127,7 @@ if __name__ == '__main__':
         logger.error("--port must be specified")
         sys.exit(1)
 
-    if options.enable and (not options.password):
+    if options.enable and (not options.password) and not options.do_not_edit_configs:
         logger.error("when enabling gpperfmon --password must be specified")
         sys.exit(1)
 
@@ -126,8 +136,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     commands = list()
-
-    cmd = Command("createdb gpperfmon")
+    cmd = Command("""psql -c "SELECT 1 FROM pg_database WHERE datname = 'gpperfmon'" | grep -q '1$' && exit 0 || createdb gpperfmon""")
     commands.append(cmd)
     cmd = Command("PGPORT=%d psql -f %s/lib/gpperfmon/gpperfmon.sql gpperfmon" % (options.port, gphome))
     commands.append(cmd)
@@ -135,7 +144,6 @@ if __name__ == '__main__':
     if options.enable:
 
         master_data_dir = os.getenv('MASTER_DATA_DIRECTORY')
-        pg_hba = "%s/pg_hba.conf" % master_data_dir
         home_dir = os.getenv('HOME')
 
         if not master_data_dir:
@@ -153,68 +161,77 @@ if __name__ == '__main__':
 
         old_pg_pass = "%s.%d" % (pg_pass, time.time())
 
-        if not os.path.isfile( pg_hba ):
-            logger.error("can not find pg_hba.conf at %s" % pg_hba)
-            sys.exit(1)
+        if not options.do_not_edit_configs:
+            pg_hba = "%s/pg_hba.conf" % master_data_dir
+            if not os.path.isfile( pg_hba ):
+                logger.error("can not find pg_hba.conf at %s" % pg_hba)
+                sys.exit(1)
 
         if not os.path.isdir(home_dir):
             logger.error("can not find $HOME")
             sys.exit(1)
 
-        cmd = Command("""PGPORT=%d psql template1 -c "DROP ROLE IF EXISTS gpmon" """ % options.port)
-        commands.append(cmd)
+        if not options.do_not_create_role:
+            cmd = Command("""PGPORT=%d psql template1 -c "DROP ROLE IF EXISTS %s" """ % (options.port, options.role))
+            commands.append(cmd)
 
-        cmd = Command("""PGPORT=%d psql template1 -c "CREATE ROLE gpmon WITH SUPERUSER CREATEDB LOGIN ENCRYPTED PASSWORD '%s'" """ % (options.port, options.password))
-        commands.append(cmd)
+            cmd = Command("""PGPORT=%d psql template1 -c "CREATE ROLE %s WITH CREATEDB LOGIN ENCRYPTED PASSWORD '%s'" """ % (options.port, options.role, options.password))
+            commands.append(cmd)
 
-        cmd = Command("""echo "local    gpperfmon         gpmon         md5" >> %s""" % pg_hba, showOutput=True)
+        cmd = Command("""PGPORT={0} psql gpperfmon -c "
+         ALTER TABLE system_history OWNER TO {1};
+         ALTER TABLE queries_history OWNER TO {1};
+         ALTER TABLE queries_now OWNER TO {1};
+         ALTER TABLE database_history OWNER TO {1};
+         ALTER TABLE segment_history OWNER TO {1};
+         ALTER TABLE diskspace_history OWNER TO {1};
+         ALTER TABLE network_interface_history OWNER TO {1};
+         ALTER TABLE socket_history OWNER TO {1};" """.format(options.port, options.role))
         commands.append(cmd)
+        if not options.do_not_edit_configs:
+            cmd = Command("""echo "local    gpperfmon         %s         md5" >> %s""" % (options.role, pg_hba), showOutput=True)
+            commands.append(cmd)
 
-        cmd = Command("""echo "host     all         gpmon         127.0.0.1/28    md5" >> %s""" % pg_hba, showOutput=True)
-        commands.append(cmd)
+            cmd = Command("""echo "host     all         %s         127.0.0.1/28    md5" >> %s""" % (options.role, pg_hba), showOutput=True)
+            commands.append(cmd)
 
-        cmd = Command("""echo "host     all         gpmon         ::1/128    md5" >> %s""" % pg_hba, showOutput=True)
-        commands.append(cmd)
+            cmd = Command("""echo "host     all         %s         ::1/128    md5" >> %s""" % (options.role, pg_hba), showOutput=True)
+            commands.append(cmd)
 
-        ################################################
-        # these commands add a new line to the top of .pgpass and save a copy of old .pgpass
-        cmd = Command("""touch %s""" % (pg_pass))
-        commands.append(cmd)
+            ################################################
+            # these commands add a new line to the top of .pgpass and save a copy of old .pgpass
+            cmd = Command("""touch %s""" % (pg_pass))
+            commands.append(cmd)
 
-        cmd = Command("""mv -f %s %s""" % (pg_pass, old_pg_pass))
-        commands.append(cmd)
+            cmd = Command("""mv -f %s %s""" % (pg_pass, old_pg_pass))
+            commands.append(cmd)
 
-        cmd = Command("""echo "*:%d:gpperfmon:gpmon:%s" >> %s""" % (options.port, options.password, pg_pass), showOutput=True)
-        commands.append(cmd)
+            cmd = Command("""echo "*:%d:gpperfmon:%s:%s" >> %s""" % (options.port, options.role, options.password, pg_pass), showOutput=True)
+            commands.append(cmd)
 
-        cmd = Command("""cat %s >> %s""" % (old_pg_pass, pg_pass), showOutput=True)
-        commands.append(cmd)
+            cmd = Command("""cat %s >> %s""" % (old_pg_pass, pg_pass), showOutput=True)
+            commands.append(cmd)
 
-        cmd = Command("""chmod 0600 %s""" % pg_pass)
-        commands.append(cmd)
-        ################################################
+            cmd = Command("""chmod 0600 %s""" % pg_pass)
+            commands.append(cmd)
+            ################################################
 
-        cmd = Command("PGPORT=%d gpconfig -c gp_enable_gpperfmon -v on" % (options.port))
-        commands.append(cmd)
+            cmd = Command("PGPORT=%d gpconfig -c gp_enable_gpperfmon -v on" % (options.port))
+            commands.append(cmd)
 
-        cmd = Command("PGPORT=%d gpconfig -c gpperfmon_port -v %d" % (options.port, options.gpperfmonport))
-        commands.append(cmd)
+            cmd = Command("PGPORT=%d gpconfig -c gpperfmon_port -v %d" % (options.port, options.gpperfmonport))
+            commands.append(cmd)
 
-        cmd = Command("PGPORT=%d gpconfig -c gp_external_enable_exec -v on --masteronly" % (options.port))
-        commands.append(cmd)
-
-        cmd = Command("PGPORT=%d gpconfig -c gpperfmon_log_alert_level -v warning" % (options.port))
-        commands.append(cmd)
+            #cmd = Command("PGPORT=%d gpconfig -c gp_external_enable_exec -v on --masteronly" % (options.port))
+            #commands.append(cmd)
 
     command = None
     try:
         for c in (commands):
             command = c
             run_command(command)
-    except:
-        logger.error("error on command: %s" % command.cmd)
-        logger.error("gpperfmon not successfully installed")
-        sys.exit(1)
+    except Exception as exc:
+        on_error(command, exc)
 
     if options.enable:
         logger.info("gpperfmon will be enabled after a full restart of GPDB")

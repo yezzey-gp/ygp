@@ -34,7 +34,7 @@
 
 void update_mmonlog_filename(void);
 int gpmmon_quantum(void);
-void incremement_tail_bytes(apr_uint64_t);
+char* gpmmon_username(void);
 time_t compute_next_dump_to_file(void);
 void populate_smdw_aliases(host_t*);
 char* get_ip_for_host(char*, bool*);
@@ -71,12 +71,9 @@ static struct
 	agg_t* agg;
 	apr_hash_t* fsinfotab; /* This is the persistent fsinfo hash table: key = gpmon_fsinfokey_t, value = mmon_fsinfo_t ptr */
 
-	apr_thread_mutex_t *tailfile_mutex; /* lock when accessing the physical tail files */
-
 	int exit; /* TRUE if we need to exit */
 	int reload;
-	apr_uint64_t tail_buffer_bytes;
-	apr_uint64_t _tail_buffer_bytes;
+	int rotate;
 } ax = { 0 };
 
 void interuptable_sleep(unsigned int seconds);
@@ -87,14 +84,12 @@ apr_thread_mutex_t *logfile_mutex = NULL;
 
 /* Default option values */
 int verbose = 0; /* == opt.v */
-int very_verbose = 0; /* == opt.V */
 int quantum = 15; /* == opt.quantum */
 int min_query_time = 60; /* == opt.m */
 
 /* thread handles */
 static apr_thread_t* conm_th = NULL;
 static apr_thread_t* event_th = NULL;
-static apr_thread_t* harvest_th = NULL;
 static apr_thread_t* message_th = NULL;
 apr_queue_t* message_queue = NULL;
 
@@ -121,20 +116,19 @@ void update_mmonlog_filename()
 		snprintf(
 			mmon_log_filename,
 	 		MMON_LOG_FILENAME_SIZE,
-			"%s/gpmmon.%d.%02d.%02d_%02d%02d%02d.log",
-			opt.log_dir,
-			tm->tm_year + 1900,
-			tm->tm_mon + 1,
-			tm->tm_mday,
-			tm->tm_hour,
-			tm->tm_min,
-			tm->tm_sec);
+			"%s/gpmmon.log",
+			opt.log_dir);
 }
 
 /** Gets quantum */
 int gpmmon_quantum(void)
 {
 	return opt.quantum;
+}
+
+char* gpmmon_username(void)
+{
+    return opt.username;
 }
 
 /* prints usage and exit */
@@ -151,11 +145,6 @@ static void usage(const char* msg)
 	exit(msg ? 1 : 0);
 }
 
-void incremement_tail_bytes(apr_uint64_t bytes)
-{
-	ax.tail_buffer_bytes += bytes;
-}
-
 /* Cleanup function called on exit. */
 static void cleanup()
 {
@@ -169,8 +158,6 @@ static void cleanup()
 		apr_thread_join(&tstatus, event_th);
 	if (conm_th)
 		apr_thread_join(&tstatus, conm_th);
-	if (harvest_th)
-		apr_thread_join(&tstatus, harvest_th);
 	if (message_th)
 		apr_thread_join(&tstatus, message_th);
 
@@ -200,6 +187,12 @@ static void SIGHUP_handler(int sig)
 {
 	/* Flag to reload configuration values from conf file */
 	ax.reload = 1;
+}
+
+static void SIGUSR1_handler(int sig)
+{
+    /* Flag to rotate log file */
+    ax.rotate = 1;
 }
 
 static void SIGUSR2_handler(int sig)
@@ -404,6 +397,16 @@ static void* event_main(apr_thread_t* thread_, void* arg_)
 				read_conf_file(opt.conf_file);
 
 			TR0(("finished reloading conf files\n"));
+		}
+		if (ax.rotate)
+		{
+		    TR0(("sigusr1 received, reopening log file\n"));
+		    ax.rotate = 0;
+		    update_mmonlog_filename();
+		    apr_thread_mutex_lock(logfile_mutex);
+		    freopen(mmon_log_filename, "w", stdout);
+		    apr_thread_mutex_unlock(logfile_mutex);
+		    TR0(("finished reopening log file\n"));
 		}
 	}
 	return 0;
@@ -722,109 +725,6 @@ static void* conm_main(apr_thread_t* thread_, void* arg_)
 	return 0;
 }
 
-/* seperate thread for harvest */
-static void* harvest_main(apr_thread_t* thread_, void* arg_)
-{
-	unsigned int loop;
-	apr_status_t status;
-	unsigned int consecutive_failures = 0;
-	unsigned int partition_check_interval = 3600 * 6; // check for new partitions every 6 hours
-
-	gpdb_check_partitions(&opt);
-
-	for (loop = 1; !ax.exit; loop++)
-	{
-		apr_sleep(apr_time_from_sec(1));
-
-		if (0 == (loop % opt.harvest_interval))
-		{
-			int e;
-			/*
-				PROCESS:
-				1) WITH TAIL MUTEX: rename tail files to stage files
-				2) WITH TAIL MUTEX: create new tail files
-				3) Append data from stage files into _tail files
-				4) load data from _tail files into system history
-				5) delete _tail files after successful data load
-
-				NOTES:
-				1) mutex is held only over rename and creation of new tail files
-				   The reason is this is a fast operation and both the main thread doing dumps and the harvest
-				   thread uses the tail files
-
-				2) tail files are renamed/moved because this operation is safe to be done while the clients are
-				   reading the files.
-
-				3) The stage files are written over every harvest cycle, so the idea is no client
-				   will still be reading the tail files for an entire harvest cycle.  (this is not perfect logic but ok)
-			*/
-
-			apr_pool_t* pool; /* create this pool so we can destroy it each loop */
-
-
-			if (0 != (e = apr_pool_create_alloc(&pool, ax.pool)))
-			{
-				interuptable_sleep(30); // sleep to prevent loop of forking process and failing
-				gpmon_fatalx(FLINE, e, "apr_pool_create_alloc failed");
-				return (void*)1;
-			}
-
-			/* LOCK TAIL MUTEX ****************************************/
-			apr_thread_mutex_lock(ax.tailfile_mutex);
-
-			ax._tail_buffer_bytes += ax.tail_buffer_bytes;
-			ax.tail_buffer_bytes = 0;
-
-			status = gpdb_rename_tail_files(pool);
-
-			status = gpdb_truncate_tail_files(pool);
-
-			apr_thread_mutex_unlock(ax.tailfile_mutex);
-			/* UNLOCK TAIL MUTEX ****************************************/
-
-			status = gpdb_copy_stage_to_harvest_files(pool);
-
-			if (status == APR_SUCCESS)
-			{
-				status = gpdb_harvest();
-			}
-
-			if (status != APR_SUCCESS)
-			{
-				gpmon_warningx(FLINE, 0, "harvest failure: accumulated tail file size is %lu bytes", ax._tail_buffer_bytes);
-				consecutive_failures++;
-			}
-
-			if (status == APR_SUCCESS ||
-					consecutive_failures > 100 ||
-					(ax._tail_buffer_bytes > opt.tail_buffer_max))
-			{
-				/*
-					delete the data in the _tail file because it has been inserted successfully into history
-					we also delete the data without loading if it loading failed more than 100 times as a defensive measure for corrupted data in the file
-					better to lose some perf data and self fix than calling support to have them manually find the corrupted perf data and clear it themselves
-					we also delete the data if the size of the data is greater than our max data size
-				*/
-				status = gpdb_empty_harvest_files(pool);
-
-				if (status != APR_SUCCESS)
-				{
-					gpmon_warningx(FLINE, 0, "error trying to clear harvest files");
-				}
-				consecutive_failures = 0;
-				ax._tail_buffer_bytes = 0;
-			}
-			gpdb_import_alert_log(pool);
-			apr_pool_destroy(pool); /*destroy the pool since we are done with it*/
-		}
-		if (0 == (loop % partition_check_interval))
-		{
-			gpdb_check_partitions(&opt);
-		}
-	}
-
-	return APR_SUCCESS;
-}
 /* Separate thread for message sending */
 static void* message_main(apr_thread_t* thread_, void* arg_)
 {
@@ -923,12 +823,6 @@ static void gpmmon_main(void)
 		gpmon_fatalx(FLINE, e, "Resource Error: Failed to create agg_mutex");
 	}
 
-	if (0 != (e = apr_thread_mutex_create(&ax.tailfile_mutex, APR_THREAD_MUTEX_UNNESTED, ax.pool)))
-	{
-		interuptable_sleep(30); // sleep to prevent loop of forking process and failing
-		gpmon_fatalx(FLINE, e, "Resource Error: Failed to create tailfile_mutex");
-	}
-
 	if (0 != (e = apr_thread_mutex_create(&logfile_mutex, APR_THREAD_MUTEX_UNNESTED, ax.pool)))
 	{
 		interuptable_sleep(30); // sleep to prevent loop of forking process and failing
@@ -997,13 +891,6 @@ static void gpmmon_main(void)
 		gpmon_fatalx(FLINE, e, "apr_thread_create failed");
 	}
 
-	/* spawn harvest thread */
-	if (0 != (e = apr_thread_create(&harvest_th, ta, harvest_main, 0, ax.pool)))
-	{
-		interuptable_sleep(30); // sleep to prevent loop of forking process and failing
-		gpmon_fatalx(FLINE, e, "apr_thread_create failed");
-	}
-
 	/* Create message queue */
 	if (0 != (e = apr_queue_create(&message_queue, MAX_MESSAGES_PER_INTERVAL, ax.pool)))
 	{
@@ -1062,16 +949,11 @@ static void gpmmon_main(void)
 			/* mutex lock the aggregate data while we dump and dupe it */
 			apr_thread_mutex_lock(ax.agg_mutex);
 
-			/* mutex tail files during dump call */
-			apr_thread_mutex_lock(ax.tailfile_mutex);
-
 			/* dump the current aggregates */
 			if (0 != (e = agg_dump(ax.agg)))
 			{
 				gpmon_warningx(FLINE, e, "unable to finish aggregation");
 			}
-
-			apr_thread_mutex_unlock(ax.tailfile_mutex);
 
 			/* make a new one, copy only recently updated entries */
 			if (0 != (e = agg_dup(&newagg, ax.agg, ax.pool, ax.fsinfotab)))
@@ -1125,12 +1007,13 @@ static int read_conf_file(char *conffile)
 
 	opt.quantum = quantum;
 	opt.min_query_time = min_query_time;
-	opt.harvest_interval = 120;
 	opt.max_log_size = 0;
 	opt.log_dir = strdup(DEFAULT_GPMMON_LOGDIR);
 	opt.max_disk_space_messages_per_interval = MAX_MESSAGES_PER_INTERVAL;
 	opt.disk_space_interval = (60*MINIMUM_MESSAGE_INTERVAL);
 	opt.partition_age = 0;
+	opt.enable_queries_now = false;
+	opt.username = GPMON_DBUSER;
 
 	if (!fp)
 	{
@@ -1178,10 +1061,6 @@ static int read_conf_file(char *conffile)
 			{
 				opt.quantum = atoi(pVal);
 			}
-			else if (apr_strnatcasecmp(pName, "harvest_interval") == 0)
-			{
-				opt.harvest_interval = atoi(pVal);
-			}
 			else if (apr_strnatcasecmp(pName, "min_query_time") == 0)
 			{
 				opt.min_query_time = atoi(pVal);
@@ -1215,6 +1094,10 @@ static int read_conf_file(char *conffile)
 
 				opt.smon_log_dir = strdup(pVal);
 			}
+			else if (apr_strnatcasecmp(pName, "username") == 0)
+			{
+			    opt.username = strdup(pVal);
+			}
 			else if (apr_strnatcasecmp(pName, "hadoop_hostfile") == 0)
 			{
 				if (opt.smon_hadoop_swonly_clusterfile)
@@ -1236,10 +1119,6 @@ static int read_conf_file(char *conffile)
 			else if (apr_strnatcasecmp(pName, "smdw_aliases") == 0)
 			{
 				opt.smdw_aliases = strdup(pVal);
-			}
-			else if (apr_strnatcasecmp(pName, "tail_buffer_max") == 0)
-			{
-				opt.tail_buffer_max = apr_atoi64(pVal);
 			}
 			else if (apr_strnatcasecmp(pName, "max_log_size") == 0)
 			{
@@ -1264,6 +1143,18 @@ static int read_conf_file(char *conffile)
 			else if (apr_strnatcasecmp(pName, "partition_age") == 0)
 			{
 				opt.partition_age = atoi(pVal);
+			}
+			else if (apr_strnatcasecmp(pName, "enable_queries_now") == 0)
+			{
+			    if (strcmp(pVal, "true") == 0 ||
+			        strcmp(pVal, "True") == 0 ||
+			        strcmp(pVal, "TRUE") == 0 ||
+			        strcmp(pVal, "1") == 0 ||
+			        strcmp(pVal, "yes") == 0 ||
+			        strcmp(pVal, "Yes") == 0 ||
+			        strcmp(pVal, "YES") == 0) {
+			        opt.enable_queries_now = true;
+			    }
 			}
 			else
 			{
@@ -1294,13 +1185,6 @@ static int read_conf_file(char *conffile)
 		snprintf(log_dir, MAXPATHLEN, "%s/%s", ax.master_data_directory,
 				"gpperfmon/logs/");
 		opt.log_dir = strdup(log_dir);
-	}
-
-	if (opt.harvest_interval < 30 && !opt.qamode)
-	{
-		fprintf(stderr, "Performance Monitor - harvest_interval must be greater than 30.  Using "
-				"default value 120\n");
-		opt.harvest_interval = 120;
 	}
 
 	if (opt.warning_disk_space_percentage < 0 || opt.warning_disk_space_percentage >= 100)
@@ -1335,13 +1219,6 @@ static int read_conf_file(char *conffile)
 	} else if (opt.disk_space_interval > (60 *MAXIMUM_MESSAGE_INTERVAL) ) {
 		fprintf(stderr, "Performance Monitor - disk_space_interval must be not be greater than than %d minutes.  Setting to %d minutes.\n",MAXIMUM_MESSAGE_INTERVAL, MAXIMUM_MESSAGE_INTERVAL );
 		opt.disk_space_interval = (60 *MAXIMUM_MESSAGE_INTERVAL);
-	}
-
-
-
-	if (opt.tail_buffer_max == 0)
-	{
-		opt.tail_buffer_max = (1LL << 31); /* 2GB */
 	}
 
 	smon_terminate_timeout = opt.quantum * smon_terminate_safe_factor;
@@ -1455,7 +1332,8 @@ int main(int argc, const char* const argv[])
 
 	/* Set up signal handlers */
 	if ((signal(SIGHUP, SIGHUP_handler) == SIG_ERR) ||
-		(signal(SIGUSR2, SIGUSR2_handler) == SIG_ERR))
+		(signal(SIGUSR2, SIGUSR2_handler) == SIG_ERR) ||
+		(signal(SIGUSR1, SIGUSR1_handler) == SIG_ERR))
 	{
 		interuptable_sleep(30); // sleep to prevent loop of forking process and failing
 		gpmon_fatal(FLINE, "Failed to set signal handlers\n");
@@ -1465,6 +1343,8 @@ int main(int argc, const char* const argv[])
 	 * and can process them */
 
 	sigprocmask(SIG_SETMASK, &unblocksig, NULL);
+
+	read_conf_file(opt.conf_file);
 
 	/* Check for gpperfmon database.  If it doesn't exists,
 	 * hang around until it does or we get a stop request */
@@ -1493,7 +1373,6 @@ int main(int argc, const char* const argv[])
 	}
 
 	getconfig();
-	read_conf_file(opt.conf_file);
 
 	/* redirect output to log_file */
 	/* stdout goes to log: debug and warnings */
@@ -1547,7 +1426,6 @@ int main(int argc, const char* const argv[])
 		}
 	}
 
-	create_log_alert_table();
 	gpmmon_main();
 
 	cleanup();

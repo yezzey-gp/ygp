@@ -239,6 +239,7 @@ int			gp_perfmon_segment_interval;
 /* Perfmon debug GUC */
 bool		gp_perfmon_print_packet_info;
 bool		gp_resource_group_bypass_catalog_query;
+char*		gp_perfmon_log_directory;
 
 bool		vmem_process_interrupt = false;
 bool		execute_pruned_plan = false;
@@ -4953,6 +4954,17 @@ struct config_string ConfigureNamesString_gp[] =
 		"none",
 		NULL, NULL, NULL
 	},
+
+	{
+	    {"gp_perfmon_log_directory", PGC_SUSET, DEVELOPER_OPTIONS,
+         gettext_noop("Sets directory for gpdb-alert* log files"),
+         NULL,
+         GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+         },
+         &gp_perfmon_log_directory,
+         "gpperfmon/logs",
+         NULL, NULL, NULL
+     },
 
 	{
 		{"memory_profiler_dataset_id", PGC_USERSET, DEVELOPER_OPTIONS,
