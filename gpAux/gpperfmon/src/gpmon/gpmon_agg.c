@@ -80,7 +80,6 @@ extern int min_query_time;
 extern mmon_options_t opt;
 extern apr_queue_t* message_queue;
 
-extern void incremement_tail_bytes(apr_uint64_t bytes);
 static bool is_query_not_active(apr_int32_t tmid, apr_int32_t ssid,
 			apr_int32_t ccnt, apr_hash_t *hash, apr_pool_t *pool);
 
@@ -629,67 +628,37 @@ static void bloom_init(bloom_t* bloom);
 static void bloom_set(bloom_t* bloom, const char* name);
 static int  bloom_isset(bloom_t* bloom, const char* name);
 static void delete_old_files(bloom_t* bloom);
-static apr_uint32_t write_fsinfo(agg_t* agg, const char* nowstr);
-static apr_uint32_t write_system(agg_t* agg, const char* nowstr);
-static apr_uint32_t write_segmentinfo(agg_t* agg, char* nowstr);
-static apr_uint32_t write_dbmetrics(dbmetrics_t* dbmetrics, char* nowstr);
-static apr_uint32_t write_qlog(FILE* fp, qdnode_t *qdnode, const char* nowstr, apr_uint32_t done);
-static apr_uint32_t write_qlog_full(FILE* fp, qdnode_t *qdnode, const char* nowstr);
+static void write_fsinfo(agg_t* agg, const char* nowstr, PGconn*);
+static void write_system(agg_t* agg, const char* nowstr, PGconn*);
+static void write_segmentinfo(agg_t* agg, char* nowstr, PGconn*);
+static void write_dbmetrics(dbmetrics_t* dbmetrics, char* nowstr, PGconn*);
+static void write_qlog_full(qdnode_t *qdnode, const char* nowstr, apr_uint32_t done, PGconn*, char*);
 
 apr_status_t agg_dump(agg_t* agg)
 {
 	apr_hash_index_t *hi;
 	bloom_t bloom;
 	char nowstr[GPMON_DATE_BUF_SIZE];
-	FILE* fp_queries_now = 0;
-	FILE* fp_queries_tail = 0;
-
 	dbmetrics_t dbmetrics = {0};
-
-	apr_uint32_t temp_bytes_written = 0;
-
 	gpmon_datetime_rounded(time(NULL), nowstr);
+	const char* errmsg;
+	PGresult* result = 0;
+	static char connstr[GPDB_CONNSTR_SIZE];
 
 	bloom_init(&bloom);
 
-	/* we never delete system_tail/ system_now/
-		queries_tail/ queries_now/ files */
-	bloom_set(&bloom, GPMON_DIR "system_now.dat");
-	bloom_set(&bloom, GPMON_DIR "system_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "system_stage.dat");
-	bloom_set(&bloom, GPMON_DIR "_system_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "queries_now.dat");
-	bloom_set(&bloom, GPMON_DIR "queries_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "queries_stage.dat");
-	bloom_set(&bloom, GPMON_DIR "_queries_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "database_now.dat");
-	bloom_set(&bloom, GPMON_DIR "database_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "database_stage.dat");
-	bloom_set(&bloom, GPMON_DIR "_database_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "segment_now.dat");
-	bloom_set(&bloom, GPMON_DIR "segment_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "segment_stage.dat");
-	bloom_set(&bloom, GPMON_DIR "_segment_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "diskspace_now.dat");
-	bloom_set(&bloom, GPMON_DIR "diskspace_tail.dat");
-	bloom_set(&bloom, GPMON_DIR "diskspace_stage.dat");
-	bloom_set(&bloom, GPMON_DIR "_diskspace_tail.dat");
+	gpdb_conn_string(connstr);
+	PGconn *conn = PQconnectdb(connstr);
+	if (PQstatus(conn) != CONNECTION_OK) {
+	    gpmon_warning(FLINE,
+                      "error creating gpdb connection: %s",
+                      PQerrorMessage(conn));
+	    return APR_FROM_OS_ERROR(errno);
+	}
 
-
-	/* dump metrics */
-	temp_bytes_written = write_system(agg, nowstr);
-	incremement_tail_bytes(temp_bytes_written);
-
-	/* write segment metrics */
-	temp_bytes_written = write_segmentinfo(agg, nowstr);
-	incremement_tail_bytes(temp_bytes_written);
-
-	/* write fsinfo metrics */
-	temp_bytes_written = write_fsinfo(agg, nowstr);
-	incremement_tail_bytes(temp_bytes_written);
-
-	if (! (fp_queries_tail = fopen(GPMON_DIR "queries_tail.dat", "a")))
-		return APR_FROM_OS_ERROR(errno);
+	write_system(agg, nowstr, conn);
+	write_segmentinfo(agg, nowstr, conn);
+	write_fsinfo(agg, nowstr, conn);
 
 	/* loop through queries */
 	for (hi = apr_hash_first(0, agg->qtab); hi; hi = apr_hash_next(hi))
@@ -703,11 +672,10 @@ apr_status_t agg_dump(agg_t* agg)
 		{
 			if (!qdnode->recorded && ((qdnode->qlog.tfin - qdnode->qlog.tstart) >= min_query_time))
 			{
-				TR1(("queries_tail: %p add query %d.%d.%d, status %d, generation %d, recorded %d\n",
+				TR1(("queries_history: %p add query %d.%d.%d, status %d, generation %d, recorded %d\n",
 					 agg->qtab, qdnode->qlog.key.tmid, qdnode->qlog.key.ssid, qdnode->qlog.key.ccnt, qdnode->qlog.status, (int) qdnode->last_updated_generation, qdnode->recorded));
 
-				temp_bytes_written += write_qlog_full(fp_queries_tail, qdnode, nowstr);
-				incremement_tail_bytes(temp_bytes_written);
+				write_qlog_full(qdnode, nowstr, 1, conn, QUERIES_HISTORY);
 
 				qdnode->recorded = 1;
 			}
@@ -731,15 +699,17 @@ apr_status_t agg_dump(agg_t* agg)
 	}
 	dbmetrics.queries_total = dbmetrics.queries_running + dbmetrics.queries_queued;
 
-	fclose(fp_queries_tail);
-	fp_queries_tail = 0;
+	write_dbmetrics(&dbmetrics, nowstr, conn);
 
-	/* dump dbmetrics */
-	temp_bytes_written += write_dbmetrics(&dbmetrics, nowstr);
-	incremement_tail_bytes(temp_bytes_written);
-
-	if (! (fp_queries_now = fopen(GPMON_DIR "_queries_now.dat", "w")))
-		return APR_FROM_OS_ERROR(errno);
+	if (opt.enable_queries_now) {
+	    errmsg = gpdb_exec_only(conn, &result, TRUNCATE_QUERIES_NOW);
+	    if (errmsg)
+	    {
+	        gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, TRUNCATE_QUERIES_NOW);
+	        PQreset(conn);
+	    }
+	    PQclear(result);
+	}
 
 	for (hi = apr_hash_first(0, agg->qtab); hi; hi = apr_hash_next(hi))
 	{
@@ -760,25 +730,17 @@ apr_status_t agg_dump(agg_t* agg)
 			bloom_set(&bloom, fname);
 		}
 
-		/* write to _query_now.dat */
-		if (qdnode->qlog.status != GPMON_QLOG_STATUS_DONE && qdnode->qlog.status != GPMON_QLOG_STATUS_ERROR)
-		{
-			write_qlog(fp_queries_now, qdnode, nowstr, 0);
+		if (opt.enable_queries_now && !qdnode->recorded) {
+		    if (qdnode->qlog.status != GPMON_QLOG_STATUS_DONE && qdnode->qlog.status != GPMON_QLOG_STATUS_ERROR) {
+		            write_qlog_full(qdnode, nowstr, 0, conn, QUERIES_NOW);
+		    }
+		    else if (qdnode->qlog.tfin - qdnode->qlog.tstart >= min_query_time)
+		    {
+		        write_qlog_full(qdnode, nowstr, 1, conn, QUERIES_NOW);
+		    }
 		}
-		else if (qdnode->qlog.tfin - qdnode->qlog.tstart >= min_query_time)
-		{
-			write_qlog(fp_queries_now, qdnode, nowstr, 1);
-		}
-
 	}
-
-	if (fp_queries_now) fclose(fp_queries_now);
-	if (fp_queries_tail) fclose(fp_queries_tail);
-	rename(GPMON_DIR "_system_now.dat", GPMON_DIR "system_now.dat");
-	rename(GPMON_DIR "_segment_now.dat", GPMON_DIR "segment_now.dat");
-	rename(GPMON_DIR "_queries_now.dat", GPMON_DIR "queries_now.dat");
-	rename(GPMON_DIR "_database_now.dat", GPMON_DIR "database_now.dat");
-	rename(GPMON_DIR "_diskspace_now.dat", GPMON_DIR "diskspace_now.dat");
+	PQfinish(conn);
 
 	/* clean up ... delete all old files by checking our bloom filter */
 	delete_old_files(&bloom);
@@ -787,6 +749,7 @@ apr_status_t agg_dump(agg_t* agg)
 }
 
 extern int gpmmon_quantum(void);
+extern char* gpmmon_username(void);
 
 static void delete_old_files(bloom_t* bloom)
 {
@@ -865,70 +828,57 @@ static void delete_old_files(bloom_t* bloom)
 	}
 }
 
-static apr_uint32_t write_segmentinfo(agg_t* agg, char* nowstr)
+static void write_segmentinfo(agg_t* agg, char* nowstr, PGconn* conn)
 {
-	FILE* fp = fopen(GPMON_DIR "segment_tail.dat", "a");
-	FILE* fp2 = fopen(GPMON_DIR "_segment_now.dat", "w");
 	apr_hash_index_t* hi;
-	const int line_size = 256;
-	char line[line_size];
-	apr_uint32_t bytes_written = 0;
-
-	if (!fp || !fp2)
-	{
-		if (fp) fclose(fp);
-		if (fp2) fclose(fp2);
-		return 0;
-	}
+	gpmon_seginfo_t* sp;
+	void* valptr;
+	static char tuple[GPDB_MAX_TUPLE_SIZE];
+	const char* errmsg;
+	static const char* table = "segment_history";
 
 	for (hi = apr_hash_first(0, agg->stab); hi; hi = apr_hash_next(hi))
 	{
-		gpmon_seginfo_t* sp;
-		int bytes_this_record;
-		void* valptr = 0;
+	    valptr = 0;
 		apr_hash_this(hi, 0, 0, (void**) &valptr);
 		sp = (gpmon_seginfo_t*) valptr;
 
-		snprintf(line, line_size, "%s|%d|%s|%" FMTU64 "|%" FMTU64, nowstr, sp->dbid, sp->hostname, sp->dynamic_memory_used, sp->dynamic_memory_available);
+		memset(tuple, '\0', sizeof(tuple));
+		snprintf(tuple, GPDB_MAX_TUPLE_SIZE, "'%s'::timestamp(0), %d::int, '%s'::varchar(64), %" FMTU64 ", %" FMTU64,
+                 nowstr,
+                 sp->dbid,
+                 sp->hostname,
+                 sp->dynamic_memory_used,
+                 sp->dynamic_memory_available);
 
-		bytes_this_record = strlen(line) + 1;
-		if (bytes_this_record == line_size)
+		errmsg = insert_into_table(conn, tuple, table);
+		if (errmsg)
 		{
-			gpmon_warning(FLINE, "segmentinfo line to too long ... ignored: %s", line);
-			continue;
+		    gpmon_warningx(FLINE, 0, "insert into %s failed with error %s\n", table, errmsg);
+		    PQreset(conn);
 		}
-		fprintf(fp, "%s\n", line);
-		fprintf(fp2, "%s\n", line);
-		bytes_written += bytes_this_record;
+		else
+		{
+		    TR1(("%s insert OK: %s\n", table, tuple));
+		}
     }
-
-	fclose(fp);
-	fclose(fp2);
-	return bytes_written;
+	return;
 }
 
-static apr_uint32_t write_fsinfo(agg_t* agg, const char* nowstr)
+static void write_fsinfo(agg_t* agg, const char* nowstr, PGconn* conn)
 {
-	FILE* fp = fopen(GPMON_DIR "diskspace_tail.dat", "a");
-	FILE* fp2 = fopen(GPMON_DIR "_diskspace_now.dat", "w");
 	apr_hash_index_t* hi;
-	const int line_size = 512;
-	char line[line_size];
-	apr_uint32_t bytes_written = 0;
 	static time_t last_time_fsinfo_written = 0;
 
-	if (!fp || !fp2)
-	{
-		if (fp) fclose(fp);
-		if (fp2) fclose(fp2);
-		return 0;
-	}
+	void* valptr;
+	mmon_fsinfo_t* fsp;
+	static char tuple[GPDB_MAX_TUPLE_SIZE];
+	const char* errmsg;
+	static const char* table = "diskspace_history";
 
 	for (hi = apr_hash_first(0, agg->fsinfotab); hi; hi = apr_hash_next(hi))
 	{
-		mmon_fsinfo_t* fsp;
-		void* valptr = 0;
-		int bytes_this_line;
+	    valptr = 0;
 
 		apr_hash_this(hi, 0, 0, (void**) &valptr);
 		fsp = (mmon_fsinfo_t*) valptr;
@@ -939,7 +889,8 @@ static apr_uint32_t write_fsinfo(agg_t* agg, const char* nowstr)
 			continue;
 		}
 
-		snprintf(line, line_size, "%s|%s|%s|%" FMT64 "|%" FMT64 "|%" FMT64,
+		memset(tuple, '\0', sizeof(tuple));
+		snprintf(tuple, GPDB_MAX_TUPLE_SIZE, "'%s'::timestamp(0), '%s'::varchar(64), '%s', %" FMT64 ", %" FMT64 ", %" FMT64,
 				nowstr,
 				fsp->key.hostname,
 				fsp->key.fsname,
@@ -947,132 +898,109 @@ static apr_uint32_t write_fsinfo(agg_t* agg, const char* nowstr)
 				fsp->bytes_used,
 				fsp->bytes_available);
 
-		TR2(("write_fsinfo(): writing %s\n", line));
-		bytes_this_line = strlen(line) + 1;
-		if (bytes_this_line == line_size){
-			gpmon_warning(FLINE, "fsinfo metrics line too long ... ignored: %s", line);
-			continue;
+		errmsg = insert_into_table(conn, tuple, table);
+		if (errmsg)
+		{
+		    gpmon_warningx(FLINE, 0, "insert into %s failed with error %s\n", table, errmsg);
+		    PQreset(conn);
 		}
-
-		fprintf(fp, "%s\n", line);
-		fprintf(fp2, "%s\n", line);
-
-		bytes_written += bytes_this_line;
+		else
+		{
+		    TR1(("%s insert OK: %s\n", table, tuple));
+		}
 	}
-
-	fclose(fp);
-	fclose(fp2);
 
 	last_time_fsinfo_written = time(NULL); //set the static time written variable
 
-	return bytes_written;
+	return;
 }
 
-static apr_uint32_t write_dbmetrics(dbmetrics_t* dbmetrics, char* nowstr)
+static void write_dbmetrics(dbmetrics_t* dbmetrics, char* nowstr, PGconn* conn)
 {
-	FILE* fp = fopen(GPMON_DIR "database_tail.dat", "a");
-	FILE* fp2 = fopen(GPMON_DIR "_database_now.dat", "w");
-	int e;
-	const int line_size = 256;
-	char line[line_size];
-	int bytes_written;
+    static char tuple[GPDB_MAX_TUPLE_SIZE];
+    const char* errmsg;
+    static const char* table = "database_history";
 
-	if (!fp || !fp2)
-	{
-		e = APR_FROM_OS_ERROR(errno);
-		if (fp) fclose(fp);
-		if (fp2) fclose(fp2);
-		return e;
-	}
-
-	snprintf(line, line_size, "%s|%d|%d|%d", nowstr,
+    memset(tuple, '\0', sizeof(tuple));
+    snprintf(tuple, GPDB_MAX_TUPLE_SIZE, "'%s'::timestamp(0), %d::int, %d::int, %d::int", nowstr,
              dbmetrics->queries_total,
              dbmetrics->queries_running,
              dbmetrics->queries_queued);
 
-	if (strlen(line) + 1 == line_size){
-		gpmon_warning(FLINE, "dbmetrics line too long ... ignored: %s", line);
-		bytes_written = 0;
-	} else {
-		fprintf(fp, "%s\n", line);
-		fprintf(fp2, "%s\n", line);
-		bytes_written = strlen(line) + 1;
-	}
+    errmsg = insert_into_table(conn, tuple, table);
+    if (errmsg)
+    {
+        gpmon_warningx(FLINE, 0, "insert into %s failed with error %s\n", table, errmsg);
+        PQreset(conn);
+    }
+    else
+    {
+        TR1(("%s insert OK: %s\n", table, tuple));
+    }
 
-    fclose(fp);
-    fclose(fp2);
-
-    return bytes_written;
+    return;
 }
 
-static apr_uint32_t write_system(agg_t* agg, const char* nowstr)
+static void write_system(agg_t* agg, const char* nowstr, PGconn* conn)
 {
-	FILE* fp = fopen(GPMON_DIR "system_tail.dat", "a");
-	FILE* fp2 = fopen(GPMON_DIR "_system_now.dat", "w");
 	apr_hash_index_t* hi;
-	const int line_size = 1000;
-	char line[line_size];
-	apr_uint32_t bytes_written = 0;
 
-	if (!fp || !fp2)
-	{
-		if (fp) fclose(fp);
-		if (fp2) fclose(fp2);
-		return 0;
- 	}
+	gpmon_metrics_t* mp;
+	void* valptr;
+	int quantum;
+	static char tuple[GPDB_MAX_TUPLE_SIZE];
+	static const char* table = "system_history";
+	const char* errmsg;
 
 	for (hi = apr_hash_first(0, agg->htab); hi; hi = apr_hash_next(hi))
 	{
-		gpmon_metrics_t* mp;
-		void* valptr = 0;
-		int quantum = gpmmon_quantum();
-		int bytes_this_line;
-		apr_hash_this(hi, 0, 0, (void**) &valptr);
-		mp = (gpmon_metrics_t*) valptr;
+	    valptr = 0;
+	    quantum = gpmmon_quantum();
+	    apr_hash_this(hi, 0, 0, (void**) &valptr);
+	    mp = (gpmon_metrics_t*) valptr;
+	    memset(tuple, '\0', sizeof(tuple));
 
-		snprintf(line, line_size,
-		"%s|%s|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%.2f|%.2f|%.2f|%.4f|%.4f|%.4f|%d|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64 "|%" FMT64,
-		nowstr,
-		mp->hname,
-		mp->mem.total,
-		mp->mem.used,
-		mp->mem.actual_used,
-		mp->mem.actual_free,
-		mp->swap.total,
-		mp->swap.used,
-		(apr_int64_t)ceil((double)mp->swap.page_in / (double)quantum),
-		(apr_int64_t)ceil((double)mp->swap.page_out / (double)quantum),
-		mp->cpu.user_pct,
-		mp->cpu.sys_pct,
-		mp->cpu.idle_pct,
-		mp->load_avg.value[0],
-		mp->load_avg.value[1],
-		mp->load_avg.value[2],
-		quantum,
-		mp->disk.ro_rate,
-		mp->disk.wo_rate,
-		mp->disk.rb_rate,
-		mp->disk.wb_rate,
-		mp->net.rp_rate,
-		mp->net.wp_rate,
-		mp->net.rb_rate,
-		mp->net.wb_rate);
+	    snprintf(tuple, GPDB_MAX_TUPLE_SIZE,
+                 "'%s'::timestamp(0),'%s'::varchar(64),%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%.2f::float,%.2f::float,%.2f::float,%.4f::float,%.4f::float,%.4f::float,%d::int,%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64 ",%" FMT64,
+                 nowstr,
+                 mp->hname,
+                 mp->mem.total,
+                 mp->mem.used,
+                 mp->mem.actual_used,
+                 mp->mem.actual_free,
+                 mp->swap.total,
+                 mp->swap.used,
+                 (apr_int64_t)ceil((double)mp->swap.page_in / (double)quantum),
+                 (apr_int64_t)ceil((double)mp->swap.page_out / (double)quantum),
+                 mp->cpu.user_pct,
+                 mp->cpu.sys_pct,
+                 mp->cpu.idle_pct,
+                 mp->load_avg.value[0],
+                 mp->load_avg.value[1],
+                 mp->load_avg.value[2],
+                 quantum,
+                 mp->disk.ro_rate,
+                 mp->disk.wo_rate,
+                 mp->disk.rb_rate,
+                 mp->disk.wb_rate,
+                 mp->net.rp_rate,
+                 mp->net.wp_rate,
+                 mp->net.rb_rate,
+                 mp->net.wb_rate);
 
-		bytes_this_line = strlen(line) + 1;
-		if (bytes_this_line == line_size){
-			gpmon_warning(FLINE, "system metrics line too long ... ignored: %s", line);
-			continue;
-		}
-
-		fprintf(fp, "%s\n", line);
-		fprintf(fp2, "%s\n", line);
-
-		bytes_written += bytes_this_line;
+	    errmsg = insert_into_table(conn, tuple, table);
+	    if (errmsg)
+	    {
+	        gpmon_warningx(FLINE, 0, "insert into %s failed with error %s\n", table, errmsg);
+	        PQreset(conn);
+	    }
+	    else
+	    {
+	        TR1(("%s insert OK: %s\n", table, tuple));
+	    }
 	}
 
-	fclose(fp);
-	fclose(fp2);
-	return bytes_written;
+	return;
 }
 
 static apr_int64_t get_rowsout(qdnode_t* qdnode)
@@ -1297,11 +1225,14 @@ static double get_row_skew(qdnode_t* qdnode)
 }
 
 
-static void fmt_qlog(char* line, const int line_size, qdnode_t* qdnode, const char* nowstr, apr_uint32_t done)
+static void fmt_qlog(char* line, const int line_size, qdnode_t* qdnode, const char* nowstr, apr_uint32_t done,
+                     char* query_text, char* plan_text, char* application_name, char* rsqname, char* priority, char* table)
 {
 	char timsubmitted[GPMON_DATE_BUF_SIZE];
 	char timstarted[GPMON_DATE_BUF_SIZE];
 	char timfinished[GPMON_DATE_BUF_SIZE];
+	char timstarted_with_quotes[GPMON_DATE_BUF_SIZE + 2];
+	char timfinished_with_quotes[GPMON_DATE_BUF_SIZE + 2];
 	double cpu_skew = 0.0f;
 	double row_skew = 0.0f;
 	int query_hash = 0;
@@ -1315,16 +1246,18 @@ static void fmt_qlog(char* line, const int line_size, qdnode_t* qdnode, const ch
 	if (qdnode->qlog.tstart)
 	{
 		gpmon_datetime((time_t)qdnode->qlog.tstart, timstarted);
+		snprintf(timstarted_with_quotes, GPMON_DATE_BUF_SIZE + 2, "'%s'", timstarted);
 	}
 	else
 	{
-		snprintf(timstarted, GPMON_DATE_BUF_SIZE, "null");
+	    snprintf(timstarted_with_quotes, GPMON_DATE_BUF_SIZE, "null");
 	}
 
 	if (done)
 	{
 		cpu_current = 0.0f;
 		gpmon_datetime((time_t)qdnode->qlog.tfin, timfinished);
+		snprintf(timfinished_with_quotes, GPMON_DATE_BUF_SIZE + 2, "'%s'", timfinished);
 	}
 	else
 	{
@@ -1337,11 +1270,24 @@ static void fmt_qlog(char* line, const int line_size, qdnode_t* qdnode, const ch
 		{
 			cpu_current = 0.0f;
 		}
-		snprintf(timfinished, GPMON_DATE_BUF_SIZE,  "null");
+		snprintf(timfinished_with_quotes, GPMON_DATE_BUF_SIZE,  "null");
 	}
 
-	snprintf(line, line_size, "%s|%d|%d|%d|%s|%s|%d|%s|%s|%s|%s|%" FMT64 "|%" FMT64 "|%.4f|%.2f|%.2f|%d",
-		nowstr,
+	if (isnan(cpu_skew)) {
+	    cpu_skew = 0.0f;
+	}
+
+	if (isnan(row_skew)) {
+	    row_skew = 0.0f;
+	}
+
+	snprintf(line, line_size, "DELETE FROM public.%s WHERE tmid = %d and ssid = %d and ccnt = %d;\tINSERT INTO public.%s VALUES ('%s'::timestamp(0), %d, %d, %d, '%s'::varchar(64), '%s'::varchar(64), %d, '%s'::timestamp(0), %s::timestamp(0), %s::timestamp(0), '%s'::varchar(64), %" FMT64 "::bigint, %" FMT64 "::bigint, %.2f, %.2f, %.2f, %d::bigint, '%s'::text, '%s'::text, '%s'::varchar(64), '%s'::varchar(64), '%s'::varchar(16));",
+        table,
+        qdnode->qlog.key.tmid,
+        qdnode->qlog.key.ssid,
+        qdnode->qlog.key.ccnt,
+        table,
+        nowstr,
 		qdnode->qlog.key.tmid,
 		qdnode->qlog.key.ssid,
 		qdnode->qlog.key.ccnt,
@@ -1349,80 +1295,60 @@ static void fmt_qlog(char* line, const int line_size, qdnode_t* qdnode, const ch
 		qdnode->qlog.db,
 		qdnode->qlog.cost,
 		timsubmitted,
-		timstarted,
-		timfinished,
+		timstarted_with_quotes,
+		timfinished_with_quotes,
 		gpmon_qlog_status_string(qdnode->qlog.status),
 		rowsout,
 		qdnode->qlog.cpu_elapsed,
 		cpu_current,
 		cpu_skew,
 		row_skew,
-		query_hash);
+		query_hash,
+		query_text,
+		plan_text,
+		application_name,
+		rsqname,
+		priority);
 }
 
-
-static apr_uint32_t write_qlog(FILE* fp, qdnode_t *qdnode, const char* nowstr, apr_uint32_t done)
+static bool get_next_query_file_kvp(FILE* queryfd, char* qfname, int max_len, char* value)
 {
-	const int line_size = 1024;
-	char line[line_size];
-	int bytes_written;
-
-	fmt_qlog(line, line_size, qdnode, nowstr, done);
-	bytes_written = strlen(line) + 1;
-
-	if (bytes_written == line_size)
-	{
-		gpmon_warning(FLINE, "qlog line too long ... ignored: %s", line);
-		return 0;
-	}
-	else
-	{
-		/* Query text "joined" by python script */
-		fprintf(fp, "%s|||||\n", line);
-		return bytes_written;
-	}
-}
-
-static int get_and_print_next_query_file_kvp(FILE* outfd, FILE* queryfd, char* qfname, apr_uint32_t* bytes_written)
-{
-    const int line_size = 1024;
-    char line[line_size];
+    static char line[GPDB_MAX_HISTORY_QUERY_SIZE];
     line[0] = 0;
+    int value_index = 0;
     char *p = NULL;
     int field_len = 0;
     int retCode = 0;
 
-    p = fgets(line, line_size, queryfd);
-    line[line_size-1] = 0; // in case libc is buggy
+    memset(line, '\0', sizeof(line));
+    p = fgets(line, GPDB_MAX_HISTORY_QUERY_SIZE, queryfd);
+    line[GPDB_MAX_HISTORY_QUERY_SIZE-1] = 0; // in case libc is buggy
 
     if (!p) {
 	    gpmon_warning(FLINE, "Error parsing file: %s", qfname);
-        return APR_NOTFOUND;
+        return false;
     }
 
     retCode = sscanf(p, "%d", &field_len);
 
     if (1 != retCode){
 	    gpmon_warning(FLINE, "bad format on file: %s", qfname);
-        return APR_NOTFOUND;
+	    return false;
     }
 
     if (field_len < 0) {
 	    gpmon_warning(FLINE, "bad field length on file: %s", qfname);
-        return APR_NOTFOUND;
+	    return false;
 	}
 
     if (!field_len) {
         // empty field, read through the newline
-        p = fgets(line, line_size, queryfd);
+        p = fgets(line, GPDB_MAX_HISTORY_QUERY_SIZE, queryfd);
         if (p)
-            return APR_SUCCESS;
+            return true;
         else
-            return APR_NOTFOUND;
+            return false;
     }
-
-    fprintf(outfd, "\"");
-    (*bytes_written)++;
 
     while (field_len > 0) {
 	    int max, n;
@@ -1431,93 +1357,121 @@ static int get_and_print_next_query_file_kvp(FILE* outfd, FILE* queryfd, char* q
         n = fread(line, 1, max, queryfd);
         for (p = line, q = line + n; p < q; p++)
         {
-            if (*p == '"')
+            if (*p == '\'' || *p == '\\')
             {
-                fputc('\"', outfd);
-                (*bytes_written)++;
+                if (value_index == max_len) {
+                    break;
+                }
+                value[value_index] = '\'';
+                value_index++;
+
             }
 
-            fputc(*p, outfd);
-
-            (*bytes_written)++;
-
+            if (value_index == max_len) {
+                break;
+            }
+            value[value_index] = *p;
+            value_index++;
         }
         field_len -= n;
         if (n < max) break;
     }
-
-	fprintf(outfd, "\"");
-	(*bytes_written)++;
+    if (value_index == max_len) {
+        value[value_index - 1] = 0;
+    } else {
+        value[value_index] = 0;
+    }
 
     int n = fread(line, 1, 1, queryfd);
     if (n != 1)
     {
 	    gpmon_warning(FLINE, "missing expected newline in file: %s", qfname);
-        return APR_NOTFOUND;
+        return false;
     }
 
-    return APR_SUCCESS;
+    return true;
 }
 
-static apr_uint32_t write_qlog_full(FILE* fp, qdnode_t *qdnode, const char* nowstr)
+static void write_qlog_full(qdnode_t *qdnode, const char* nowstr, apr_uint32_t done, PGconn* conn, char* table)
 {
-	const int line_size = 1024;
+    // query text < GPDB_MAX_HISTORY_QUERY_SIZE bytes
+    // query plan = 0 bytes
+    // application name < 64 bytes
+    // rsqname < 64 bytes
+    // priority < 16 bytes
+    int field_max_size = 64;
+    int priority_max_size = 16;
+    static char line[GPDB_MAX_TUPLE_SIZE];
+    static char query_text[GPDB_MAX_HISTORY_QUERY_SIZE];
+    char plan_text[1];
+    char application_name[field_max_size];
+    char rsqname[field_max_size];
+    char priority[field_max_size];
 	const int qfname_size = 256;
-    char line[line_size];
     char qfname[qfname_size];
     FILE* qfptr = 0;
-    apr_uint32_t bytes_written = 0;
+    PGresult* result = 0;
+    const char* errmsg;
+    int bytes_written;
 
-    fmt_qlog(line, line_size, qdnode, nowstr, 1);
-    bytes_written = strlen(line) + 1;
-	if (bytes_written == line_size)
-	{
-		gpmon_warning(FLINE, "qlog line too long ... ignored: %s", line);
-		return 0;
-	}
-
-	fprintf(fp, "%s", line);
-
+    if (strcmp(qdnode->qlog.user, gpmmon_username()) == 0) {
+        return;
+    }
+    memset(line, '\0', sizeof(line));
+    memset(query_text, '\0', sizeof(query_text));
 	snprintf(qfname, qfname_size, GPMON_DIR "q%d-%d-%d.txt", qdnode->qlog.key.tmid,
             qdnode->qlog.key.ssid, qdnode->qlog.key.ccnt);
 
+	query_text[0] = 0;
+	application_name[0] = 0;
+	rsqname[0] = 0;
+	priority[0] = 0;
+	plan_text[0] = 0;
+
 	qfptr = fopen(qfname, "r");
-    if (!qfptr)
+    if (qfptr)
     {
-	    fprintf(fp, "|||||\n");
-	    bytes_written += 6;
-	    return bytes_written;
-    }
-
-    // 0 add query text
-    // 1 add query plan
-    // 2 add application name
-    // 3 add rsqname
-    // 4 add priority
-
-    int total_iterations = 5;
-    int all_good = 1;
-    int iter;
-    int retCode = APR_SUCCESS;
-    for (iter = 0; iter < total_iterations; ++iter)
-    {
-	    fprintf(fp, "|");
-        bytes_written++;
-
-        if (!all_good || iter == 1){
-            // we have no data for query plan
-            // if we failed once already don't bother trying to parse query file
-            continue;
+        for (int i = 0; i < 1; ++i)
+        {
+            if (!get_next_query_file_kvp(qfptr, qfname, GPDB_MAX_HISTORY_QUERY_SIZE, query_text)) {
+                gpmon_warning(FLINE, "query_text read failed %s", query_text);
+                break;
+            }
+            if (!get_next_query_file_kvp(qfptr, qfname, field_max_size, application_name)) {
+                gpmon_warning(FLINE, "application_name read failed %s", application_name);
+                break;
+            }
+            if (!get_next_query_file_kvp(qfptr, qfname, field_max_size, rsqname)) {
+                gpmon_warning(FLINE, "rsqname read failed %s", rsqname);
+                break;
+            }
+            if (!get_next_query_file_kvp(qfptr, qfname, priority_max_size, priority)) {
+                gpmon_warning(FLINE, "priority read failed %s", priority);
+            }
         }
-
-        retCode = get_and_print_next_query_file_kvp(fp, qfptr, qfname, &bytes_written);
-        if (retCode != APR_SUCCESS)
-            all_good = 0;
+        fclose(qfptr);
+    } else {
+        gpmon_warning(FLINE, "failed to open file %s", qfname);
     }
 
-    fprintf(fp, "\n");
-    fclose(qfptr);
-	return bytes_written;
+    fmt_qlog(line, GPDB_MAX_TUPLE_SIZE, qdnode, nowstr, done, query_text, plan_text, application_name, rsqname, priority, table);
+    bytes_written = strlen(line) + 1;
+    if (bytes_written == GPDB_MAX_TUPLE_SIZE)
+    {
+        /* Should never reach this place */
+        gpmon_warning(FLINE, "qlog line too long ... ignored: %s", line);
+        return;
+    }
+
+    errmsg = gpdb_exec_only(conn, &result, line);
+    if (errmsg)
+    {
+        gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, line);
+        PQreset(conn);
+    }
+
+    PQclear(result);
+    return;
 }
 
 static void bloom_init(bloom_t* bloom)

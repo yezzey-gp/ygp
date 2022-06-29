@@ -63,6 +63,7 @@
 		"gp_motion_slice_noop",
 		"gp_partitioning_dynamic_selection_log",
 		"gp_perfmon_print_packet_info",
+		"gp_perfmon_log_directory",
 		"gp_resgroup_memory_policy_auto_fixed_mem",
 		"gp_resgroup_print_operator_memory_limits",
 		"gp_resqueue_memory_policy_auto_fixed_mem",

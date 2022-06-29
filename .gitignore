@@ -55,6 +55,7 @@ lib*.pc
 compile_commands.json
 
 # Local excludes in root directory
+.idea
 /GNUmakefile
 /config.cache
 /config.log

@@ -351,6 +351,8 @@ extern bool execute_pruned_plan;
 extern bool gp_partitioning_dynamic_selection_log;
 extern int gp_max_partition_level;
 
+// The directory used by gpperfmon where we store alert logs.
+extern char* gp_perfmon_log_directory;
 extern bool gp_perfmon_print_packet_info;
 
 extern bool gp_enable_relsize_collection;

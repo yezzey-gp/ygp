@@ -9,9 +9,6 @@
 #include "time.h"
 
 int gpdb_exec_search_for_at_least_one_row(const char*, PGconn*);
-apr_status_t empty_harvest_file(const char*, apr_pool_t*, PGconn*);
-apr_status_t truncate_tail_file(const char*, apr_pool_t*, PGconn*);
-void upgrade_log_alert_table_distributed_key(PGconn*);
 
 #define GPMON_HOSTTTYPE_HDW 1
 #define GPMON_HOSTTTYPE_HDM 2
@@ -22,7 +19,12 @@ void upgrade_log_alert_table_distributed_key(PGconn*);
 #define MAX_SMON_PATH_SIZE (1024)
 #define MAX_OWNER_LENGTH   (100)
 
-#define GPDB_CONNECTION_STRING "dbname='" GPMON_DB "' user='" GPMON_DBUSER "' connect_timeout='30'"
+extern char* gpmmon_username(void);
+
+void gpdb_conn_string(char* connstr) {
+    memset(connstr, '\0', sizeof(GPDB_CONNSTR_SIZE));
+    snprintf(connstr, GPDB_CONNSTR_SIZE, "dbname='%s' user='%s' connect_timeout='30'", GPMON_DB, gpmmon_username());
+}
 
 int find_token_in_config_string(char* buffer, char**result, const char* token)
 {
@@ -30,7 +32,7 @@ int find_token_in_config_string(char* buffer, char**result, const char* token)
 }
 
 // assumes a valid connection already exists
-static const char* gpdb_exec_only(PGconn* conn, PGresult** pres, const char* query)
+const char* gpdb_exec_only(PGconn* conn, PGresult** pres, const char* query)
 {
 	PGresult* res = 0;
 	ExecStatusType status;
@@ -46,23 +48,23 @@ static const char* gpdb_exec_only(PGconn* conn, PGresult** pres, const char* que
 	return 0;
 }
 
-static const bool gpdb_exec_ddl(PGconn* conn, const char* ddl_query)
+const char* insert_into_table(PGconn* conn, char* tuple, const char* table)
 {
-	PGresult *result = NULL;
-	const char *errmsg = gpdb_exec_only(conn, &result, ddl_query);
-	PQclear(result);
-	if (errmsg)
-	{
-		gpmon_warning(FLINE, "failed to execute query '%s': %s\n", ddl_query, errmsg);
-	}
-	return errmsg == NULL;
+    static char query[GPDB_MAX_QUERY_FOR_INSERT_SIZE];
+    static const char* QRYFMT = "insert into %s values (%s);";
+    static PGresult *result = NULL;
+
+    memset(&query, '\0', GPDB_MAX_QUERY_FOR_INSERT_SIZE);
+    snprintf(query, GPDB_MAX_QUERY_FOR_INSERT_SIZE, QRYFMT, table, tuple);
+
+    return gpdb_exec_only(conn, &result, query);
 }
 
 // creates a connection and then runs the query
 static const char* gpdb_exec(PGconn** pconn, PGresult** pres, const char* query)
 {
-	const char *connstr = "dbname='" GPMON_DB "' user='" GPMON_DBUSER
-	"' connect_timeout='30'";
+    static char connstr[GPDB_CONNSTR_SIZE];
+    gpdb_conn_string(connstr);
 	PGconn *conn = NULL;
 
 	conn = PQconnectdb(connstr);
@@ -110,89 +112,6 @@ int gpdb_exec_search_for_at_least_one_row(const char* QUERY, PGconn* persistant_
 	return res;
 }
 
-static bool should_recreate_from_result(PGresult	*result,
-										const char	*encoding,
-										bool		script_exist,
-										int			expected_encoding_num)
-{
-	ASSERT(result);
-	ASSERT(encoding);
-	int rowcount = PQntuples(result);
-	if (rowcount > 0)
-	{
-		const char* cmd = PQgetvalue(result, 0, 0);
-		int encoding_num = atoi(PQgetvalue(result, 0, 1));
-		ASSERT(cmd);
-		const int MAX_ICONV_CMD_LEN = 50;
-		char iconv[MAX_ICONV_CMD_LEN];
-		snprintf(iconv, sizeof(iconv), "iconv -f %s -t %s -c", encoding, encoding);
-		const char gpperfmoncat[] = "gpperfmoncat.sh";
-		if (strncmp(cmd, iconv, sizeof(iconv)) != 0)
-		{
-			if (!script_exist && encoding_num == expected_encoding_num)
-			{
-				return false;
-			}
-		}
-		else if (strncmp(cmd, gpperfmoncat, sizeof(gpperfmoncat)))
-		{
-			if (script_exist && encoding_num == expected_encoding_num)
-			{
-				return false;
-			}
-		}
-	}
-	return true;
-}
-
-// Whether log_alert_table needs to be recreated. The order command is
-// EXECUTE 'cat ...' which would crash if gpdb-alert log files contain invalid
-// character. We use 'iconv' instead of 'cat' to fix it.
-// returns true if given table exist and uses 'cat' instead of 'iconv', then should be
-// recreated.
-// return false otherwise
-static bool gpdb_should_recreate_log_alert(PGconn		*conn,
-										   const char	*table_name,
-										   const char	*encoding,
-										   int			expected_encoding_num,
-										   bool			script_exist)
-{
-	ASSERT(conn);
-	ASSERT(strcasecmp(table_name, "log_alert_tail") == 0 ||
-		   strcasecmp(table_name, "log_alert_now") == 0);
-
-	PGresult *result = 0;
-
-	const char* errmsg = NULL;
-
-	const char* pattern = "select a.command, a.encoding from pg_exttable a, pg_class b "
-		"where a.reloid = b.oid and b.relname='%s'";
-
-	const int QRYBUFSIZ = 2000;
-	char query[QRYBUFSIZ];
-	snprintf(query, QRYBUFSIZ, pattern, table_name);
-
-	bool ret = true;
-
-	if (conn)
-	    errmsg = gpdb_exec_only(conn, &result, query);
-
-	if (errmsg)
-	{
-		gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, query);
-	}
-	else
-	{
-		ret = should_recreate_from_result(result,
-										  encoding,
-										  script_exist,
-										  expected_encoding_num);
-	}
-
-	PQclear(result);
-	return ret;
-}
-
 int gpdb_validate_gpperfmon(void)
 {
 	/* Check db */
@@ -203,16 +122,13 @@ int gpdb_validate_gpperfmon(void)
 	if (!gpdb_get_gpmon_port())
 		return 0;
 
-	/* check external tables are accessable by gpmon user */
-	if (!gpdb_validate_ext_table_access())
-		return 0;
-
 	return 1;
 }
 
 int gpdb_gpperfmon_db_exists(void)
 {
-	const char *connstr = "dbname='" GPMON_DB "' user='" GPMON_DBUSER "' connect_timeout='30'";
+    static char connstr[GPDB_CONNSTR_SIZE];
+    gpdb_conn_string(connstr);
 	int db_exists = 0;
 
 	PGconn *conn = PQconnectdb(connstr);
@@ -235,12 +151,6 @@ int gpdb_gpperfmon_db_exists(void)
 int gpdb_gpperfmon_enabled(void)
 {
 	const char* QUERY = "SELECT 1 FROM pg_settings WHERE name = 'gp_enable_gpperfmon' and setting='on'";
-	return gpdb_exec_search_for_at_least_one_row(QUERY, NULL);
-}
-
-int gpdb_validate_ext_table_access(void)
-{
-	const char* QUERY = "select * from master_data_dir";
 	return gpdb_exec_search_for_at_least_one_row(QUERY, NULL);
 }
 
@@ -676,7 +586,7 @@ void gpdb_get_master_data_dir(char** hostname, char** mstrdir, apr_pool_t* pool)
 {
 	PGconn* conn = 0;
 	PGresult* result = 0;
-	const char* QUERY = "select * from master_data_dir";
+	const char* QUERY = "select address, datadir from gp_segment_configuration where content=-1 and role='p'";
 	char* dir = 0;
 	char* hname = 0;
 	int rowcount;
@@ -906,146 +816,6 @@ static apr_status_t check_partition(const char* tbl, apr_pool_t* pool, PGconn* c
 	return APR_SUCCESS;
 }
 
-static apr_status_t harvest(const char* tbl, apr_pool_t* pool, PGconn* conN)
-{
-	PGconn* conn = 0;
-	PGresult* result = 0;
-	const int QRYBUFSIZ = 255;
-	char qrybuf[QRYBUFSIZ];
-	const char* QRYFMT = "insert into %s_history select * from _%s_tail;";
-	const char* errmsg;
-	apr_status_t res = APR_SUCCESS;
-
-	snprintf(qrybuf, QRYBUFSIZ, QRYFMT, tbl, tbl);
-
-	errmsg = gpdb_exec(&conn, &result, qrybuf);
-	if (errmsg)
-	{
-		res = 1;
-		gpmon_warningx(FLINE, 0, "---- HARVEST %s FAILED ---- on query %s with error %s\n", tbl, qrybuf, errmsg);
-	}
-	else
-	{
-		TR1(("load completed OK: %s\n", tbl));
-	}
-
-	PQclear(result);
-	PQfinish(conn);
-	return res;
-}
-
-/**
- * This function removes the not null constraint from the segid column so that
- * we can set it to null when the segment aggregation flag is true
- */
-apr_status_t remove_segid_constraint(void)
-{
-	PGconn* conn = 0;
-	PGresult* result = 0;
-	const char* ALTERSTR = "alter table iterators_history alter column segid drop not null;";
-	const char* errmsg;
-	apr_status_t res = APR_SUCCESS;
-
-	errmsg = gpdb_exec(&conn, &result, ALTERSTR);
-	if (errmsg)
-	{
-		res = 1;
-		gpmon_warningx(FLINE, 0, "---- Alter FAILED ---- on command: %s with error %s\n", ALTERSTR, errmsg);
-	}
-	else
-	{
-		TR1(("remove_segid_constraint: alter completed OK\n"));
-	}
-
-	PQclear(result);
-	PQfinish(conn);
-	return res;
-}
-
-apr_status_t gpdb_harvest_one(const char* table)
-{
-	return harvest(table, NULL, NULL);
-}
-
-
-
-apr_status_t truncate_file(char* fn, apr_pool_t* pool)
-{
-	apr_file_t *fp = NULL;
-	apr_status_t status;
-
-	status = apr_file_open(&fp, fn, APR_WRITE|APR_CREATE|APR_TRUNCATE, APR_UREAD|APR_UWRITE, pool);
-
-	if (status == APR_SUCCESS)
-	{
-		status = apr_file_trunc(fp, 0);
-		apr_file_close(fp);
-	}
-
-	if (status != APR_SUCCESS)
-	{
-		gpmon_warningx(FLINE, 0, "harvest process truncate file %s failed", fn);
-	}
-	else
-	{
-		TR1(("harvest truncated file %s: ok\n", fn));
-	}
-
-	return status;
-}
-
-
-/* rename tail to stage */
-static apr_status_t rename_tail_files(const char* tbl, apr_pool_t* pool, PGconn* conn)
-{
-	char srcfn[PATH_MAX];
-	char dstfn[PATH_MAX];
-
-	apr_status_t status;
-
-	/* make the file names */
-	snprintf(srcfn, PATH_MAX, "%s%s_tail.dat", GPMON_DIR, tbl);
-	snprintf(dstfn, PATH_MAX, "%s%s_stage.dat", GPMON_DIR, tbl);
-
-	status = apr_file_rename(srcfn, dstfn, pool);
-	if (status != APR_SUCCESS)
-	{
-		gpmon_warningx(FLINE, status, "harvest failed renaming %s to %s", srcfn, dstfn);
-		return status;
-	}
-	else
-	{
-		TR1(("harvest rename %s to %s success\n", srcfn, dstfn));
-	}
-
-	return status;
-}
-
-/* append stage data to _tail file */
-static apr_status_t append_to_harvest(const char* tbl, apr_pool_t* pool, PGconn* conn)
-{
-	char srcfn[PATH_MAX];
-	char dstfn[PATH_MAX];
-
-	apr_status_t status;
-
-	/* make the file names */
-	snprintf(srcfn, PATH_MAX, "%s%s_stage.dat", GPMON_DIR, tbl);
-	snprintf(dstfn, PATH_MAX, "%s_%s_tail.dat", GPMON_DIR, tbl);
-
-	status = apr_file_append(srcfn, dstfn, APR_FILE_SOURCE_PERMS, pool);
-	if (status != APR_SUCCESS)
-	{
-		gpmon_warningx(FLINE, status, "harvest failed appending %s to %s", srcfn, dstfn);
-	}
-	else
-	{
-		TR1(("harvest append %s to %s: ok\n", srcfn, dstfn));
-	}
-
-	return status;
-}
-
 typedef apr_status_t eachtablefunc(const char* tbl, apr_pool_t*, PGconn*);
 typedef apr_status_t eachtablefuncwithopt(const char* tbl, apr_pool_t*, PGconn*, mmon_options_t*);
 
@@ -1093,216 +863,15 @@ apr_status_t call_for_each_table_with_opt(eachtablefuncwithopt func, apr_pool_t*
 	return status;
 }
 
-/* rename tail files to stage files */
-apr_status_t gpdb_rename_tail_files(apr_pool_t* pool)
-{
-	return call_for_each_table(rename_tail_files, pool, NULL);
-}
-
-/* copy data from stage files to harvest files */
-apr_status_t gpdb_copy_stage_to_harvest_files(apr_pool_t* pool)
-{
-	return call_for_each_table(append_to_harvest, pool, NULL);
-}
-
-/* truncate _tail files */
-apr_status_t empty_harvest_file(const char* tbl, apr_pool_t* pool, PGconn* conn)
-{
-	char fn[PATH_MAX];
-	snprintf(fn, PATH_MAX, "%s_%s_tail.dat", GPMON_DIR, tbl);
-	return truncate_file(fn, pool);
-}
-
-/* truncate tail files */
-apr_status_t truncate_tail_file(const char* tbl, apr_pool_t* pool, PGconn* conn)
-{
-	char fn[PATH_MAX];
-	snprintf(fn, PATH_MAX, "%s%s_tail.dat", GPMON_DIR, tbl);
-	return truncate_file(fn, pool);
-}
-
-/* truncate _tail files to clear data already loaded into the DB */
-apr_status_t gpdb_truncate_tail_files(apr_pool_t* pool)
-{
-	return call_for_each_table(truncate_tail_file, pool, NULL);
-}
-
-/* truncate _tail files to clear data already loaded into the DB */
-apr_status_t gpdb_empty_harvest_files(apr_pool_t* pool)
-{
-	return call_for_each_table(empty_harvest_file, pool, NULL);
-}
-
-/* insert _tail data into history table */
-apr_status_t gpdb_harvest(void)
-{
-	return call_for_each_table(harvest, NULL, NULL);
-}
-
-static bool gpdb_insert_alert_log()
-{
-	PGconn* conn = 0;
-	PGresult* result = 0;
-	const char* QRY = "insert into log_alert_history select * from log_alert_tail;";
-	const char* errmsg;
-	errmsg = gpdb_exec(&conn, &result, QRY);
-
-	bool success = true;
-	if (errmsg)
-	{
-		gpmon_warningx(
-			FLINE, 0,
-			"---- ARCHIVING HISTORICAL ALERT DATA FAILED ---- on query %s with error %s\n",
-			QRY, errmsg);
-		success = false;
-	}
-	else
-	{
-		TR1(("load completed OK: alert_log\n"));
-	}
-
-	PQclear(result);
-	PQfinish(conn);
-	return success;
-}
-
-static void gpdb_remove_success_files(apr_array_header_t *success_append_files, apr_pool_t *pool)
-{
-	void *file_slot = NULL;
-	while ((file_slot = apr_array_pop(success_append_files)))
-	{
-		const char *file_name = (*(char**)file_slot);
-		if (file_name)
-		{
-			if (apr_file_remove(file_name, pool) != APR_SUCCESS)
-			{
-				gpmon_warningx(FLINE, 0, "failed removing file:%s", file_name);
-			}
-		}
-	}
-}
-
-static int cmp_string(const void *left, const void *right)
-{
-	const char *op1 = *(const char**)left;
-	const char *op2 = *(const char**)right;
-	return strcmp(op1, op2);
-}
-
-// Find all files start with 'gpdb-alert' under GPMON_LOG directory, sort it and
-// remove the latest one 'gpdb-alert-*.csv' as it is still used by GPDB.
-static void get_alert_log_tail_files(apr_array_header_t *tail_files, apr_pool_t *pool)
-{
-	apr_dir_t *dir;
-	apr_status_t status = apr_dir_open(&dir, GPMON_LOG, pool);
-	if (status != APR_SUCCESS)
-	{
-		gpmon_warningx(FLINE, status, "failed opening directory:%s", GPMON_LOG);
-		return;
-	}
-
-	apr_finfo_t dirent;
-	static const char gpdb_prefix[] = "gpdb-alert";
-	while (apr_dir_read(&dirent, APR_FINFO_DIRENT, dir) == APR_SUCCESS)
-	{
-		if (strncmp(dirent.name, gpdb_prefix, sizeof(gpdb_prefix) - 1) == 0)
-		{
-			void *file_slot = apr_array_push(tail_files);
-			if (! file_slot)
-			{
-				gpmon_warningx(FLINE, 0, "failed getting alert tail log:%s due to out of memory", dirent.name);
-				continue;
-			}
-			(*(const char**)file_slot) = apr_pstrcat(pool, GPMON_LOG, "/", dirent.name, NULL);
-		}
-	}
-
-	// We only want to use qsort in stdlib.h, not the macro qsort in port.h.
-	(qsort)(tail_files->elts, tail_files->nelts, tail_files->elt_size, cmp_string);
-	(void)apr_array_pop(tail_files);
-	apr_dir_close(dir);
-}
-
-void gpdb_import_alert_log(apr_pool_t *pool)
-{
-	// Get alert log files to be imported.
-	apr_array_header_t* tail_files = apr_array_make(pool, 10, sizeof(char*));
-	apr_array_header_t* success_append_files = apr_array_make(pool, 10, sizeof(char*));
-	get_alert_log_tail_files(tail_files, pool);
-
-	// Create or truncate stage file.
-	char *dst_file = apr_pstrcat(pool, GPMON_LOG, "/", GPMON_ALERT_LOG_STAGE, NULL);
-	apr_status_t status = truncate_file(dst_file, pool);
-	if (status != APR_SUCCESS)
-	{
-	    gpmon_warningx(FLINE, 0, "failed truncating stage file:%s", dst_file);
-	    return;
-	}
-
-	// Append alert log tail file to stage file
-	void *tail_file = NULL;
-	while ((tail_file = apr_array_pop(tail_files)))
-	{
-		char *filename = *(char**)tail_file;
-		void *success_file_slot = apr_array_push(success_append_files);
-		if (!success_file_slot)
-		{
-			gpmon_warningx(
-				FLINE, 0, "failed appending file:%s to stage file:%s due to out of memory",
-				filename, dst_file);
-			continue;
-		}
-		(*(char**)success_file_slot) = NULL;
-
-	    status = apr_file_append(filename, dst_file, APR_FILE_SOURCE_PERMS, pool);
-	    if (status != APR_SUCCESS)
-	    {
-			gpmon_warningx(FLINE, status, "failed appending file:%s to stage file:%s", filename, dst_file);
-			continue;
-		}
-	    else
-	    {
-			(*(char**)success_file_slot) = filename;
-	    	TR1(("success appending file:%s to stage file:%s\n", filename, dst_file));
-	    }
-	}
-
-	// Insert tail file to history table.
-	if (!gpdb_insert_alert_log())
-	{
-		// Failure might happen on malformed log entries
-		time_t now;
-		char timestr[20];
-		char *bad_file;
-
-		// Copy failed log into separate file for user attention
-		now = time(NULL);
-		strftime(timestr, 20, "%Y-%m-%d_%H%M%S", localtime(&now));
-		bad_file = apr_pstrcat(pool, GPMON_LOG, "/", GPMON_ALERT_LOG_STAGE, "_broken_", timestr,  NULL);
-		if (apr_file_copy(dst_file, bad_file, APR_FPROT_FILE_SOURCE_PERMS, pool) == APR_SUCCESS)
-		{
-			gpmon_warningx(FLINE, status, "Staging file with broken entries is archived to %s", bad_file);
-		}
-		else
-		{
-			gpmon_warningx(FLINE, status, "failed copying stage file:%s to broken file:%s", dst_file, bad_file);
-		}
-	}
-
-	// Delete tail file regardless of load success, as keeping too many tail files
-	// might cause serious harm to the system
-	gpdb_remove_success_files(success_append_files, pool);
-	truncate_file(dst_file, pool);
-}
-
-
 /* insert _tail data into history table */
 apr_status_t gpdb_check_partitions(mmon_options_t *opt)
 {
 	apr_status_t result;
 
 	PGconn *conn = NULL;
-	conn = PQconnectdb(GPDB_CONNECTION_STRING);
+	static char connstr[GPDB_CONNSTR_SIZE];
+	gpdb_conn_string(connstr);
+	conn = PQconnectdb(connstr);
 
 	if (PQstatus(conn) != CONNECTION_OK) {
 		gpmon_warning(
@@ -1313,15 +882,6 @@ apr_status_t gpdb_check_partitions(mmon_options_t *opt)
 		result = APR_EINVAL;
 	} else {
 		result = call_for_each_table_with_opt(check_partition, NULL, conn, opt);
-
-		// make sure to run check_partition even if we just got a failure from the previous call
-		apr_status_t temp_result;
-		temp_result = check_partition("log_alert", NULL, conn, opt);
-
-		// use the first error that occurred, if any
-		if (result == APR_SUCCESS) {
-			result = temp_result;
-		}
 	}
 
 	// close connection
@@ -1353,8 +913,10 @@ apr_hash_t *get_active_queries(apr_pool_t *pool)
 {
 	PGresult   *result = NULL;
 	apr_hash_t *active_query_tab = NULL;
+	static char connstr[GPDB_CONNSTR_SIZE];
 
-	PGconn *conn = PQconnectdb(GPDB_CONNECTION_STRING);
+	gpdb_conn_string(connstr);
+	PGconn *conn = PQconnectdb(connstr);
 	if (PQstatus(conn) != CONNECTION_OK)
 	{
 		gpmon_warning(
@@ -1435,323 +997,3 @@ const char *iconv_encodings[] = {
 	"JOHAB",
 	NULL // SJIS, not supported in server encoding.
 };
-
-static const char* find_encoding(int encoding_num)
-{
-	// Because encodings here are in consistant with those
-	// in gpdb, we have assertion here.
-	ASSERT(encoding_num >= 0 &&
-		   encoding_num < (sizeof(iconv_encodings) / sizeof(char*)));
-	return iconv_encodings[encoding_num];
-}
-
-static bool get_encoding_from_result(PGresult	*result,
-									 char		*encoding,
-									 size_t		encoding_len,
-									 int		*encoding_num)
-{
-	ASSERT(result);
-	ASSERT(encoding);
-	ASSERT(encoding_num);
-	if (PQntuples(result) > 0)
-	{
-		const char* encoding_str = PQgetvalue(result, 0, 0);
-		*encoding_num = atoi(encoding_str);
-		const char *encoding_item = find_encoding(*encoding_num);
-		if (encoding_item)
-		{
-			strncpy(encoding, encoding_item, encoding_len);
-		}
-		else
-		{
-			gpmon_warning(FLINE, "GPDB bad encoding: %d\n", *encoding_num);
-			return false;
-		}
-	}
-	else
-	{
-		TR0(("could not find owner for 'gpperfmon' database\n"));
-		return false;
-	}
-	return true;
-}
-
-static bool gpdb_get_server_encoding(PGconn	*conn,
-									 char	*encoding,
-									 size_t	encoding_len,
-									 int	*encoding_num)
-{
-	ASSERT(conn);
-	ASSERT(encoding);
-	ASSERT(encoding_num);
-
-	PGresult *result = NULL;
-	const char *query = "SELECT encoding FROM pg_catalog.pg_database "
-						"d WHERE d.datname = 'gpperfmon'";
-	const char* errmsg = gpdb_exec_only(conn, &result, query);
-	bool ret = true;
-
-	if (errmsg != NULL)
-	{
-		gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, query);
-		ret = false;
-	}
-	else
-	{
-		ret = get_encoding_from_result(result,
-									   encoding,
-									   encoding_len,
-									   encoding_num);
-	}
-
-	PQclear(result);
-	return ret;
-}
-
-static bool create_alert_table_with_script(PGconn *conn, const char *encoding)
-{
-	ASSERT(conn);
-	ASSERT(encoding);
-	const char query_pattern[] = "BEGIN;"
-		"DROP EXTERNAL TABLE IF EXISTS public.log_alert_tail;"
-		"CREATE EXTERNAL WEB TABLE public.log_alert_tail (LIKE "
-		"public.log_alert_history) EXECUTE 'gpperfmoncat.sh "
-		"gpperfmon/logs/alert_log_stage 2> /dev/null || true' "
-		"ON MASTER FORMAT 'csv' (DELIMITER e',' NULL e'' "
-		"ESCAPE e'\"' QUOTE e'\"') ENCODING '%s';"
-		"DROP EXTERNAL TABLE IF EXISTS public.log_alert_now;"
-		"CREATE EXTERNAL WEB TABLE public.log_alert_now "
-		"(LIKE public.log_alert_history) "
-		"EXECUTE 'gpperfmoncat.sh gpperfmon/logs/*.csv 2> /dev/null "
-		"|| true' ON MASTER FORMAT 'csv' (DELIMITER e',' NULL "
-		"e'' ESCAPE e'\"' QUOTE e'\"') ENCODING '%s'; COMMIT;";
-
-	char query[sizeof(query_pattern) + 100];
-	snprintf(query, sizeof(query), query_pattern, encoding, encoding);
-
-	return gpdb_exec_ddl(conn, query);
-}
-
-static bool create_alert_table_without_script(PGconn *conn, const char *encoding)
-{
-	ASSERT(conn);
-	ASSERT(encoding);
-	const char query_pattern[] = "BEGIN;"
-		"DROP EXTERNAL TABLE IF EXISTS public.log_alert_tail;"
-		"CREATE EXTERNAL WEB TABLE public.log_alert_tail (LIKE "
-		"public.log_alert_history) EXECUTE 'iconv -f %s -t %s -c "
-		"gpperfmon/logs/alert_log_stage 2> /dev/null || true' ON MASTER FORMAT "
-		"'csv' (DELIMITER e',' NULL e'' ESCAPE e'\"' QUOTE e'\"') ENCODING '%s';"
-		"DROP EXTERNAL TABLE IF EXISTS public.log_alert_now;"
-		"CREATE EXTERNAL WEB TABLE public.log_alert_now (LIKE "
-		"public.log_alert_history) EXECUTE 'iconv -f %s -t %s -c "
-		"gpperfmon/logs/*.csv 2> /dev/null || true' ON MASTER FORMAT 'csv' "
-		"(DELIMITER e',' NULL e'' ESCAPE e'\"' QUOTE e'\"') ENCODING '%s'; COMMIT;";
-
-	char query[sizeof(query_pattern) + 100];
-	snprintf(query, sizeof(query), query_pattern, encoding, encoding,
-			 encoding, encoding, encoding, encoding);
-	return gpdb_exec_ddl(conn, query);
-}
-
-static bool recreate_alert_tables_if_needed(PGconn *conn, const char *owner)
-{
-	ASSERT(conn);
-
-	const int max_encoding_length = 20;
-	char encoding[max_encoding_length];
-	int encoding_num;
-	bool success_get_encoding = gpdb_get_server_encoding(conn,
-														 encoding,
-														 sizeof(encoding),
-														 &encoding_num);
-	if (!success_get_encoding)
-	{
-		gpmon_warning(FLINE, "GPDB failed to get server encoding.\n");
-		return false;
-	}
-
-	bool script_exist = (system("which gpperfmoncat.sh > /dev/null 2>&1") == 0);
-	bool should_recreate = gpdb_should_recreate_log_alert(
-														conn,
-														"log_alert_tail",
-														encoding,
-														encoding_num,
-														script_exist);
-	if (should_recreate)
-	{
-		return (script_exist ?
-				create_alert_table_with_script(conn, encoding) :
-				create_alert_table_without_script(conn, encoding));
-	}
-
-	return true;
-}
-
-static bool gpdb_get_gpperfmon_owner(PGconn *conn, char *owner, size_t owner_length)
-{
-	ASSERT(conn);
-	ASSERT(owner);
-
-	PGresult *result = NULL;
-	const char *query = "select pg_catalog.pg_get_userbyid(d.datdba) as "
-						"owner from pg_catalog.pg_database d where "
-						"d.datname = 'gpperfmon'";
-	const char *errmsg = gpdb_exec_only(conn, &result, query);
-	bool ret = true;
-
-	if (errmsg != NULL)
-	{
-		gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, query);
-		ret = false;
-	}
-	else
-	{
-		if (PQntuples(result) > 0)
-		{
-			const char* owner_field = PQgetvalue(result, 0, 0);
-			strncpy(owner, owner_field, owner_length);
-			ret = true;
-		}
-		else
-		{
-			TR0(("could not find owner for 'gpperfmon' database\n"));
-			ret = false;
-		}
-	}
-	PQclear(result);
-	return ret;
-}
-
-static void gpdb_change_alert_table_owner(PGconn *conn, const char *owner)
-{
-	ASSERT(conn);
-	ASSERT(owner);
-
-	// change owner from gpmon, otherwise, gpperfmon_install
-	// might quit with error when execute 'drop role gpmon if exists'
-	const char* query_pattern = "ALTER TABLE public.log_alert_history owner to %s;"
-								"ALTER EXTERNAL TABLE public.log_alert_tail "
-								"owner to %s;ALTER EXTERNAL TABLE public.log_alert_now"
-								" owner to %s;";
-	const int querybufsize = 512;
-	char query[querybufsize];
-	snprintf(query, querybufsize, query_pattern, owner, owner, owner);
-	TR0(("change owner to %s\n", owner));
-	gpdb_exec_ddl(conn, query);
-}
-
-/*
- * Upgrade: alter distributed key of log_alert_history from logsegment to logtime
- */
-void upgrade_log_alert_table_distributed_key(PGconn* conn)
-{
-	if (conn == NULL)
-	{
-		TR0(("Can't upgrade log_alert_history: conn is NULL\n"));
-		return;
-	}
-
-	const char* qry = "SELECT d.nspname||'.'||a.relname as tablename, b.attname as distributed_key\
-	    FROM pg_class  a\
-	    INNER JOIN pg_attribute b on a.oid=b.attrelid\
-	    INNER JOIN gp_distribution_policy c on a.oid = c.localoid\
-	    INNER JOIN pg_namespace d on a.relnamespace = d.oid\
-	    WHERE a.relkind = 'r' AND b.attnum = any(c.distkey) AND a.relname = 'log_alert_history'";
-
-	PGresult* result = NULL;
-	const char* errmsg = gpdb_exec_only(conn, &result, qry);
-
-	if (errmsg != NULL)
-	{
-		gpmon_warning(FLINE, "GPDB error %s\n\tquery: %s\n", errmsg, qry);
-	}
-	else
-	{
-		if (PQntuples(result) > 0)
-		{
-			// check if current distributed key is logsegment
-			const char* current_distributed_key = PQgetvalue(result, 0, 1);
-			if (current_distributed_key == NULL)
-			{
-				TR0(("could not find distributed key of log_alert_history\n"));
-				PQclear(result);
-				return;
-			}
-			if (strcmp(current_distributed_key, "logsegment") == 0)
-			{
-				TR0(("[INFO] log_alert_history: Upgrading log_alert_history table to use logsegment as distributed key\n"));
-				qry = "alter table public.log_alert_history set distributed by (logtime);";
-				gpdb_exec_ddl(conn, qry);
-			}
-		}
-	}
-
-	PQclear(result);
-	return;
-}
-
-
-
-// to mitigate upgrade hassle.
-void create_log_alert_table()
-{
-	PGconn *conn = PQconnectdb(GPDB_CONNECTION_STRING);
-	if (PQstatus(conn) != CONNECTION_OK)
-	{
-		gpmon_warning(FLINE,
-			"error creating gpdb client connection to dynamically "
-			"check/create gpperfmon partitions: %s",
-		PQerrorMessage(conn));
-		PQfinish(conn);
-		return;
-	}
-
-	const char *qry= "SELECT tablename FROM pg_tables "
-					"WHERE tablename = 'log_alert_history' "
-					"AND schemaname = 'public' ;";
-
-	const bool has_history_table = gpdb_exec_search_for_at_least_one_row(qry, conn);
-
-	char owner[MAX_OWNER_LENGTH] = {};
-	bool success_get_owner = gpdb_get_gpperfmon_owner(conn, owner, sizeof(owner));
-
-	// log_alert_history: create table if not exist or alter it to use correct
-	// distribution key.
-	if (!has_history_table)
-	{
-		qry = "BEGIN; CREATE TABLE public.log_alert_history (LIKE "
-			"gp_toolkit.__gp_log_master_ext) DISTRIBUTED BY (logtime) "
-			"PARTITION BY range (logtime)(START (date '2010-01-01') "
-			"END (date '2010-02-01') EVERY (interval '1 month')); COMMIT;";
-
-		TR0(("sounds like you have just upgraded your database, creating"
-			 " newer tables\n"));
-
-		gpdb_exec_ddl(conn, qry);
-	}
-	else
-	{
-		/*
-		* Upgrade: alter distributed key of log_alert_history from logsegment to logtime
-		*/
-		upgrade_log_alert_table_distributed_key(conn);
-	}
-
-	// log_alert_now/log_alert_tail: change to use 'gpperfmoncat.sh' from 'iconv/cat' to handle
-	// encoding issue.
-	if (recreate_alert_tables_if_needed(conn, owner))
-	{
-		if (success_get_owner)
-		{
-			gpdb_change_alert_table_owner(conn, owner);
-		}
-	}
-	else
-	{
-		TR0(("recreate alert_tables failed\n"));
-	}
-
-	PQfinish(conn);
-	return;
-}
