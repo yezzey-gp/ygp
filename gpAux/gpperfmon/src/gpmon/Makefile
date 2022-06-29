@@ -49,8 +49,6 @@ install: all
 	mkdir -p $(prefix)/bin
 	cp -p gpmmon $(prefix)/bin
 	cp -p gpsmon $(prefix)/bin
-	cp -p gpperfmoncat.sh $(prefix)/bin
-	cp -p gpmon_catqrynow.py $(prefix)/sbin
 	cp -p gpperfmon_install $(prefix)/bin
 	mkdir -p $(prefix)/lib/gpperfmon
 	cp -p gpperfmon.sql $(prefix)/lib/gpperfmon

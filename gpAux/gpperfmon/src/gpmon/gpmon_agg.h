@@ -4,6 +4,10 @@
 #include "apr_pools.h"
 #include "gpmonlib.h"
 
+#define QUERIES_HISTORY "queries_history"
+#define QUERIES_NOW "queries_now"
+#define TRUNCATE_QUERIES_NOW "TRUNCATE public.queries_now;"
+
 typedef struct agg_t agg_t;
 apr_status_t agg_create(agg_t** retagg, apr_int64_t generation, apr_pool_t* parent_pool, apr_hash_t* fsinfotab);
 apr_status_t agg_dup(agg_t** agg, agg_t* oldagg, apr_pool_t* pool, apr_hash_t* fsinfotab);

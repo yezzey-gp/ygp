@@ -98,9 +98,7 @@ static char *last_csv_file_name = NULL;
 // Store only those logs the severe of that are at least WARNING level to
 // speed up the access for it when log files become very huge.
 static FILE *alertLogFile = NULL;
-// The directory used by gpperfmon where we store alert logs.
-static const char *gp_perf_mon_directory = "gpperfmon/logs";
-static const char *alert_file_pattern = "gpdb-alert-%Y-%m-%d_%H%M%S.csv";
+static const char *alert_file_pattern = "gpdb-alert.csv";
 static char *alert_last_file_name = NULL;
 static bool alert_log_level_opened = false;
 static bool write_to_alert_log = false;
@@ -268,7 +266,8 @@ get_avail_chunk()
 NON_EXEC_STATIC void
 SysLoggerMain(int argc, char *argv[])
 {
-	char	   *currentLogDir;
+    char	   *currentLogDir;
+    char	   *currentLogAlertDir;
 	char	   *currentLogFilename;
 	int			currentLogRotationAge;
 	pg_time_t	now;
@@ -413,6 +412,7 @@ SysLoggerMain(int argc, char *argv[])
 
 	/* remember active logfile parameters */
 	currentLogDir = pstrdup(Log_directory);
+	currentLogAlertDir = pstrdup(gp_perfmon_log_directory);
 	currentLogFilename = pstrdup(Log_filename);
 	currentLogRotationAge = Log_RotationAge;
 	/* set next planned rotation time */
@@ -467,6 +467,22 @@ SysLoggerMain(int argc, char *argv[])
 				 * Also, create new directory if not present; ignore errors
 				 */
 				mkdir(Log_directory, S_IRWXU | S_IRGRP | S_IXGRP);
+			}
+			/*
+             * Check if the log alert directory or filename pattern changed in
+             * postgresql.conf. If so, force rotation to make sure we're
+             * writing the logfiles in the right place.
+             */
+			if (strcmp(gp_perfmon_log_directory, currentLogAlertDir) != 0)
+			{
+			    pfree(currentLogAlertDir);
+			    currentLogAlertDir = pstrdup(gp_perfmon_log_directory);
+			    alert_rotation_requested = true;
+
+			    /*
+				 * Also, create new directory if not present; ignore errors
+				 */
+			    mkdir(gp_perfmon_log_directory, S_IRWXU | S_IRGRP | S_IXGRP);
 			}
 			if (strcmp(Log_filename, currentLogFilename) != 0)
 			{
@@ -544,6 +560,11 @@ SysLoggerMain(int argc, char *argv[])
 			}
 		}
 
+		if (rotation_requested)
+		{
+		    alert_rotation_requested = true;
+		}
+
 		all_rotations_occurred = rotation_requested ||
 								 (alert_log_level_opened && alert_rotation_requested);
 
@@ -570,10 +591,13 @@ SysLoggerMain(int argc, char *argv[])
 
 		if (alert_log_level_opened && alert_rotation_requested)
 		{
+		    if (!time_based_rotation && size_rotation_for_alert == 0)
+		        size_rotation_for_alert = true;
+
 			alert_rotation_requested = false;
 			all_rotations_occurred &=
 				logfile_rotate(time_based_rotation, size_rotation_for_alert,
-							   NULL, gp_perf_mon_directory, alert_file_pattern,
+                               NULL, currentLogAlertDir, alert_file_pattern,
 							   &alertLogFile, &alert_last_file_name);
 		}
 
@@ -825,19 +849,19 @@ SysLoggerMain(int argc, char *argv[])
 }
 
 static void
-open_alert_log_file()
+open_alert_log_file(char* currentLogAlertDir)
 {
 	if (IsUnderMasterDispatchMode() &&
         gpperfmon_log_alert_level != GPPERFMON_LOG_ALERT_LEVEL_NONE)
     {
-        if(mkdir(gp_perf_mon_directory, 0700) == -1)
+	    if(mkdir(currentLogAlertDir, 0700) == -1)
 		{
 			ereport(WARNING,
 			        (errcode_for_file_access(),
 			         (errmsg("could not create log file directory \"%s\": %m",
-					  gp_perf_mon_directory))));
+                             currentLogAlertDir))));
 		}
-        char *alert_file_name = logfile_getname(time(NULL), NULL, gp_perf_mon_directory, alert_file_pattern);
+	    char *alert_file_name = logfile_getname(time(NULL), NULL, currentLogAlertDir, alert_file_pattern);
         alertLogFile = fopen(alert_file_name, "a");
         if (!alertLogFile)
         {
@@ -931,7 +955,7 @@ SysLogger_Start(void)
 
 	syslogFile = logfile_open(filename, "a", false);
 
-	open_alert_log_file();
+	open_alert_log_file(gp_perfmon_log_directory);
 
 	pfree(filename);
 
