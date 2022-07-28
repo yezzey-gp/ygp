@@ -55,6 +55,9 @@ typedef struct AppendOnlyStorageWrite
 	 * Name of the relation to use in system logging and error messages.
 	 */
 	char	   *relationName;
+	char	   *relationNamespace;
+
+	Oid			relationOid;
 
 	/*
 	 * A phrase that better describes the purpose of the this open.
@@ -88,7 +91,8 @@ typedef struct AppendOnlyStorageWrite
 	/*
 	 * The handle to the current open segment file.
 	 */
-	File		file;
+	SMGRFile		file;
+	const struct f_smgr_ao * smgr;
 
 	/*
 	 * The committed EOF at the beginning of the write open.
@@ -179,7 +183,9 @@ typedef struct AppendOnlyStorageWrite
 extern void AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 										MemoryContext memoryContext,
 										int32 maxBufferLen,
+										char *relationNamespace,
 										char *relationName,
+										Oid reloid,
 										char *title,
 										AppendOnlyStorageAttributes *storageAttributes,
 										bool needsWAL);
@@ -193,6 +199,7 @@ extern void AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite
 								int version,
 								int64 logicalEof,
 								int64 fileLen_uncompressed,
+								int64 modcount,
 								RelFileNodeBackend *relFileNode,
 								int32 segmentFileNum);
 extern void AppendOnlyStorageWrite_FlushAndCloseFile(AppendOnlyStorageWrite *storageWrite,

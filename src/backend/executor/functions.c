@@ -229,7 +229,9 @@ querytree_safe_for_qe_walker(Node *expr, void *context)
 						if (!(IsSystemNamespace(namespaceId) ||
 									IsToastNamespace(namespaceId) ||
 									IsAoSegmentNamespace(namespaceId) ||
-									IsReplicatedTable(rte->relid)))
+									(IsReplicatedTable(rte->relid) &&
+									 !IS_QUERY_DISPATCHER())
+									 || IsYezzeyNamespace(namespaceId)))
 						{
 							ereport(ERROR,
 									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),

@@ -95,6 +95,7 @@ BufferedAppendInit(BufferedAppend *bufferedAppend,
 	 * File level members.
 	 */
 	bufferedAppend->file = -1;
+	bufferedAppend->smgr = smgrao();
 	bufferedAppend->filePathName = NULL;
 	bufferedAppend->fileLen = 0;
 }
@@ -150,7 +151,7 @@ BufferedAppendWrite(BufferedAppend *bufferedAppend, bool needsWAL)
 	{
 		int64		currentWritePosition;
 
-		currentWritePosition = FileNonVirtualCurSeek(bufferedAppend->file);
+		currentWritePosition = bufferedAppend->smgr->smgr_NonVirtualCurSeek(bufferedAppend->file);
 		if (currentWritePosition < 0)
 			ereport(ERROR, (errcode_for_file_access(),
 							errmsg("unable to get current position in table \"%s\" for file \"%s\": %m",
@@ -158,7 +159,7 @@ BufferedAppendWrite(BufferedAppend *bufferedAppend, bool needsWAL)
 								   bufferedAppend->filePathName)));
 
 		if (currentWritePosition != bufferedAppend->largeWritePosition)
-			ereport(ERROR, (errcode_for_file_access(),
+			ereport(WARNING, (errcode_for_file_access(),
 							errmsg("Current position mismatch actual "
 								   INT64_FORMAT ", expected " INT64_FORMAT " in table \"%s\" for file \"%s\"",
 								   currentWritePosition, bufferedAppend->largeWritePosition,
@@ -176,7 +177,7 @@ BufferedAppendWrite(BufferedAppend *bufferedAppend, bool needsWAL)
 	{
 		int32		byteswritten;
 
-		byteswritten = FileWrite(bufferedAppend->file,
+		byteswritten = bufferedAppend->smgr->smgr_FileWrite(bufferedAppend->file,
 								 (char *) largeWriteMemory + bytestotal,
 								 bytesleft);
 		if (byteswritten < 0)
