@@ -1089,7 +1089,8 @@ EvaluateDeferredStatements(List *deferredStmts)
 #define METATRACK_VALIDNAMESPACE(namespaceId) \
 	(namespaceId != PG_TOAST_NAMESPACE &&	\
 	 namespaceId != PG_BITMAPINDEX_NAMESPACE && \
-	 namespaceId != PG_AOSEGMENT_NAMESPACE )
+	 namespaceId != PG_AOSEGMENT_NAMESPACE && \
+	 namespaceId != YEZZEY_AUX_NAMESPACE)
 
 /* check for valid namespace and valid relkind */
 static bool
@@ -6313,7 +6314,7 @@ ATAocsWriteNewColumns(AlteredTableInfo *tab)
 			 * Open aocs segfile for chosen column for current
 			 * appendonly segment.
 			 */
-			aocs_headerscan_opensegfile(sdesc, segInfos[segi], basepath);
+			aocs_headerscan_opensegfile(sdesc, segInfos[segi], basepath, rel->rd_node);
 
 			/*
 			 * Create new segfiles for new columns for current
@@ -6682,7 +6683,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 			MemTupleBinding*		mt_bind;
 
 			if(newrel)
-				aoInsertDesc = appendonly_insert_init(newrel, segno, false);
+				aoInsertDesc = appendonly_insert_init(oldrel, newrel, segno, false);
 
 			mt_bind = (newrel ? aoInsertDesc->mt_bind : create_memtuple_binding(newTupDesc));
 
@@ -7096,6 +7097,7 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			/*
 			 * Allow ALTER TABLE operations in standard alone mode on
 			 * AO segment tables.
@@ -12316,6 +12318,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			if (recursing)
 				break;
 			/* FALL THRU */
@@ -12903,6 +12906,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			if (RelationIsAppendOptimized(rel))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -13089,6 +13093,10 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 	ForkNumber	forkNum;
 	List	   *reltoastidxids = NIL;
 	ListCell   *lc;
+
+	if (newTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move to this tablespace. Use yezzey SQL API");
+	}
 
 	/*
 	 * Need lock here in case we are recursing to toast table or index
@@ -15153,6 +15161,7 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	Oid					tmprelid;
 	Oid					relid = RelationGetRelid(rel);
 	char				relstorage = rel->rd_rel->relstorage;
+	Oid                 origtablespace;
 	ExpandStmtSpec		*spec = (ExpandStmtSpec *)rootCmd->def;
 
 	/*--
@@ -15275,9 +15284,15 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	 * the cache, we keep the lock though. ATRewriteCatalogs() knows
 	 * that we've closed the relation here.
 	 */
+
+	origtablespace = rel->rd_node.spcNode;
+
 	heap_close(rel, NoLock);
 	rel = NULL;
 	tmprelid = RangeVarGetRelid(tmprv, NoLock, false);
+
+	origtablespace = rel->rd_node.spcNode;
+
 	swap_relation_files(relid, tmprelid,
 						false, /* target_is_pg_class */
 						false, /* swap_toast_by_content */
@@ -15286,6 +15301,10 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 						RecentXmin,
 						ReadNextMultiXactId(),
 						NULL);
+
+	if (origtablespace == YEZZEYTABLESPACE_OID) {
+		/* do we need any additional logic here? */
+	}
 
 	/*
 	 * Make changes from swapping relation files visible before updating
@@ -17716,7 +17735,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			if (!(*targetAODescPtr))
 			{
 				MemoryContextSwitchTo(oldCxt);
-				*targetAODescPtr = appendonly_insert_init(targetRelation,
+				*targetAODescPtr = appendonly_insert_init(NULL, targetRelation,
 														  RESERVED_SEGNO, false);
 				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
 			}

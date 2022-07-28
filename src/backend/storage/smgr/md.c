@@ -355,6 +355,10 @@ mdcreate_ao(RelFileNodeBackend rnode, int32 segmentFileNum, bool isRedo)
 	char	   *path;
 	File		fd;
 
+	if (rnode.node.spcNode == YEZZEYTABLESPACE_OID) {
+		return;
+	}
+
 	path = aorelpath(rnode, segmentFileNum);
 
 	fd = PathNameOpenFile(path, O_RDWR | O_CREAT | O_EXCL | PG_BINARY, 0600);
@@ -541,6 +545,15 @@ mdunlinkfork(RelFileNodeBackend rnode, ForkNumber forkNum, bool isRedo, char rel
 		register_unlink(rnode);
 	}
 
+	if (forkNum == MAIN_FORKNUM) {
+		if (relstorage_is_ao(relstorage))
+		{
+			mdunlink_ao(path, forkNum);
+			pfree(path);
+			return;
+		}
+	}
+	
 	/*
 	 * Delete any additional segments.
 	 */
@@ -1184,6 +1197,11 @@ mdsync(void)
 	hash_seq_init(&hstat, pendingOpsTable);
 	while ((entry = (PendingOperationEntry *) hash_seq_search(&hstat)) != NULL)
 	{
+		if (entry->rnode.spcNode == YEZZEYTABLESPACE_OID) {
+			/* skip offloaded relations */
+			continue;
+		}
+		
 		ForkNumber	forknum;
 
 		/*
@@ -1586,7 +1604,7 @@ register_dirty_segment(SMgrRelation reln, ForkNumber forknum, MdfdVec *seg)
  * for AO segment files.
  */
 void
-register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
+register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd, struct f_smgr_ao *smgrao)
 {
 	if (pendingOpsTable)
 	{
@@ -1601,7 +1619,7 @@ register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
 		ereport(DEBUG1,
 				(errmsg("could not forward AO fsync request because request queue is full")));
 
-		if (FileSync(vfd) < 0)
+		if (smgrao->smgr_FileSync(vfd) < 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not fsync AO file \"%s\": %m",

@@ -37,10 +37,13 @@
 #include "cdb/cdbappendonlyxlog.h"
 #include "common/relpath.h"
 #include "utils/guc.h"
+#include "utils/lsyscache.h"
 
 #define SEGNO_SUFFIX_LENGTH 12
 
 static bool mdunlink_ao_perFile(const int segno, void *ctx);
+static bool
+mdunlink_ao_yezzey(const int segno, void *ctx);
 static bool copy_append_only_data_perFile(const int segno, void *ctx);
 static bool truncate_ao_perFile(const int segno, void *ctx);
 
@@ -138,13 +141,16 @@ MakeAOSegmentFileName(Relation rel,
  * the File* routines can be used to read, write, close, etc, the file.
  */
 File
-OpenAOSegmentFile(char *filepathname, int64	logicalEof)
+OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount)
 {
 	int			fileFlags = O_RDWR | PG_BINARY;
 	File		fd;
 
 	errno = 0;
-	fd = PathNameOpenFile(filepathname, fileFlags, 0600);
+	
+
+
+	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, 0600, modcount);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -164,9 +170,9 @@ OpenAOSegmentFile(char *filepathname, int64	logicalEof)
  * Close an Append Only relation file segment
  */
 void
-CloseAOSegmentFile(File fd)
+CloseAOSegmentFile(Relation aorel, File fd)
 {
-	FileClose(fd);
+	aorel->rd_smgr->smgr_ao->smgr_FileClose(fd);
 }
 
 /*
@@ -184,7 +190,7 @@ TruncateAOSegmentFile(File fd, Relation rel, int32 segFileNum, int64 offset)
 	 * Call the 'fd' module with a 64-bit length since AO segment files
 	 * can be multi-gigabyte to the terabytes...
 	 */
-	if (FileTruncate(fd, offset) != 0)
+	if (rel->rd_smgr->smgr_ao->smgr_FileTruncate(fd, offset) != 0)
 		ereport(ERROR,
 				(errmsg("\"%s\": failed to truncate data after eof: %m",
 					    relname)));
@@ -213,6 +219,7 @@ struct truncate_ao_callback_ctx
 	Relation rel;
 };
 
+
 void
 mdunlink_ao(const char *path, ForkNumber forkNumber)
 {
@@ -224,7 +231,7 @@ mdunlink_ao(const char *path, ForkNumber forkNumber)
 	if (forkNumber == INIT_FORKNUM)
 		return;
 
-	Assert(forkNumber == MAIN_FORKNUM);
+	Assert(forkNumber == MAIN_FORKNUM || forkNumber == YEZZEY_FORKNUM);
 
 	int pathSize = strlen(path);
 	char *segPath = (char *) palloc(pathSize + SEGNO_SUFFIX_LENGTH);
@@ -236,16 +243,50 @@ mdunlink_ao(const char *path, ForkNumber forkNumber)
 	unlinkFiles.segPath = segPath;
 	unlinkFiles.segpathSuffixPosition = segPathSuffixPosition;
 
-    ao_foreach_extent_file(mdunlink_ao_perFile, &unlinkFiles);
-
+	if (forkNumber == MAIN_FORKNUM) {
+    	ao_foreach_extent_file(mdunlink_ao_perFile, &unlinkFiles);
+	} else /* YEZZEY_FORKNUM */ {
+		ao_foreach_extent_file(mdunlink_ao_yezzey, &unlinkFiles);
+	}
 	pfree(segPath);
 }
+
+
+static bool
+mdunlink_ao_yezzey(const int segno, void *ctx)
+{
+	StringInfoData buf;
+	const struct mdunlink_ao_callback_ctx *unlinkFiles = ctx;
+
+	initStringInfo(&buf);
+	char *segPath = unlinkFiles->segPath;
+	char *segPathSuffixPosition = unlinkFiles->segpathSuffixPosition;
+
+	sprintf(segPathSuffixPosition, ".%u", segno);
+
+	appendStringInfo(&buf, "%s_yezzey", segPath);
+	if (unlink(buf.data) != 0)
+	{
+		/* ENOENT is expected after the end of the extensions */
+		if (errno != ENOENT)
+			ereport(WARNING,
+					(errcode_for_file_access(),
+							errmsg("could not remove file \"%s\": %m", buf.data)));
+		else
+			return false;
+	}
+
+	return true;
+}
+
 
 static bool
 mdunlink_ao_perFile(const int segno, void *ctx)
 {
+	StringInfoData buf;
 	const struct mdunlink_ao_callback_ctx *unlinkFiles = ctx;
 
+	initStringInfo(&buf);
 	char *segPath = unlinkFiles->segPath;
 	char *segPathSuffixPosition = unlinkFiles->segpathSuffixPosition;
 
@@ -257,8 +298,6 @@ mdunlink_ao_perFile(const int segno, void *ctx)
 			ereport(WARNING,
 					(errcode_for_file_access(),
 							errmsg("could not remove file \"%s\": %m", segPath)));
-		else
-			return false;
 	}
 
 	return true;
@@ -270,12 +309,23 @@ copy_file(char *srcsegpath, char *dstsegpath,
 {
 	File		srcFile;
 	File		dstFile;
+	struct f_smgr_ao *srcSmgr;
+	struct f_smgr_ao *dstSmgr;
 	int64		left;
 	off_t		offset;
 	char       *buffer = palloc(BLCKSZ);
 	int dstflags;
 
-	srcFile = PathNameOpenFile(srcsegpath, O_RDONLY | PG_BINARY, 0600);
+	srcSmgr = smgrao();
+	dstSmgr = smgrao();
+
+	srcFile = srcSmgr->smgr_AORelOpenSegFile(
+		InvalidOid /* dont need reloid */,
+		NULL,
+		NULL
+	/*we dont need to pass original relation name here, because yezzey not need it in r/o case*/,
+		srcsegpath, O_RDONLY | PG_BINARY, 0600, -1 /* FIXME */);
+
 	if (srcFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -290,13 +340,17 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	if (segfilenum)
 		dstflags |= O_CREAT;
 
-	dstFile = PathNameOpenFile(dstsegpath, dstflags, 0600);
+	dstFile = dstSmgr->smgr_AORelOpenSegFile(
+		InvalidOid /*FIXME: copying yezzey files may not work here */,
+		NULL,
+		NULL/*FIXME: copying yezzey files may not work here*/, 
+		dstsegpath, dstflags, 0600, 0);
 	if (dstFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 (errmsg("could not create destination file %s: %m", dstsegpath))));
 
-	left = FileSeek(srcFile, 0, SEEK_END);
+	left = srcSmgr->smgr_FileSeek(srcFile, 0, SEEK_END);
 	if (left < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -315,13 +369,13 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		CHECK_FOR_INTERRUPTS();
 
 		len = Min(left, BLCKSZ);
-		if (FileRead(srcFile, buffer, len) != len)
+		if (srcSmgr->smgr_FileRead(srcFile, buffer, len) != len)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not read %d bytes from file \"%s\": %m",
 							len, srcsegpath)));
 
-		if (FileWrite(dstFile, buffer, len) != len)
+		if (dstSmgr->smgr_FileWrite(dstFile, buffer, len) != len)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not write %d bytes to file \"%s\": %m",
@@ -334,13 +388,13 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		left -= len;
 	}
 
-	if (FileSync(dstFile) != 0)
+	if (dstSmgr->smgr_FileSync(dstFile) != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("could not fsync file \"%s\": %m",
 						dstsegpath)));
-	FileClose(srcFile);
-	FileClose(dstFile);
+	srcSmgr->smgr_FileClose(srcFile);
+	dstSmgr->smgr_FileClose(dstFile);
 	pfree(buffer);
 }
 
@@ -455,7 +509,8 @@ truncate_ao_perFile(const int segno, void *ctx)
 {
 	File		fd;
 	Relation aorel;
-
+	char *relname;
+	char *nspname;
 	const struct truncate_ao_callback_ctx *truncateFiles = ctx;
 
 	char *segPath = truncateFiles->segPath;
@@ -464,15 +519,23 @@ truncate_ao_perFile(const int segno, void *ctx)
 
 	sprintf(segPathSuffixPosition, ".%u", segno);
 
-	fd = OpenAOSegmentFile(segPath, 0);
+	relname = RelationGetRelationName(aorel);
+
+	nspname = get_namespace_name(RelationGetNamespace(aorel));
+
+	RelationOpenSmgr(aorel);
+
+	fd = OpenAOSegmentFile(aorel, nspname, segPath, 0, -1);
 
 	if (fd >= 0)
 	{
 		TruncateAOSegmentFile(fd, aorel, segno, 0);
-		CloseAOSegmentFile(fd);
+		CloseAOSegmentFile(aorel, fd);
 	}
 	else
 	{
+		RelationCloseSmgr(aorel);
+		pfree(nspname);
 		/* 
 		 * we traverse possible segment files of AO/AOCS tables and call
 		 * truncate_ao_perFile to truncate them. It is ok that some files do not exist
@@ -480,5 +543,7 @@ truncate_ao_perFile(const int segno, void *ctx)
 		return false;
 	}
 
+	pfree(nspname);
+	RelationCloseSmgr(aorel);
 	return true;
 }
