@@ -749,6 +749,7 @@ INCLUDES
 enable_ic_proxy
 HAVE_CXX14
 enable_gpcloud
+enable_yezzey
 enable_orca
 autodepend
 PKG_CONFIG_LIBDIR
@@ -878,6 +879,7 @@ enable_depend
 enable_cassert
 enable_orca
 enable_gpcloud
+enable_yezzey
 enable_ic_proxy
 enable_thread_safety
 with_icu
@@ -1574,6 +1576,7 @@ Optional Features:
   --enable-cassert        enable assertion checks (for debugging)
   --disable-orca          disable ORCA optimizer
   --enable-gpcloud        enable gpcloud support
+  --disable-yezzey        disable yezzey support
   --enable-ic-proxy       enable interconnect proxy mode (requires libuv
                           library)
   --disable-thread-safety disable thread-safety in client libraries
@@ -7295,6 +7298,29 @@ fi
 $as_echo "$pgac_cv_prog_CLANGXX_cxxflags__Xclang__no_opaque_pointers" >&6; }
 if test x"$pgac_cv_prog_CLANGXX_cxxflags__Xclang__no_opaque_pointers" = x"yes"; then
   BITCODE_CXXFLAGS="${BITCODE_CXXFLAGS} -Xclang -no-opaque-pointers"
+fi
+# Check whether --enable-yezzey was given.
+if test "${enable_yezzey+set}" = set; then :
+  enableval=$enable_yezzey;
+  case $enableval in
+    yes)
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --enable-yezzey option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  enable_yezzey=yes
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
 fi
 
 

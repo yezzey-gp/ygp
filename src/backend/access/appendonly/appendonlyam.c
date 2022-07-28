@@ -261,7 +261,7 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 								   &scan->storageRead,
 								   scan->aos_filenamepath,
 								   formatversion,
-								   eof);
+								   eof, scan->aos_rd->rd_node);
 
 	AppendOnlyExecutionReadBlock_SetSegmentFileNum(
 												   &scan->executorReadBlock,

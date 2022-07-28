@@ -320,6 +320,8 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 
 	errno = 0;
 
+	smgrwarmup(storageWrite->relFileNode.node, path);
+
 	int			fileFlags = O_RDWR | PG_BINARY;
 	file = PathNameOpenFile(path, fileFlags);
 	if (file < 0)
@@ -328,7 +330,6 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 				 errmsg("Append-only Storage Write could not open segment file %s \"%s\" for relation \"%s\": %m",
 						path, filePathName,
 						storageWrite->relationName)));
-
 	/*
 	 * Seek to the logical EOF write position.
 	 */

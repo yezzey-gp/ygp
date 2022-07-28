@@ -307,7 +307,7 @@ void
 AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
 							   char *filePathName,
 							   int version,
-							   int64 logicalEof)
+							   int64 logicalEof, RelFileNode relFileNode)
 {
 	File		file;
 
@@ -326,6 +326,8 @@ AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
 				 errmsg("append-only storage read segment file '%s' EOF must be > 0 for relation '%s'",
 						filePathName,
 						storageRead->relationName)));
+
+	smgrwarmup(relFileNode, filePathName);
 
 	file = AppendOnlyStorageRead_DoOpenFile(storageRead,
 											filePathName);

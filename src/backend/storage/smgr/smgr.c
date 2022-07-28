@@ -161,6 +161,7 @@ smgrshutdown(int code, Datum arg)
 /* Hooks for plugins to get control in smgr */
 smgr_hook_type smgr_hook = NULL;
 smgr_init_hook_type smgr_init_hook = NULL;
+smgrwarmup_hook_type smgrwarmup_hook = NULL;
 smgr_shutdown_hook_type smgr_shutdown_hook = NULL;
 
 const f_smgr *
@@ -242,6 +243,12 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which)
 	}
 
 	return reln;
+}
+
+void smgrwarmup(RelFileNode rnode, char * filepath) {
+	if (smgrwarmup_hook != NULL) {
+		return smgrwarmup_hook(rnode, filepath);
+	}
 }
 
 /*

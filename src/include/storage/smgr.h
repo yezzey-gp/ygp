@@ -124,6 +124,10 @@ typedef struct f_smgr
 
 typedef void (*smgr_init_hook_type) (void);
 typedef void (*smgr_shutdown_hook_type) (void);
+
+typedef void (*smgrwarmup_hook_type) (RelFileNode rnode, char* path);
+
+extern PGDLLIMPORT smgrwarmup_hook_type smgrwarmup_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern void smgr_init_standard(void);
