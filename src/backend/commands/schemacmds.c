@@ -301,7 +301,8 @@ RemoveSchemaById(Oid schemaOid)
 
 	/* MPP-6929: metadata tracking */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		MetaTrackDropObject(NamespaceRelationId, schemaOid);
+		MetaTrackDropObject(NamespaceRelationId,
+							schemaOid);
 }
 
 

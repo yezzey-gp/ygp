@@ -172,6 +172,7 @@ DESCR("");
 #define		  RELKIND_AOSEGMENTS	  'o'		/* AO segment files and eof's */
 #define		  RELKIND_AOBLOCKDIR	  'b'		/* AO block directory */
 #define		  RELKIND_AOVISIMAP		  'M'		/* AO visibility map */
+#define		  RELKIND_YEZZEYINDEX	  'Y'		/* yezzey external storage map */
 
 #define		  RELPERSISTENCE_PERMANENT	'p'		/* regular table */
 #define		  RELPERSISTENCE_UNLOGGED	'u'		/* unlogged permanent table */

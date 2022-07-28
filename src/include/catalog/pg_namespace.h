@@ -92,12 +92,15 @@ DATA(insert OID = 7012  ( "pg_bitmapindex" PGUID _null_ ));
 DESCR("Reserved schema for internal relations of bitmap indexes");
 #define PG_BITMAPINDEX_NAMESPACE 7012
 
+#define YEZZEY_AUX_NAMESPACE 8001
+
 #define IsBuiltInNameSpace(namespaceId) \
 	(namespaceId == PG_CATALOG_NAMESPACE || \
 	 namespaceId == PG_TOAST_NAMESPACE || \
 	 namespaceId == PG_BITMAPINDEX_NAMESPACE || \
 	 namespaceId == PG_PUBLIC_NAMESPACE || \
-	 namespaceId == PG_AOSEGMENT_NAMESPACE)
+	 namespaceId == PG_AOSEGMENT_NAMESPACE || \
+	 namespaceId == YEZZEY_AUX_NAMESPACE)
 
 /*
  * prototypes for functions in pg_namespace.c
