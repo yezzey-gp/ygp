@@ -77,7 +77,6 @@ typedef struct SMgrRelationData
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	dlist_node	node;
 	
-	const struct f_smgr *smgr; /* storage manager selector */
 } SMgrRelationData;
 
 typedef SMgrRelationData *SMgrRelation;
@@ -128,13 +127,20 @@ typedef struct f_smgr
 	void		(*smgr_post_ckpt) (void);		/* may be NULL */
 } f_smgr;
 
+void smgrwarmup(RelFileNode rnode, char * path);
+
 
 typedef void (*smgr_init_hook_type) (void);
 typedef void (*smgr_shutdown_hook_type) (void);
+
+typedef void (*smgrwarmup_hook_type) (RelFileNode rnode, char* path);
+
+extern PGDLLIMPORT smgrwarmup_hook_type smgrwarmup_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern void smgr_init_standard(void);
 extern void smgr_shutdown_standard(void);
+
 
 
 typedef const f_smgr *(*smgr_hook_type) (BackendId backend, RelFileNode rnode);

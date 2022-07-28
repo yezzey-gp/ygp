@@ -49,8 +49,6 @@ typedef struct FileTag
 	int16		forknum;		/* ForkNumber, saving space */
 	RelFileNode rnode;
 	uint32		segno;
-} FileTag;
-
 	/*
 	 * GPDB_12_MERGE_FIXME: Should the "is this AO table?" flag be put here?
 	 * Do we need to keep track of whether this file backs an AO table? GPDB 6
