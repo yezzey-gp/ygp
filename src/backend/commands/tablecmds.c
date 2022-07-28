@@ -6304,7 +6304,7 @@ ATAocsWriteNewColumns(AlteredTableInfo *tab)
 			 * Open aocs segfile for chosen column for current
 			 * appendonly segment.
 			 */
-			aocs_headerscan_opensegfile(sdesc, segInfos[segi], basepath);
+			aocs_headerscan_opensegfile(sdesc, segInfos[segi], basepath, rel->rd_node);
 
 			/*
 			 * Create new segfiles for new columns for current
