@@ -8,3 +8,6 @@
 [submodule "gpcontrib/gpcloud/test/googletest"]
 	path = gpcontrib/gpcloud/test/googletest
 	url = https://github.com/google/googletest.git
+[submodule "gpcontrib/yezzey"]
+	path = gpcontrib/yezzey
+	url = https://github.com/yezzey-gp/yezzey.git

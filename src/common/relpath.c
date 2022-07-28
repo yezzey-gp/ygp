@@ -35,7 +35,8 @@ const char *const forkNames[] = {
 	"main",						/* MAIN_FORKNUM */
 	"fsm",						/* FSM_FORKNUM */
 	"vm",						/* VISIBILITYMAP_FORKNUM */
-	"init"						/* INIT_FORKNUM */
+	"init",						/* INIT_FORKNUM */
+	"yezzey"					/* YEZZEY_FORKNUM */
 };
 
 /*
@@ -118,6 +119,11 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 		/* The default tablespace is {datadir}/base */
 		return psprintf("base/%u", dbNode);
 	}
+	/* -- yezzey patch */
+	else if (spcNode == YEZZEYTABLESPACE_OID) {
+		return psprintf("yezzey/%u", dbNode);
+	}
+	/* -- yezzey patch */
 	else
 	{
 		/* All other tablespaces are accessed via symlinks */
@@ -181,6 +187,29 @@ GetRelationPath(Oid dbNode, Oid spcNode, Oid relNode,
 								forkNames[forkNumber]);
 			else
 				path = psprintf("base/%u/t_%u",
+								dbNode, relNode);
+		}
+	}
+	else if (spcNode == YEZZEYTABLESPACE_OID) {
+				/* The default tablespace is {datadir}/base */
+		if (backendId == InvalidBackendId)
+		{
+			if (forkNumber != MAIN_FORKNUM)
+				path = psprintf("yezzey/%u/%u_%s",
+								dbNode, relNode,
+								forkNames[forkNumber]);
+			else
+				path = psprintf("yezzey/%u/%u",
+								dbNode, relNode);
+		}
+		else
+		{
+			if (forkNumber != MAIN_FORKNUM)
+				path = psprintf("yezzey/%u/t_%u_%s",
+								dbNode, relNode,
+								forkNames[forkNumber]);
+			else
+				path = psprintf("yezzey/%u/t_%u",
 								dbNode, relNode);
 		}
 	}

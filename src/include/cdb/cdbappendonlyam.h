@@ -60,6 +60,7 @@
 typedef struct AppendOnlyInsertDescData
 {
 	Relation		aoi_rel;
+	Relation		from_aoi_rel;
 	Snapshot		appendOnlyMetaDataSnapshot;
 	MemTupleBinding *mt_bind;
 	File			appendFile;
@@ -349,7 +350,7 @@ extern bool appendonly_fetch(
 	AOTupleId *aoTid,
 	TupleTableSlot *slot);
 extern void appendonly_fetch_finish(AppendOnlyFetchDesc aoFetchDesc);
-extern AppendOnlyInsertDesc appendonly_insert_init(Relation rel, int segno, bool update_mode);
+extern AppendOnlyInsertDesc appendonly_insert_init(Relation fromrel, Relation rel, int segno, bool update_mode);
 extern Oid appendonly_insert(
 		AppendOnlyInsertDesc aoInsertDesc, 
 		MemTuple instup, 

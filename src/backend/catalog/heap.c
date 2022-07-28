@@ -100,7 +100,6 @@
 
 #include "utils/guc.h"
 
-
 static void MetaTrackAddUpdInternal(Oid			classid,
 									Oid			objoid,
 									Oid			relowner,
@@ -875,6 +874,7 @@ void MetaTrackUpdObject(Oid		classid,
 						   subtype);
 
 } /* end MetaTrackUpdObject */
+
 void MetaTrackDropObject(Oid		classid, 
 						 Oid		objoid)
 {
@@ -928,7 +928,6 @@ void MetaTrackDropObject(Oid		classid,
 
 	systable_endscan(desc);
 	heap_close(rel, RowExclusiveLock);
-
 } /* end MetaTrackDropObject */
 
 /*
@@ -1235,6 +1234,8 @@ AddNewRelationTuple(Relation pg_class_desc,
 			new_rel_reltup->reltuples = 1;
 			new_rel_reltup->relallvisible = 0;
 			break;
+		case RELKIND_YEZZEYINDEX:
+		/* fall throught to default case */
 		default:
 			/* Views, etc, have no disk storage */
 			new_rel_reltup->relpages = 0;
@@ -1840,6 +1841,7 @@ heap_create_with_catalog(const char *relname,
 			case PG_TOAST_NAMESPACE:
 			case PG_BITMAPINDEX_NAMESPACE:
 			case PG_AOSEGMENT_NAMESPACE:
+			case YEZZEY_AUX_NAMESPACE:
 				doIt = false;
 				break;
 			default:
@@ -2485,7 +2487,6 @@ heap_drop_with_catalog(Oid relid)
 	/* MPP-6929: metadata tracking */
 	MetaTrackDropObject(RelationRelationId,
 						relid);
-
 }
 
 
@@ -3738,6 +3739,7 @@ should_have_valid_relfrozenxid(char relkind, char relstorage,
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			return true;
 	}
 

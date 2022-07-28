@@ -98,8 +98,9 @@ BufferedReadInit(
 	/*
 	 * File level members.
 	 */
-	bufferedRead->file = -1;
+ 	bufferedRead->file = -1;
 	bufferedRead->fileLen = 0;
+	bufferedRead->smgr = smgrao();
 
 	/*
 	 * Temporary limit support for random reading.
@@ -171,7 +172,7 @@ BufferedReadIo(
 	{
 		int64		currentReadPosition;
 
-		currentReadPosition = FileNonVirtualCurSeek(bufferedRead->file);
+		currentReadPosition = bufferedRead->smgr->smgr_NonVirtualCurSeek(bufferedRead->file);
 		if (currentReadPosition < 0)
 			ereport(ERROR, (errcode_for_file_access(),
 							errmsg("unable to get current position for table \"%s\" in file \"%s\": %m",
@@ -180,7 +181,7 @@ BufferedReadIo(
 
 		if (currentReadPosition != bufferedRead->largeReadPosition)
 		{
-			ereport(ERROR, (errcode_for_file_access(),
+			ereport(WARNING, (errcode_for_file_access(),
 							errmsg("Current position mismatch actual "
 								   INT64_FORMAT ", expected " INT64_FORMAT " for table \"%s\" in file \"%s\"",
 								   currentReadPosition, bufferedRead->largeReadPosition,
@@ -193,7 +194,7 @@ BufferedReadIo(
 	offset = 0;
 	while (largeReadLen > 0)
 	{
-		int			actualLen = FileRead(
+		int			actualLen = bufferedRead->smgr->smgr_FileRead(
 										 bufferedRead->file,
 										 (char *) largeReadMemory,
 										 largeReadLen);
@@ -422,7 +423,7 @@ BufferedReadSetTemporaryRange(
 		 * the beginning of file.
 		 */
 		int64		seekOffset = beginFileOffset - largeReadAfterPos;
-		int64		seekPos = FileSeek(bufferedRead->file, seekOffset, SEEK_CUR);
+		int64		seekPos = bufferedRead->smgr->smgr_FileSeek(bufferedRead->file, seekOffset, SEEK_CUR);
 
 		if (seekPos != beginFileOffset)
 			ereport(ERROR, (errcode_for_file_access(),

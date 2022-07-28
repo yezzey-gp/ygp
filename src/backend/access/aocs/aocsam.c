@@ -48,6 +48,8 @@
 #include "utils/relcache.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 
 static AOCSScanDesc aocs_beginscan_internal(Relation relation,
@@ -157,6 +159,21 @@ open_ds_write(Relation rel, DatumStreamWrite **ds, TupleDesc relationTupleDesc,
 		clvl = opts[i]->compresslevel;
 		blksz = opts[i]->blocksize;
 
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(rel->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", rel->rd_rel->relname.data);
+		}
+
+
 		ds[i] = create_datumstreamwrite(ct,
 										clvl,
 										checksum,
@@ -165,10 +182,14 @@ open_ds_write(Relation rel, DatumStreamWrite **ds, TupleDesc relationTupleDesc,
 																	 * column? */
 										blksz,
 										attr,
+										nspname,
 										RelationGetRelationName(rel),
+										RelationGetRelid(rel),
 										/* title */ titleBuf.data,
 										XLogIsNeeded() && RelationNeedsWAL(rel));
 
+
+		pfree(nspname);
 	}
 }
 
@@ -218,6 +239,19 @@ open_ds_read(Relation rel, DatumStreamRead **ds, TupleDesc relationTupleDesc,
 						 RelationGetRelationName(rel),
 						 attno + 1,
 						 NameStr(attr->attname));
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(rel->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", rel->rd_rel->relname.data);
+		}
 
 		ds[attno] = create_datumstreamread(ct,
 										   clvl,
@@ -227,8 +261,12 @@ open_ds_read(Relation rel, DatumStreamRead **ds, TupleDesc relationTupleDesc,
 																			 * column */
 										   blksz,
 										   attr,
+										   nspname,
 										   RelationGetRelationName(rel),
+										   rel->rd_id,
 										    /* title */ titleBuf.data);
+
+		pfree(nspname);
 	}
 }
 
@@ -805,7 +843,7 @@ OpenAOCSDatumStreams(AOCSInsertDesc desc)
 		FormatAOSegmentFileName(basepath, seginfo->segno, i, &fileSegNo, fn);
 		Assert(strlen(fn) + 1 <= MAXPGPATH);
 
-		datumstreamwrite_open_file(desc->ds[i], fn, e->eof, e->eof_uncompressed,
+		datumstreamwrite_open_file(desc->ds[i], fn, e->eof, e->eof_uncompressed, seginfo->modcount,
 								   &rnode,
 								   fileSegNo, seginfo->formatversion);
 	}
@@ -1302,6 +1340,22 @@ aocs_fetch_init(Relation relation,
 			aocsFetchDesc->datumStreamFetchDesc[colno] = (DatumStreamFetchDesc)
 				palloc0(sizeof(DatumStreamFetchDescData));
 
+			
+			HeapTuple tp;
+			char * nspname;
+
+			tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(relation->rd_rel->relnamespace));
+
+			if (HeapTupleIsValid(tp))
+			{
+				Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+				nspname = pstrdup(NameStr(nsptup->nspname));
+				ReleaseSysCache(tp);
+			} else {
+				elog(ERROR, "yezzey: failed to get namescape name of relation %s", relation->rd_rel->relname.data);
+			}
+
+
 			aocsFetchDesc->datumStreamFetchDesc[colno]->datumStream =
 				create_datumstreamread(ct,
 									   clvl,
@@ -1311,9 +1365,13 @@ aocs_fetch_init(Relation relation,
 																		 * column */
 									   blksz,
 									   tupleDesc->attrs[colno],
-									   relation->rd_rel->relname.data,
+									   RelationGetRelationName(relation),
+									   nspname,
+									   relation->rd_id,
 									    /* title */ titleBuf.data);
 
+
+			pfree(nspname);
 		}
 		if (opts[colno])
 			pfree(opts[colno]);
@@ -1743,6 +1801,8 @@ aocs_begin_headerscan(Relation rel, int colno)
 	AOCSHeaderScanDesc hdesc;
 	AppendOnlyStorageAttributes ao_attr;
 	StdRdOptions **opts = RelationGetAttributeOptions(rel);
+	HeapTuple tp;
+	char * nspname;
 
 	Assert(opts[colno]);
 
@@ -1758,13 +1818,35 @@ aocs_begin_headerscan(Relation rel, int colno)
 	ao_attr.overflowSize = 0;
 	ao_attr.safeFSWriteSize = 0;
 	hdesc = palloc(sizeof(AOCSHeaderScanDescData));
-	AppendOnlyStorageRead_Init(&hdesc->ao_read,
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(rel->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", rel->rd_rel->relname.data);
+	}
+
+
+	AppendOnlyStorageRead_Init(
+							   &hdesc->ao_read,
+							   rel->rd_id,
 							   NULL, //current memory context
 							   opts[colno]->blocksize,
+							   nspname,
 							   RelationGetRelationName(rel),
 							   "ALTER TABLE ADD COLUMN scan",
 							   &ao_attr);
 	hdesc->colno = colno;
+
+	for (int i = 0; i < RelationGetNumberOfAttributes(rel); i++)
+		pfree(opts[i]);
+	pfree(opts);
+	pfree(nspname);
+
 	return hdesc;
 }
 
@@ -1774,7 +1856,7 @@ aocs_begin_headerscan(Relation rel, int colno)
 void
 aocs_headerscan_opensegfile(AOCSHeaderScanDesc hdesc,
 							AOCSFileSegInfo *seginfo,
-							char *basepath)
+							char *basepath, RelFileNode rnode)
 {
 	AOCSVPInfoEntry *vpe;
 	char		fn[MAXPGPATH];
@@ -1787,7 +1869,7 @@ aocs_headerscan_opensegfile(AOCSHeaderScanDesc hdesc,
 	Assert(strlen(fn) + 1 <= MAXPGPATH);
 	vpe = getAOCSVPEntry(seginfo, hdesc->colno);
 	AppendOnlyStorageRead_OpenFile(&hdesc->ao_read, fn, seginfo->formatversion,
-								   vpe->eof);
+								   vpe->eof, rnode);
 }
 
 bool
@@ -1847,10 +1929,30 @@ aocs_addcol_init(Relation rel,
 		ct = opts[iattr]->compresstype;
 		clvl = opts[iattr]->compresslevel;
 		blksz = opts[iattr]->blocksize;
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(rel->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", rel->rd_rel->relname.data);
+		}
+
+
 		desc->dsw[i] = create_datumstreamwrite(ct, clvl, rel->rd_appendonly->checksum, 0, blksz /* safeFSWriteSize */ ,
-											   attr, RelationGetRelationName(rel),
+											   attr, nspname, RelationGetRelationName(rel),
+											   RelationGetRelid(rel),
 											   titleBuf.data,
 											   XLogIsNeeded() && RelationNeedsWAL(rel));
+
+
+
+		pfree(nspname);
 	}
 	return desc;
 }
@@ -1895,7 +1997,7 @@ aocs_addcol_newsegfile(AOCSAddColumnDesc desc,
 								&fileSegNo, fn);
 		Assert(strlen(fn) + 1 <= MAXPGPATH);
 		datumstreamwrite_open_file(desc->dsw[i], fn,
-								   0 /* eof */ , 0 /* eof_uncompressed */ ,
+								   0 /* eof */ , 0 /* eof_uncompressed */ , 0, /*modcount*/
 								   &relfilenode, fileSegNo,
 								   version);
 		desc->dsw[i]->blockFirstRowNum = 1;

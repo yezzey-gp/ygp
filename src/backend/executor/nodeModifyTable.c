@@ -294,7 +294,7 @@ ExecInsert(TupleTableSlot *parentslot,
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
 
 			resultRelInfo->ri_aoInsertDesc =
-				appendonly_insert_init(resultRelationDesc,
+				appendonly_insert_init(NULL, resultRelationDesc,
 									   resultRelInfo->ri_aosegno,
 									   false);
 		}
@@ -505,7 +505,7 @@ ExecInsert(TupleTableSlot *parentslot,
 				ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
 
 				resultRelInfo->ri_aoInsertDesc =
-					appendonly_insert_init(resultRelationDesc,
+					appendonly_insert_init(NULL, resultRelationDesc,
 										   resultRelInfo->ri_aosegno,
 										   false);
 			}

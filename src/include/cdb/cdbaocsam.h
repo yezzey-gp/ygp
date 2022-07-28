@@ -26,6 +26,7 @@
 #include "storage/block.h"
 #include "utils/rel.h"
 #include "utils/tqual.h"
+#include "storage/relfilenode.h"
 #include "cdb/cdbappendonlyblockdirectory.h"
 #include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbappendonlystorageread.h"
@@ -248,7 +249,7 @@ extern void aocs_delete_finish(AOCSDeleteDesc desc);
 extern AOCSHeaderScanDesc aocs_begin_headerscan(
 		Relation rel, int colno);
 extern void aocs_headerscan_opensegfile(
-		AOCSHeaderScanDesc hdesc, AOCSFileSegInfo *seginfo, char *basepath);
+		AOCSHeaderScanDesc hdesc, AOCSFileSegInfo *seginfo, char *basepath, RelFileNode rnode);
 extern bool aocs_get_nextheader(AOCSHeaderScanDesc hdesc);
 extern void aocs_end_headerscan(AOCSHeaderScanDesc hdesc);
 extern AOCSAddColumnDesc aocs_addcol_init(
