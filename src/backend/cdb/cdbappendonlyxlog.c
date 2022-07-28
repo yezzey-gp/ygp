@@ -71,6 +71,8 @@ ao_insert_replay(XLogReaderState *record)
 	dbPath = GetDatabasePath(xlrec->target.node.dbNode,
 							 xlrec->target.node.spcNode);
 
+	struct f_smgr_ao * smgrao_curr = smgrao();
+
 	if (xlrec->target.segment_filenum == 0)
 		snprintf(path, MAXPGPATH, "%s/%u", dbPath, xlrec->target.node.relNode);
 	else
@@ -82,14 +84,19 @@ ao_insert_replay(XLogReaderState *record)
 	/* When writing from the beginning of the file, it might not exist yet. Create it. */
 	if (xlrec->target.offset == 0)
 		fileFlags |= O_CREAT;
-	file = PathNameOpenFile(path, fileFlags);
+	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
+		NULL,
+		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
+		path, 
+		fileFlags, -1 /* FIXME */);
 	if (file < 0)
 	{
 		XLogAOSegmentFile(xlrec->target.node, xlrec->target.segment_filenum);
 		return;
 	}
 
-	written_len = FileWrite(file, buffer, len, xlrec->target.offset,
+	written_len = smgrao_curr->smgr_FileWrite(file, buffer, len,xlrec->target.offset,
 							WAIT_EVENT_COPY_FILE_WRITE);
 	if (written_len < 0 || written_len != len)
 	{
@@ -102,9 +109,9 @@ ao_insert_replay(XLogReaderState *record)
 
 	register_dirty_segment_ao(xlrec->target.node,
 							  xlrec->target.segment_filenum,
-							  file);
+							  file, smgrao_curr);
 
-	FileClose(file);
+	smgrao_curr->smgr_FileClose(file);
 }
 
 /*
@@ -136,6 +143,8 @@ ao_truncate_replay(XLogReaderState *record)
 	dbPath = GetDatabasePath(xlrec->target.node.dbNode,
 							 xlrec->target.node.spcNode);
 
+	struct f_smgr_ao * smgrao_curr = smgrao();
+
 	if (xlrec->target.segment_filenum == 0)
 		snprintf(path, MAXPGPATH, "%s/%u", dbPath, xlrec->target.node.relNode);
 	else
@@ -143,7 +152,12 @@ ao_truncate_replay(XLogReaderState *record)
 	pfree(dbPath);
 	dbPath = NULL;
 
-	file = PathNameOpenFile(path, O_RDWR | PG_BINARY);
+	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
+		NULL,
+		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
+		path, 
+		O_RDWR | PG_BINARY, -1 /* FIXME */);
 	if (file < 0)
 	{
 		/*
@@ -163,7 +177,8 @@ ao_truncate_replay(XLogReaderState *record)
 		return;
 	}
 
-	if (FileTruncate(file, xlrec->target.offset, WAIT_EVENT_DATA_FILE_TRUNCATE) != 0)
+	/* Trucate file using Yezzey AO smgr API */ 
+	if (smgrao_curr->smgr_FileTruncate(file, xlrec->target.offset, WAIT_EVENT_DATA_FILE_TRUNCATE) != 0)
 	{
 		ereport(WARNING,
 				(errcode_for_file_access(),
@@ -171,7 +186,7 @@ ao_truncate_replay(XLogReaderState *record)
 						path, xlrec->target.offset)));
 	}
 
-	FileClose(file);
+	smgrao_curr->smgr_FileClose(file);
 }
 
 void

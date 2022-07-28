@@ -259,7 +259,9 @@ extern DatumStreamWrite *create_datumstreamwrite(
 						bool checksum,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
+						Oid reloid,
 						char *title,
 						bool needsWAL);
 
@@ -269,7 +271,9 @@ extern DatumStreamRead *create_datumstreamread(
 					   bool checksum,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
+					   Oid reloid,
 					   char *title);
 
 extern void datumstreamwrite_open_file(
@@ -277,6 +281,7 @@ extern void datumstreamwrite_open_file(
 						   char *fn,
 						   int64 eof,
 						   int64 eofUncompressed,
+						   int64 modcount,
 						   RelFileNodeBackend *relFileNode,
 						   int32 segmentFileNum,
 						   int version);

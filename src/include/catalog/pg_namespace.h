@@ -53,12 +53,15 @@ FOREIGN_KEY(nspowner REFERENCES pg_authid(oid));
  */
 typedef FormData_pg_namespace *Form_pg_namespace;
 
+#define YEZZEY_AUX_NAMESPACE 8001
+
 #define IsBuiltInNameSpace(namespaceId) \
 	(namespaceId == PG_CATALOG_NAMESPACE || \
 	 namespaceId == PG_TOAST_NAMESPACE || \
 	 namespaceId == PG_BITMAPINDEX_NAMESPACE || \
 	 namespaceId == PG_PUBLIC_NAMESPACE || \
-	 namespaceId == PG_AOSEGMENT_NAMESPACE)
+	 namespaceId == PG_AOSEGMENT_NAMESPACE || \
+	 namespaceId == YEZZEY_AUX_NAMESPACE)
 
 /*
  * prototypes for functions in pg_namespace.c

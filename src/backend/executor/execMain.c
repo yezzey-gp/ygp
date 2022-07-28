@@ -2198,7 +2198,15 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 						 errmsg("cannot change AO visibility map relation \"%s\"",
 								RelationGetRelationName(resultRel))));
 			break;
-
+		
+		/* Yezzey additions */
+		case RELKIND_YEZZEYINDEX:
+			if (!allowSystemTableMods)
+				ereport(ERROR,
+						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+						 errmsg("cannot change yezzey index map relation \"%s\"",
+								RelationGetRelationName(resultRel))));
+			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),

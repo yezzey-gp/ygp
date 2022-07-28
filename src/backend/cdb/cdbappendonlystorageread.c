@@ -59,8 +59,10 @@
  */
 void
 AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
+						   Oid reloid,
 						   MemoryContext memoryContext,
 						   int32 maxBufferLen,
+						   char *relationNamespace,
 						   char *relationName,
 						   char *title,
 						   AppendOnlyStorageAttributes *storageAttributes)
@@ -74,6 +76,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 	/* UNDONE: Range check maxBufferLen */
 
 	Assert(relationName != NULL);
+	Assert(relationNamespace != NULL);
 	Assert(storageAttributes != NULL);
 
 	/* UNDONE: Range check fields in storageAttributes */
@@ -94,6 +97,8 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 		   sizeof(AppendOnlyStorageAttributes));
 
 	storageRead->relationName = pstrdup(relationName);
+	storageRead->relationOid = reloid;
+	storageRead->relationNamespace = pstrdup(relationNamespace);
 	storageRead->title = title;
 
 	storageRead->minimumHeaderLen =
@@ -119,8 +124,9 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 					 relationName);
 
 	elogif(Debug_appendonly_print_scan || Debug_appendonly_print_read_block, LOG,
-		   "Append-Only Storage Read initialize for table '%s' "
+		   "Append-Only Storage Read initialize for table '%s.%s' "
 		   "(compression = %s, compression level %d, maximum buffer length %d, large read length %d)",
+		   storageRead->relationNamespace,
 		   storageRead->relationName,
 		   (storageRead->storageAttributes.compress ? "true" : "false"),
 		   storageRead->storageAttributes.compressLevel,
@@ -128,6 +134,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 		   storageRead->largeReadLen);
 
 	storageRead->file = -1;
+	storageRead->smgr = smgrao();
 	storageRead->formatVersion = -1;
 
 	MemoryContextSwitchTo(oldMemoryContext);
@@ -182,6 +189,12 @@ AppendOnlyStorageRead_FinishSession(AppendOnlyStorageRead *storageRead)
 	{
 		pfree(storageRead->relationName);
 		storageRead->relationName = NULL;
+	}
+
+	if (storageRead->relationNamespace != NULL)
+	{
+		pfree(storageRead->relationNamespace);
+		storageRead->relationNamespace = NULL;
 	}
 
 	if (storageRead->segmentFileName != NULL)
@@ -240,9 +253,14 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 		   fileFlags);
 
 	/*
-	 * Open the file for read.
+	 * Open the file for read. Use smgr iface. Pass filename, as it needed by Yezzey
 	 */
-	file = PathNameOpenFile(filePathName, fileFlags);
+	file = storageRead->smgr->smgr_AORelOpenSegFile(
+		storageRead->relationOid /* Oid should be needed and used */,
+		storageRead->relationNamespace,
+		storageRead->relationName,
+		filePathName,
+		fileFlags, -1 /*FIXME*/);
 
 	return file;
 }
@@ -307,7 +325,7 @@ void
 AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
 							   char *filePathName,
 							   int version,
-							   int64 logicalEof)
+							   int64 logicalEof, RelFileNode relFileNode)
 {
 	File		file;
 
@@ -448,7 +466,7 @@ AppendOnlyStorageRead_CloseFile(AppendOnlyStorageRead *storageRead)
 	if (storageRead->file == -1)
 		return;
 
-	FileClose(storageRead->file);
+	storageRead->smgr->smgr_FileClose(storageRead->file);
 
 	storageRead->file = -1;
 	storageRead->formatVersion = -1;
@@ -742,7 +760,7 @@ AppendOnlyStorageRead_ReadNextBlock(AppendOnlyStorageRead *storageRead)
 		if (!AppendOnlyStorageFormat_VerifyHeaderChecksum(header,
 														  &storedChecksum,
 														  &computedChecksum))
-			ereport(ERROR,
+			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("header checksum does not match, expected 0x%08X and found 0x%08X",
 							storedChecksum, computedChecksum),

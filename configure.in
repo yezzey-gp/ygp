@@ -827,6 +827,20 @@ AS_IF([test "$enable_orca" = yes || test "$enable_gpcloud" = yes],
 ]) # fi
 
 #
+# yezzey, enabled by default
+#
+PGAC_ARG_BOOL(enable, yezzey, yes, [disable yezzey support],
+              [AC_DEFINE([USE_GPCLOUD], 1,
+			             [Define to 1 to build with yezzey (--enable-yezzey)])])
+AC_MSG_RESULT([checking whether to build with yezzey... $enable_yezzey])
+AC_SUBST(enable_yezzey)
+
+AS_IF([test "$enable_yezzey" = yes],
+[ # then
+  AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory])
+]) # fi
+
+#
 # ic-proxy
 #
 PGAC_ARG_BOOL(enable, ic-proxy, no,

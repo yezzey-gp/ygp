@@ -28,6 +28,7 @@
 #include "access/xlogutils.h"
 #include "catalog/storage.h"
 #include "catalog/storage_xlog.h"
+#include "catalog/pg_tablespace.h"
 #include "common/relpath.h"
 #include "commands/dbcommands.h"
 #include "storage/freespace.h"
@@ -144,10 +145,6 @@ log_smgrcreate(const RelFileNode *rnode, ForkNumber forkNum, SMgrImpl impl)
 	XLogInsert(RM_SMGR_ID, XLOG_SMGR_CREATE | XLR_SPECIAL_REL_UPDATE);
 }
 
-/*
- * RelationDropStorage
- *		Schedule unlinking of physical storage at transaction commit.
- */
 void
 RelationDropStorage(Relation rel)
 {

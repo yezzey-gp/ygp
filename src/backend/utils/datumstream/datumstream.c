@@ -33,6 +33,8 @@
 #include "utils/guc.h"
 #include "catalog/pg_compression.h"
 #include "utils/faultinjector.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 typedef enum AOCSBK
 {
@@ -490,7 +492,9 @@ create_datumstreamwrite(
 						bool checksum,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
+						Oid reloid,
 						char *title,
 						bool needsWAL)
 {
@@ -557,7 +561,9 @@ create_datumstreamwrite(
 								&acc->ao_write,
 								 /* memoryContext */ NULL,
 								acc->maxAoBlockSize,
+								relnamespace,
 								relname,
+								reloid,
 								title,
 								&acc->ao_attr,
 								needsWAL);
@@ -631,7 +637,9 @@ create_datumstreamread(
 					   bool checksum,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
+					   Oid reloid,
 					   char *title)
 {
 	DatumStreamRead *acc = palloc0(sizeof(DatumStreamRead));
@@ -683,8 +691,10 @@ create_datumstreamread(
 
 	AppendOnlyStorageRead_Init(
 							   &acc->ao_read,
+							   /* relation Oid */ reloid,
 								/* memoryContext */ NULL,
 							   acc->maxAoBlockSize,
+							   relnamespace,
 							   relname,
 							   title,
 							   &acc->ao_attr);
@@ -790,7 +800,7 @@ destroy_datumstreamread(DatumStreamRead * ds)
 
 
 void
-datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofUncompressed,
+datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofUncompressed, int64 modcount,
 						   RelFileNodeBackend *relFileNode, int32 segmentFileNum, int version)
 {
 	ds->eof = eof;
@@ -819,6 +829,7 @@ datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofU
 									version,
 									eof,
 									eofUncompressed,
+									modcount,
 									relFileNode,
 									segmentFileNum);
 
@@ -834,7 +845,7 @@ datumstreamread_open_file(DatumStreamRead * ds, char *fn, int64 eof, int64 eofUn
 	if (ds->need_close_file)
 		datumstreamread_close_file(ds);
 
-	AppendOnlyStorageRead_OpenFile(&ds->ao_read, fn, version, ds->eof);
+	AppendOnlyStorageRead_OpenFile(&ds->ao_read, fn, version, ds->eof, relFileNode);
 
 	ds->need_close_file = true;
 }

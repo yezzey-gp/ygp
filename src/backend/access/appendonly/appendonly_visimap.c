@@ -650,6 +650,7 @@ AppendOnlyVisimapDelete_Stash(
 		   "Append-only visi map delete: Stash dirty visimap entry %d/" INT64_FORMAT,
 		   visiMap->visimapEntry.segmentFileNum, visiMap->visimapEntry.firstRowNum);
 
+	/* Use custom smgr here? will that make a sence? */
 	if (BufFileWrite(visiMapDelete->workfile, &key, sizeof(key)) != sizeof(key))
 	{
 		elog(ERROR, "Failed to write visimap delete spill key information: "
@@ -658,6 +659,7 @@ AppendOnlyVisimapDelete_Stash(
 			 key.segno, key.firstRowNum, (int64)offset, sizeof(key));
 	}
 	int size = VARSIZE(visiMap->visimapEntry.data);
+	/* Use custom smgr here? will that make a sence? */
 	if (BufFileWrite(visiMapDelete->workfile, visiMap->visimapEntry.data, size) != size)
 	{
 		elog(ERROR, "Failed to write visimap delete spill key information: "

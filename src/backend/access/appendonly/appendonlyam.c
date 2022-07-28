@@ -63,6 +63,8 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/snapmgr.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 
 typedef enum AoExecutorBlockKind
@@ -147,14 +149,31 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 	if (!scan->initedStorageRoutines)
 	{
 		PGFunction *fns = NULL;
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(scan->aos_rd->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", scan->aos_rd->rd_rel->relname.data);
+		}
 
 		AppendOnlyStorageRead_Init(
 								   &scan->storageRead,
+								   scan->aos_rd->rd_id,
 								   scan->aoScanInitContext,
 								   scan->usableBlockSize,
+								   nspname,
 								   NameStr(scan->aos_rd->rd_rel->relname),
 								   scan->title,
 								   &scan->storageAttributes);
+
+		pfree(nspname);
 
 		/*
 		 * There is no guarantee that the current memory context will be
@@ -261,7 +280,7 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 								   &scan->storageRead,
 								   scan->aos_filenamepath,
 								   formatversion,
-								   eof);
+								   eof, scan->aos_rd->rd_node);
 
 	AppendOnlyExecutionReadBlock_SetSegmentFileNum(
 												   &scan->executorReadBlock,
@@ -398,6 +417,7 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									aoInsertDesc->fsInfo->formatversion,
 									eof,
 									eof_uncompressed,
+									aoInsertDesc->fsInfo->modcount,
 									&rnode,
 									aoInsertDesc->cur_segno);
 
@@ -2510,14 +2530,32 @@ appendonly_fetch_init(Relation relation,
 		aoFetchDesc->lastSequence[segno] = ReadLastSequence(segrelid, segno);
 	}
 
+	HeapTuple tp;
+	char * nspname;
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoFetchDesc->relation->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoFetchDesc->relation->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageRead_Init(
 							   &aoFetchDesc->storageRead,
+							   RelationGetRelid(aoFetchDesc->relation),
 							   aoFetchDesc->initContext,
 							   aoFetchDesc->usableBlockSize,
+							   nspname,
 							   NameStr(aoFetchDesc->relation->rd_rel->relname),
 							   aoFetchDesc->title,
 							   &aoFetchDesc->storageAttributes);
 
+	pfree(nspname);
 
 	fns = get_funcs_for_compression(attr->compressType);
 	aoFetchDesc->storageRead.compression_functions = fns;
@@ -3087,14 +3125,34 @@ appendonly_insert_init(Relation rel, int segno, int64 num_rows)
 					 RelationGetRelationName(aoInsertDesc->aoi_rel));
 	aoInsertDesc->title = titleBuf.data;
 
+	HeapTuple tp;
+	char * nspname;
+
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoInsertDesc->aoi_rel->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoInsertDesc->aoi_rel->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageWrite_Init(
 								&aoInsertDesc->storageWrite,
 								NULL,
 								aoInsertDesc->usableBlockSize,
-								RelationGetRelationName(aoInsertDesc->aoi_rel),
+								nspname,
+								aoInsertDesc->from_aoi_rel ? RelationGetRelationName(aoInsertDesc->from_aoi_rel) : RelationGetRelationName(aoInsertDesc->aoi_rel),
+								aoInsertDesc->from_aoi_rel ? RelationGetRelid(aoInsertDesc->from_aoi_rel) : RelationGetRelid(aoInsertDesc->aoi_rel),
 								aoInsertDesc->title,
 								&aoInsertDesc->storageAttributes,
 								XLogIsNeeded() && RelationNeedsWAL(aoInsertDesc->aoi_rel));
+
+	pfree(nspname);
 
 	aoInsertDesc->storageWrite.compression_functions = fns;
 	aoInsertDesc->storageWrite.compressionState = cs;
