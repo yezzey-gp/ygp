@@ -1811,7 +1811,7 @@ aocs_begin_headerscan(Relation rel, int colno)
 void
 aocs_headerscan_opensegfile(AOCSHeaderScanDesc hdesc,
 							AOCSFileSegInfo *seginfo,
-							char *basepath)
+							char *basepath, RelFileNode rnode)
 {
 	AOCSVPInfoEntry *vpe;
 	char		fn[MAXPGPATH];
@@ -1824,7 +1824,7 @@ aocs_headerscan_opensegfile(AOCSHeaderScanDesc hdesc,
 	Assert(strlen(fn) + 1 <= MAXPGPATH);
 	vpe = getAOCSVPEntry(seginfo, hdesc->colno);
 	AppendOnlyStorageRead_OpenFile(&hdesc->ao_read, fn, seginfo->formatversion,
-								   vpe->eof);
+								   vpe->eof, rnode);
 }
 
 bool
