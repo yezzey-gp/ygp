@@ -19,6 +19,7 @@
 #include "cdb/cdbappendonlystorage.h"
 #include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbbufferedread.h"
+#include "storage/relfilenode.h"
 #include "utils/palloc.h"
 #include "storage/fd.h"
 
@@ -202,7 +203,7 @@ extern char *AppendOnlyStorageRead_SegmentFileName(AppendOnlyStorageRead *storag
 extern void AppendOnlyStorageRead_FinishSession(AppendOnlyStorageRead *storageRead);
 
 extern void AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
-							   char *filePathName, int version, int64 logicalEof);
+							   char *filePathName, int version, int64 logicalEof, RelFileNode relFileNode);
 extern bool AppendOnlyStorageRead_TryOpenFile(AppendOnlyStorageRead *storageRead,
 								  char *filePathName, int version, int64 logicalEof);
 extern void AppendOnlyStorageRead_SetTemporaryRange(AppendOnlyStorageRead *storageRead,
