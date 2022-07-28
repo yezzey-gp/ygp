@@ -840,7 +840,7 @@ datumstreamread_open_file(DatumStreamRead * ds, char *fn, int64 eof, int64 eofUn
 	if (ds->need_close_file)
 		datumstreamread_close_file(ds);
 
-	AppendOnlyStorageRead_OpenFile(&ds->ao_read, fn, version, ds->eof);
+	AppendOnlyStorageRead_OpenFile(&ds->ao_read, fn, version, ds->eof, relFileNode);
 
 	ds->need_close_file = true;
 }
