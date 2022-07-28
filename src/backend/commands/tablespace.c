@@ -148,6 +148,11 @@ TablespaceCreateDbspace(Oid spcNode, Oid dbNode, bool isRedo)
 	if (spcNode == GLOBALTABLESPACE_OID)
 		return;
 
+	/* yezzey tablespace not persisted on-disk */
+	if (spcNode == YEZZEYTABLESPACE_OID) {
+		return;
+	}
+
 	Assert(OidIsValid(spcNode));
 	Assert(OidIsValid(dbNode));
 
@@ -343,6 +348,13 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 						stmt->tablespacename),
 		errdetail("The prefix \"pg_\" is reserved for system tablespaces.")));
 
+	// if (!allowSystemTableMods && stmt->tablespacename != "yezzey")
+	// 	ereport(ERROR,
+	// 			(errcode(ERRCODE_RESERVED_NAME),
+	// 			 errmsg("unacceptable tablespace name \"%s\"",
+	// 					stmt->tablespacename),
+	// 	errdetail("In yezzey-engined installation tablespace support are dropped.")));
+
 	/*
 	 * Check that there is no other tablespace by this name.  (The unique
 	 * index would catch this anyway, but might as well give a friendlier
@@ -380,6 +392,12 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 		nulls[Anum_pg_tablespace_spcoptions - 1] = true;
 
 	tuple = heap_form_tuple(rel->rd_att, values, nulls);
+
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(stmt->tablespacename, "yezzey") == 0) {
+		HeapTupleSetOid(tuple, YEZZEYTABLESPACE_OID);
+	}
+
 
 	tablespaceoid = simple_heap_insert(rel, tuple);
 
@@ -1765,6 +1783,10 @@ get_tablespace_oid(const char *tablespacename, bool missing_ok)
 	HeapTuple	tuple;
 	ScanKeyData entry[1];
 
+	if (strcmp(tablespacename, "yezzey(cloud-storage)") == 0) {
+		return YEZZEYTABLESPACE_OID;
+	}
+
 	/*
 	 * Search pg_tablespace.  We use a heapscan here even though there is an
 	 * index on name, on the theory that pg_tablespace will usually have just
@@ -1810,6 +1832,12 @@ get_tablespace_name(Oid spc_oid)
 	HeapScanDesc scandesc;
 	HeapTuple	tuple;
 	ScanKeyData entry[1];
+
+	/* Yezzey fixes */
+	if (spc_oid == YEZZEYTABLESPACE_OID) {
+		return pstrdup("yezzey(cloud-storage)");
+	}
+	/* Yezzey fixes end*/
 
 	/*
 	 * Search pg_tablespace.  We use a heapscan here even though there is an

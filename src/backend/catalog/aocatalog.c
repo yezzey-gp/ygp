@@ -22,6 +22,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_appendonly_fn.h"
 #include "catalog/pg_namespace.h"
+#include "catalog/pg_tablespace.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_type.h"
 #include "miscadmin.h"
@@ -129,7 +130,7 @@ CreateAOAuxiliaryTable(
 	 */
 	aoauxiliary_relid = heap_create_with_catalog(aoauxiliary_relname,
 											     namespaceid,
-											     rel->rd_rel->reltablespace,
+											     rel->rd_rel->reltablespace == YEZZEYTABLESPACE_OID ? 0 : rel->rd_rel->reltablespace,
 											     InvalidOid,
 												 InvalidOid,
 												 InvalidOid,
@@ -177,7 +178,7 @@ CreateAOAuxiliaryTable(
 										 indexInfo,
 										 indexColNames,
 										 BTREE_AM_OID,
-										 rel->rd_rel->reltablespace,
+										 rel->rd_rel->reltablespace == YEZZEYTABLESPACE_OID ? 0 : rel->rd_rel->reltablespace,
 										 collationObjectId, classObjectId, coloptions, (Datum) 0,
 										 true, false, false, false,
 										 true, false, false, true, NULL);
