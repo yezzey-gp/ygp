@@ -51,6 +51,7 @@ class Config {
    public:
     Config(const string& filename, const string& urlWithOptions, const string& url, const char *datadir);
     Config(const string& filename, const string& urlWithOptions);
+    Config(const string &filename);
     ~Config();
     bool SectionExist(const string& sec);
     string Get(const string& sec, const string& key, const string& defaultvalue);
