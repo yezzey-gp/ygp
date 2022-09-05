@@ -153,6 +153,17 @@ Config::Config(const string &filename, const string& urlWithOptions) : _conf(NUL
     }
 }
 
+Config::Config(const string &filename) : _conf(NULL) {
+    if (!filename.empty()) this->_conf = ini_load(filename.c_str());
+    if (this->_conf == NULL) {
+#ifndef S3_STANDALONE
+        write_log("Failed to load config file:'%s'\n", filename.c_str());
+#else
+        S3ERROR("Failed to load config file:'%s'", filename.c_str());
+#endif
+    }
+}
+
 Config::~Config() {
     if (this->_conf) ini_free(this->_conf);
 }
