@@ -1,3 +1,6 @@
+[submodule "gpcontrib/yezzey"]
+	path = gpcontrib/yezzey
+	url = ssh://git@bb.yandex-team.ru/mdb/yezzey.git
 [submodule "gpAux/extensions/pgbouncer/source"]
 	path = gpAux/extensions/pgbouncer/source
 	url = https://github.com/greenplum-db/pgbouncer.git
