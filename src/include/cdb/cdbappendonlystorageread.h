@@ -21,7 +21,8 @@
 #include "cdb/cdbbufferedread.h"
 #include "storage/relfilenode.h"
 #include "utils/palloc.h"
-#include "storage/fd.h"
+// #include "storage/fd.h"
+#include "storage/smgr.h"
 
 
 /*
@@ -149,7 +150,8 @@ typedef struct AppendOnlyStorageRead
 	/*
 	 * The handle to the current open segment file.
 	 */
-	File		file;
+	SMGRFile		file;
+	const struct f_smgr_ao * smgr;
 
 	/*
 	 * The byte length of the current segment file being read.
