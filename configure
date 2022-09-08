@@ -748,6 +748,7 @@ INCLUDES
 enable_ic_proxy
 HAVE_CXX11
 enable_gpcloud
+enable_yezzey
 enable_mapreduce
 enable_orca
 autodepend
@@ -867,6 +868,7 @@ enable_debugntuplestore
 enable_orca
 enable_mapreduce
 enable_gpcloud
+enable_yezzey
 enable_ic_proxy
 enable_thread_safety
 with_tcl
@@ -1551,6 +1553,7 @@ Optional Features:
   --disable-orca          disable ORCA optimizer
   --enable-mapreduce      enable Greenplum Mapreduce support
   --disable-gpcloud       disable gpcloud support
+  --disable-yezzey        disable yezzey support
   --enable-ic-proxy       enable interconnect proxy mode (requires libuv
                           library)
   --disable-thread-safety disable thread-safety in client libraries
@@ -6433,6 +6436,31 @@ else
 $as_echo "#define USE_GPCLOUD 1" >>confdefs.h
 
 fi
+
+# Check whether --enable-yezzey was given.
+if test "${enable_yezzey+set}" = set; then :
+  enableval=$enable_yezzey;
+  case $enableval in
+    yes)
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --enable-yezzey option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  enable_yezzey=yes
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
+fi
+
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: checking whether to build with gpcloud... $enable_gpcloud" >&5
