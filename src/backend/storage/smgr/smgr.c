@@ -100,6 +100,18 @@ static const f_smgr smgrsw[] = {
 	}
 };
 
+static const f_smgr_ao smgrswao[] = {
+	/* regular file */
+	{
+		.smgr_FileClose = FileClose,
+		.smgr_FileTruncate = FileTruncate,
+		.smgr_PathNameOpenFile = PathNameOpenFile,
+		.smgr_FileWrite = FileWrite,
+		.smgr_FileRead = FileRead,
+		.smgr_FileSync = FileSync,
+	},
+};
+
 static const int NSmgr = lengthof(smgrsw);
 
 /*
@@ -154,6 +166,71 @@ smgrshutdown(int code, Datum arg)
 			smgrsw[i].smgr_shutdown();
 	}
 }
+
+static void
+smgrshutdown(int code, Datum arg)
+{
+	if (smgr_shutdown_hook)
+		(*smgr_shutdown_hook)();
+
+	smgr_shutdown_standard();
+}
+
+/* Hooks for plugins to get control in smgr */
+smgr_hook_type smgr_hook = NULL;
+smgrao_hook_type smgrao_hook = NULL;
+smgr_init_hook_type smgr_init_hook = NULL;
+smgrao_init_hook_type smgrao_init_hook = NULL;
+smgr_shutdown_hook_type smgr_shutdown_hook = NULL;
+
+const f_smgr *
+smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which)
+{
+	// for md.c 
+	return &smgrsw[which];
+}
+
+
+const f_smgr_ao *
+smgrao_standard()
+{
+	// for md.c 
+	return &smgrswao[0];
+}
+
+const f_smgr *
+smgr(BackendId backend, RelFileNode rnode, SMgrImpl which)
+{
+	const f_smgr *result;
+
+	if (smgr_hook)
+ 	{
+		result = (*smgr_hook)(backend, rnode, which);
+ 	}
+	else
+		result = smgr_standard(backend, rnode, which);
+
+	return result;
+}
+
+
+
+const f_smgr_ao *
+smgrao(void)
+{
+	const f_smgr_ao *result;
+
+	if (smgrao_hook)
+ 	{
+		result = (*smgrao_hook)();
+ 	}
+	else
+		result = smgrao_standard();
+
+	return result;
+}
+
+
 
 /*
  *	smgropen() -- Return an SMgrRelation object, creating it if need be.
@@ -299,7 +376,7 @@ smgrclose(SMgrRelation reln)
 	if (hash_search(SMgrRelationHash,
 					(void *) &(reln->smgr_rnode),
 					HASH_REMOVE, NULL) == NULL)
-		elog(ERROR, "SMgrRelation hashtable corrupted");
+		elog(WARNING, "SMgrRelation hashtable corrupted");
 
 	/*
 	 * Unhook the owner pointer, if any.  We do this last since in the remote

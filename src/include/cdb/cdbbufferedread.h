@@ -20,6 +20,8 @@
 
 #include "storage/fd.h"
 #include "storage/relfilenode.h"
+#include "storage/smgr.h"
+
 typedef struct BufferedRead
 {
 	/*
@@ -66,7 +68,7 @@ typedef struct BufferedRead
 	/*
 	 * File level members.
 	 */
-	File 				 file;
+	SMGRFile 				 file;
     char				 *filePathName;
     int64                fileLen;
 
@@ -79,6 +81,8 @@ typedef struct BufferedRead
 	 */
 	bool				haveTemporaryLimitInEffect;
 	int64				temporaryLimitFileLen;
+
+	const struct f_smgr_ao * smgr;
 
 } BufferedRead;
 

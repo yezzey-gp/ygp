@@ -102,10 +102,12 @@ BufferedReadInit(
 	/*
 	 * File level members.
 	 */
-	bufferedRead->file = -1;
+ 	bufferedRead->file = -1;
 	bufferedRead->fileLen = 0;
-	/* start reading from beginning of file */
-	bufferedRead->fileOff = 0;
+
+	/* Yezzey path begin */
+	bufferedRead->smgr = smgrao();
+	/* Yezzey path end */
 
 	bufferedRead->relFileNode = *file_node;
 	/*
@@ -178,11 +180,16 @@ BufferedReadIo(
 	offset = 0;
 	while (largeReadLen > 0)
 	{
-		int			actualLen = FileRead(bufferedRead->file,
-										 (char *) largeReadMemory,
-										 largeReadLen,
-										 bufferedRead->fileOff,
-										 WAIT_EVENT_DATA_FILE_READ);
+		int			actualLen;
+
+
+		/* Read file using Yezzey AO smgr API */
+		actualLen = bufferedRead->smgr->smgr_FileRead(bufferedRead->file,
+							 (char *) largeReadMemory,
+							 largeReadLen,
+							 bufferedRead->fileOff,
+							 WAIT_EVENT_DATA_FILE_READ);
+
 
 		if (actualLen == 0)
 			ereport(ERROR, (errcode_for_file_access(),

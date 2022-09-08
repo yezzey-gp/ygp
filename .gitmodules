@@ -1,3 +1,6 @@
+[submodule "gpcontrib/yezzey"]
+	path = gpcontrib/yezzey
+	url = ssh://git@bb.yandex-team.ru/mdb/yezzey.git
 [submodule "gpcontrib/gpcloud/test/googletest"]
 	path = gpcontrib/gpcloud/test/googletest
 	url = https://github.com/google/googletest.git

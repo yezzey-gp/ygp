@@ -109,6 +109,7 @@ extern SMgrRelation RelationCreateStorage(RelFileNode rnode,
 										  SMgrImpl smgr_which,
 										  Relation rel);
 extern void RelationDropStorage(Relation rel);
+extern void RelationDropStorageNoClose(Relation rel);
 extern void RelationPreserveStorage(RelFileNode rnode, bool atCommit);
 extern void RelationPreTruncate(Relation rel);
 extern void RelationTruncate(Relation rel, BlockNumber nblocks);

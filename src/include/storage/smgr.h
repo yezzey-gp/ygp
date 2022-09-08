@@ -22,6 +22,7 @@
 #include "storage/relfilenode.h"
 #include "storage/dbdirnode.h"
 #include "utils/relcache.h"
+#include "fd.h"
 
 typedef enum SMgrImplementation
 {
@@ -130,11 +131,43 @@ typedef struct f_smgr
 typedef void (*smgr_init_hook_type) (void);
 typedef void (*smgr_hook_type) (SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
 typedef void (*smgr_shutdown_hook_type) (void);
+#define SmgrIsTemp(smgr) \
+	RelFileNodeBackendIsTemp((smgr)->smgr_rnode)
+/* Yezzey path */
+typedef int SMGRFile;
+
+typedef struct f_smgr_ao {
+	int64       (*smgr_NonVirtualCurSeek) (SMGRFile file);
+	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
+	void 		(*smgr_FileClose)(SMGRFile file);
+	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset, uint32 wait_event_info);
+	SMGRFile    (*smgr_PathNameOpenFile) (const char * fileName, int fileFlags, int fileMode);
+	int         (*smgr_FileWrite)(SMGRFile file, char *buffer, int amount, off_t offset, uint32 wait_event_info);
+    int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount,off_t offset, uint32 wait_event_info );
+	int	        (*smgr_FileSync)(SMGRFile file);
+} f_smgr_ao;
+
+
+/* Yezzey path end */
+
+
+typedef void (*smgr_init_hook_type) (void);
+typedef void (*smgrao_init_hook_type) (void);
+typedef void (*smgr_shutdown_hook_type) (void);
+typedef void (*smgrao_shutdown_hook_type) (void);
+
+extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_hook_type smgr_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 
 extern bool smgr_is_heap_relation(SMgrRelation reln);
+
+/* Yezzey path begin */
+typedef const f_smgr_ao *(*smgrao_hook_type)();
+extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
+extern const f_smgr_ao *smgrao(void);
+/* Yezzey path end */
 
 extern void smgrinit(void);
 extern SMgrRelation smgropen(RelFileNode rnode, BackendId backend,
