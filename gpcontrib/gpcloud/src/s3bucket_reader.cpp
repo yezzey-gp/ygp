@@ -2,6 +2,8 @@
 
 S3BucketReader::S3BucketReader() : Reader() {
     this->keyIndex = 0;  // doesn't matter, be set in open()
+    this->iter = 0;
+    this->curr_offset = 0;
 
     this->s3Interface = NULL;
     this->upstreamReader = NULL;
@@ -16,6 +18,7 @@ S3BucketReader::~S3BucketReader() {
 
 void S3BucketReader::open(const S3Params& params) {
     this->params = params;
+    this->is_empty = false;
 
     this->keyIndex = s3ext_segid;  // we may change it in unit tests
 
@@ -96,36 +99,46 @@ uint64_t S3BucketReader::readWithoutHeaderLine(char* buf, uint64_t count) {
 uint64_t S3BucketReader::read(char* buf, uint64_t count) {
     S3_CHECK_OR_DIE(this->upstreamReader != NULL, S3RuntimeError, "upstreamReader is NULL");
     uint64_t readCount = 0;
-    while (true) {
+    while (this->iter < this->keyList.contents.size()) {
+        BucketContent& key = this->keyList.contents[this->iter];
         if (this->needNewReader) {
-            if (this->keyIndex >= this->keyList.contents.size()) {
-                S3DEBUG("Read finished for segment: %d", s3ext_segid);
-                return 0;
-            }
-            BucketContent& key = this->getNextKey();
-
             this->upstreamReader->open(constructReaderParams(key));
             this->needNewReader = false;
 
             // ignore header line if it is not the first file
             if (hasHeader && !this->isFirstFile) {
                 readCount = readWithoutHeaderLine(buf, count);
+                if (readCount > 0) {
+                    this->curr_offset += readCount;
+                }
                 if (readCount != 0) {
                     return readCount;
                 }
             }
         }
 
-        readCount = this->upstreamReader->read(buf, count);
-        if (readCount != 0) {
-            return readCount;
+        if (this->curr_offset < key.getSize()) {
+            readCount = this->upstreamReader->read(buf, count);
+            if (readCount > 0) {
+                this->curr_offset += readCount;
+            }
+            if (readCount != 0) {
+                return readCount;
+            }
         }
 
         // Finished one file, continue to next
         this->upstreamReader->close();
         this->needNewReader = true;
         this->isFirstFile = false;
+        this->curr_offset = 0;
+        this->iter++;
+        if (this->iter == this->keyList.contents.size()) {
+            this->is_empty = true;
+        }
     }
+    this->upstreamReader = NULL;
+    return 0;
 }
 
 void S3BucketReader::close() {
