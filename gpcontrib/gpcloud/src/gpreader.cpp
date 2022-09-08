@@ -172,3 +172,11 @@ bool reader_cleanup(GPReader** reader) {
 
     return result;
 }
+
+bool GPReader::empty() {
+    return this->bucketReader.is_empty;
+}
+
+bool reader_empty(GPReader * reader) {
+    return reader->empty();
+}

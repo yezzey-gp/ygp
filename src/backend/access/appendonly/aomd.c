@@ -357,8 +357,10 @@ static bool
 mdunlink_ao_perFile(const int segno, void *ctx)
 {
 	FileTag tag;
+	StringInfoData buf;
 	const struct mdunlink_ao_callback_ctx *unlinkFiles = ctx;
 
+	initStringInfo(&buf);
 	char *segPath = unlinkFiles->segPath;
 	char *segPathSuffixPosition = unlinkFiles->segpathSuffixPosition;
 
@@ -377,13 +379,27 @@ mdunlink_ao_perFile(const int segno, void *ctx)
 		if (errno != ENOENT)
 			ereport(WARNING,
 					(errcode_for_file_access(),
-					 errmsg("could not remove file \"%s\": %m", segPath)));
+							errmsg("could not remove file \"%s\": %m", segPath)));
+	}
+
+	/* Yezzey path begin */
+	/* Drop yezzey tmpbuf file, if any */
+	appendStringInfo(&buf, "%s_tmpbuf", segPath);
+	if (unlink(buf.data) != 0)
+	{
+		/* ENOENT is expected after the end of the extensions */
+		if (errno != ENOENT)
+			ereport(WARNING,
+					(errcode_for_file_access(),
+							errmsg("could not remove file \"%s\": %m", buf.data)));
 		else
 			return false;
 	}
+	/* Yezzey path end */
 	return true;
 }
 
+/* Rewrite this using Yezzey interfaces */
 static void
 copy_file(char *srcsegpath, char *dstsegpath,
 		  RelFileNode dst, int segfilenum, bool use_wal)

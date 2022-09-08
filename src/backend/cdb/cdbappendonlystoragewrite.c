@@ -170,6 +170,7 @@ AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 	}
 
 	storageWrite->file = -1;
+	storageWrite->smgr = smgrao();
 	storageWrite->formatVersion = -1;
 	storageWrite->needsWAL = needsWAL;
 
@@ -320,10 +321,9 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 
 	errno = 0;
 
-	smgrwarmup(storageWrite->relFileNode.node, path);
-
 	int			fileFlags = O_RDWR | PG_BINARY;
-	file = PathNameOpenFile(path, fileFlags);
+	/* Yezzey path, open by smgr */
+	file = storageWrite->smgr->smgr_PathNameOpenFile(path, fileFlags, 0600);
 	if (file < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -403,14 +403,15 @@ AppendOnlyStorageWrite_FlushAndCloseFile(
 	 * primary.  Temp tables are not crash safe, no need to fsync them.
 	 */
 	if (!RelFileNodeBackendIsTemp(storageWrite->relFileNode) &&
-		FileSync(storageWrite->file, WAIT_EVENT_DATA_FILE_SYNC) != 0)
+		/* Open with smgr, yezzey */
+		storageWrite->smgr->smgr_FileSync(storageWrite->file) != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("Could not flush (fsync) Append-Only segment file '%s' to disk for relation '%s': %m",
 						storageWrite->segmentFileName,
 						storageWrite->relationName)));
 
-	FileClose(storageWrite->file);
+	storageWrite->smgr->smgr_FileClose(storageWrite->file);
 
 	storageWrite->file = -1;
 	storageWrite->formatVersion = -1;
@@ -763,7 +764,7 @@ AppendOnlyStorageWrite_VerifyWriteBlock(AppendOnlyStorageWrite *storageWrite,
 														  header,
 														  &storedChecksum,
 														  &computedChecksum))
-			ereport(ERROR,
+			ereport(WARNING,
 					(errmsg("Verify block during write found header checksum does not match.  Expected 0x%08X and found 0x%08X",
 							storedChecksum,
 							computedChecksum),
