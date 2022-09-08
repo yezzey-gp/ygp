@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 /* Do the module magic dance */
-PG_MODULE_MAGIC;
+// PG_MODULE_MAGIC;
 PG_FUNCTION_INFO_V1(s3_export);
 PG_FUNCTION_INFO_V1(s3_import);
 

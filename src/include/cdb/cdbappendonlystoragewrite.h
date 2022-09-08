@@ -88,7 +88,8 @@ typedef struct AppendOnlyStorageWrite
 	/*
 	 * The handle to the current open segment file.
 	 */
-	File		file;
+	SMGRFile		file;
+	const struct f_smgr_ao * smgr;
 
 	/*
 	 * The committed EOF at the beginning of the write open.

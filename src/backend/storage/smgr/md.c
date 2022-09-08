@@ -543,6 +543,15 @@ mdunlinkfork(RelFileNodeBackend rnode, ForkNumber forkNum, bool isRedo, char rel
 		register_unlink(rnode);
 	}
 
+	if (forkNum == MAIN_FORKNUM) {
+		if (relstorage_is_ao(relstorage))
+		{
+			mdunlink_ao(path, forkNum);
+			pfree(path);
+			return;
+		}
+	}
+	
 	/*
 	 * Delete any additional segments.
 	 */
