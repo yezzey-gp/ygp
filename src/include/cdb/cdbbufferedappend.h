@@ -19,6 +19,7 @@
 #define CDBBUFFEREDAPPEND_H
 
 #include "storage/fd.h"
+#include "storage/smgr.h"
 #include "storage/relfilenode.h"
 
 typedef struct BufferedAppend
@@ -69,12 +70,13 @@ typedef struct BufferedAppend
 	/*
 	 * File level members.
 	 */
-	File 				 file;
-	RelFileNodeBackend	relFileNode;
-	int32				segmentFileNum;
+	SMGRFile 				  file;
+	const struct f_smgr_ao     *smgr;
+	RelFileNodeBackend	  relFileNode;
+	int32			 	  segmentFileNum;
     char				 *filePathName;
-    int64                fileLen;
-    int64				 fileLen_uncompressed; /* for calculating compress ratio */
+    int64                 fileLen;
+    int64				  fileLen_uncompressed; /* for calculating compress ratio */
 
 } BufferedAppend;
 
