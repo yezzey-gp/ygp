@@ -81,6 +81,8 @@ ao_insert_replay(XLogRecord *record)
 	dbPath = GetDatabasePath(xlrec->target.node.dbNode,
 							 xlrec->target.node.spcNode);
 
+	struct f_smgr_ao * smgrao_curr = smgrao();
+
 	if (xlrec->target.segment_filenum == 0)
 		snprintf(path, MAXPGPATH, "%s/%u", dbPath, xlrec->target.node.relNode);
 	else
@@ -92,14 +94,14 @@ ao_insert_replay(XLogRecord *record)
 	/* When writing from the beginning of the file, it might not exist yet. Create it. */
 	if (xlrec->target.offset == 0)
 		fileFlags |= O_CREAT;
-	file = PathNameOpenFile(path, fileFlags, 0600);
+	file = smgrao_curr->smgr_PathNameOpenFile(path, fileFlags, 0600);
 	if (file < 0)
 	{
 		XLogAOSegmentFile(xlrec->target.node, xlrec->target.segment_filenum);
 		return;
 	}
 
-	seek_offset = FileSeek(file, xlrec->target.offset, SEEK_SET);
+	seek_offset = smgrao_curr->smgr_FileSeek(file, xlrec->target.offset, SEEK_SET);
 	if (seek_offset != xlrec->target.offset)
 	{
 		ereport(ERROR,
@@ -110,7 +112,7 @@ ao_insert_replay(XLogRecord *record)
 						path)));
 	}
 
-	written_len = FileWrite(file, buffer, len);
+	written_len = smgrao_curr->smgr_FileWrite(file, buffer, len);
 	if (written_len < 0 || written_len != len)
 	{
 		ereport(ERROR,
@@ -124,7 +126,7 @@ ao_insert_replay(XLogRecord *record)
 							  xlrec->target.segment_filenum,
 							  file);
 
-	FileClose(file);
+	smgrao_curr->smgr_FileClose(file);
 }
 
 /*
@@ -159,6 +161,8 @@ ao_truncate_replay(XLogRecord *record)
 	dbPath = GetDatabasePath(xlrec->target.node.dbNode,
 							 xlrec->target.node.spcNode);
 
+	struct f_smgr_ao * smgrao_curr = smgrao();
+
 	if (xlrec->target.segment_filenum == 0)
 		snprintf(path, MAXPGPATH, "%s/%u", dbPath, xlrec->target.node.relNode);
 	else
@@ -166,7 +170,7 @@ ao_truncate_replay(XLogRecord *record)
 	pfree(dbPath);
 	dbPath = NULL;
 
-	file = PathNameOpenFile(path, O_RDWR | PG_BINARY, 0600);
+	file = smgrao_curr->smgr_PathNameOpenFile(path, O_RDWR | PG_BINARY, 0600);
 	if (file < 0)
 	{
 		/*
@@ -186,7 +190,7 @@ ao_truncate_replay(XLogRecord *record)
 		return;
 	}
 
-	if (FileTruncate(file, xlrec->target.offset) != 0)
+	if (smgrao_curr->smgr_FileTruncate(file, xlrec->target.offset) != 0)
 	{
 		ereport(WARNING,
 				(errcode_for_file_access(),
@@ -194,7 +198,7 @@ ao_truncate_replay(XLogRecord *record)
 						path, xlrec->target.offset)));
 	}
 
-	FileClose(file);
+	smgrao_curr->smgr_FileClose(file);
 }
 
 void
