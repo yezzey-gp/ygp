@@ -77,7 +77,6 @@ typedef struct SMgrRelationData
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	dlist_node	node;
 	
-	const struct f_smgr *smgr; /* storage manager selector */
 } SMgrRelationData;
 
 typedef SMgrRelationData *SMgrRelation;
