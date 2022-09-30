@@ -32,6 +32,7 @@ else
                gp_parallel_retrieve_cursor \
                gp_internal_tools \
                gp_pitr \
+	       gp_parser \
                gp_legacy_string_agg \
                gp_array_agg \
                gp_percentile_agg \
