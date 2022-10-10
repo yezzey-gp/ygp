@@ -195,6 +195,14 @@ static void SIGUSR1_handler(int sig)
     ax.rotate = 1;
 }
 
+static void SIGQUIT_handler(int sig)
+{
+	/*
+	* We dont want to handle SIGQUIT
+	*/
+	exit(2);
+}
+
 static void SIGUSR2_handler(int sig)
 {
 	ax.exit = 1;
@@ -1333,7 +1341,8 @@ int main(int argc, const char* const argv[])
 	/* Set up signal handlers */
 	if ((signal(SIGHUP, SIGHUP_handler) == SIG_ERR) ||
 		(signal(SIGUSR2, SIGUSR2_handler) == SIG_ERR) ||
-		(signal(SIGUSR1, SIGUSR1_handler) == SIG_ERR))
+		(signal(SIGUSR1, SIGUSR1_handler) == SIG_ERR) || 
+		(signal(SIGQUIT, SIGQUIT_handler) == SIG_ERR))
 	{
 		interuptable_sleep(30); // sleep to prevent loop of forking process and failing
 		gpmon_fatal(FLINE, "Failed to set signal handlers\n");
