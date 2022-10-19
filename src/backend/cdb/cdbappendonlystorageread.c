@@ -127,6 +127,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 		   storageRead->largeReadLen);
 
 	storageRead->file = -1;
+	storageRead->smgr = smgrao();
 	storageRead->formatVersion = -1;
 
 	MemoryContextSwitchTo(oldMemoryContext);
@@ -245,7 +246,7 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	/*
 	 * Open the file for read.
 	 */
-	file = PathNameOpenFile(filePathName, fileFlags, fileMode);
+	file = storageRead->smgr->smgr_PathNameOpenFile(filePathName, fileFlags, fileMode);
 
 	return file;
 }
@@ -274,10 +275,12 @@ AppendOnlyStorageRead_FinishOpenFile(AppendOnlyStorageRead *storageRead,
 	/*
 	 * Seek to the beginning of the file.
 	 */
-	seekResult = FileSeek(file, 0, SEEK_SET);
+	// 
+	seekResult = storageRead->smgr->smgr_FileSeek(file, 0, SEEK_SET);
+	//seekResult = FileSeek(file, 0, SEEK_SET);
 	if (seekResult != 0)
 	{
-		FileClose(file);
+		storageRead->smgr->smgr_FileClose(file);
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("append-only storage read error on segment file '%s' for relation '%s'",
@@ -346,8 +349,6 @@ AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
 				 errmsg("append-only storage read segment file '%s' EOF must be > 0 for relation '%s'",
 						filePathName,
 						storageRead->relationName)));
-
-	smgrwarmup(relFileNode, filePathName);
 
 	file = AppendOnlyStorageRead_DoOpenFile(storageRead,
 											filePathName);
@@ -449,7 +450,7 @@ AppendOnlyStorageRead_CloseFile(AppendOnlyStorageRead *storageRead)
 	if (storageRead->file == -1)
 		return;
 
-	FileClose(storageRead->file);
+	storageRead->smgr->smgr_FileClose(storageRead->file);
 
 	storageRead->file = -1;
 	storageRead->formatVersion = -1;

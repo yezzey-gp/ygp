@@ -21,6 +21,7 @@
 #include "storage/block.h"
 #include "storage/relfilenode.h"
 #include "storage/dbdirnode.h"
+#include "fd.h"
 
 struct f_smgr;
 
@@ -127,27 +128,41 @@ typedef struct f_smgr
 	void		(*smgr_post_ckpt) (void);		/* may be NULL */
 } f_smgr;
 
-void smgrwarmup(RelFileNode rnode, char * path);
+typedef int SMGRFile;
+
+
+
+typedef struct f_smgr_ao {
+	int64       (*smgr_NonVirtualCurSeek) (SMGRFile file);
+	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
+	void 		(*smgr_FileClose)(SMGRFile file);
+	SMGRFile    (*smgr_PathNameOpenFile) (FileName fileName, int fileFlags, int fileMode);
+	int         (*smgr_FileWrite)(SMGRFile file, char *buffer, int amount);
+    int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount);
+	int	        (*smgr_FileSync)(SMGRFile file);
+} f_smgr_ao;
 
 
 typedef void (*smgr_init_hook_type) (void);
+typedef void (*smgrao_init_hook_type) (void);
 typedef void (*smgr_shutdown_hook_type) (void);
+typedef void (*smgrao_shutdown_hook_type) (void);
 
-typedef void (*smgrwarmup_hook_type) (RelFileNode rnode, char* path);
-
-extern PGDLLIMPORT smgrwarmup_hook_type smgrwarmup_hook;
+extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern void smgr_init_standard(void);
 extern void smgr_shutdown_standard(void);
 
 
-
 typedef const f_smgr *(*smgr_hook_type) (BackendId backend, RelFileNode rnode);
+typedef const f_smgr_ao *(*smgrao_hook_type)();
 extern PGDLLIMPORT smgr_hook_type smgr_hook;
+extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
 extern const f_smgr *smgr_standard(BackendId backend, RelFileNode rnode);
 
 extern const f_smgr *smgr(BackendId backend, RelFileNode rnode);
+extern const f_smgr_ao *smgrao(void);
 
 extern void smgrinit(void);
 extern SMgrRelation smgropen(RelFileNode rnode, BackendId backend);
