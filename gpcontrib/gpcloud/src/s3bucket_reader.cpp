@@ -96,13 +96,14 @@ uint64_t S3BucketReader::readWithoutHeaderLine(char* buf, uint64_t count) {
 uint64_t S3BucketReader::read(char* buf, uint64_t count) {
     S3_CHECK_OR_DIE(this->upstreamReader != NULL, S3RuntimeError, "upstreamReader is NULL");
     uint64_t readCount = 0;
-    while (true) {
+    int key=1;
+    while (key--) {
         if (this->needNewReader) {
-            if (this->keyIndex >= this->keyList.contents.size()) {
+            if (0 == this->keyList.contents.size()) {
                 S3DEBUG("Read finished for segment: %d", s3ext_segid);
                 return 0;
             }
-            BucketContent& key = this->getNextKey();
+            BucketContent& key = this->keyList.contents[0];
 
             this->upstreamReader->open(constructReaderParams(key));
             this->needNewReader = false;
@@ -126,6 +127,7 @@ uint64_t S3BucketReader::read(char* buf, uint64_t count) {
         this->needNewReader = true;
         this->isFirstFile = false;
     }
+    return 0;
 }
 
 void S3BucketReader::close() {
