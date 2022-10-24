@@ -23,6 +23,8 @@ class GPReader : public Reader {
     // Return 0 if EOF. Throw exception if encounters errors.
     virtual uint64_t read(char *buf, uint64_t count);
 
+    virtual bool empty();
+
     // This should be reentrant, has no side effects when called multiple times.
     virtual void close();
 
@@ -49,6 +51,7 @@ class GPReader : public Reader {
 
 // Following 3 functions are invoked by s3_import(), need to be exception safe
 GPReader *reader_init(const char *url_with_options);
+bool reader_empty(GPReader * reader);
 bool reader_transfer_data(GPReader *reader, char *data_buf, int &data_len);
 bool reader_cleanup(GPReader **reader);
 
