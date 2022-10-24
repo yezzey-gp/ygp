@@ -889,7 +889,7 @@ AppendOnlyStorageWrite_VerifyWriteBlock(AppendOnlyStorageWrite *storageWrite,
 														  header,
 														  &storedChecksum,
 														  &computedChecksum))
-			ereport(ERROR,
+			ereport(WARNING,
 					(errmsg("Verify block during write found header checksum does not match.  Expected 0x%08X and found 0x%08X",
 							storedChecksum,
 							computedChecksum),

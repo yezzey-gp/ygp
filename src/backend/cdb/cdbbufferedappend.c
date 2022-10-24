@@ -159,7 +159,7 @@ BufferedAppendWrite(BufferedAppend *bufferedAppend, bool needsWAL)
 								   bufferedAppend->filePathName)));
 
 		if (currentWritePosition != bufferedAppend->largeWritePosition)
-			ereport(ERROR, (errcode_for_file_access(),
+			ereport(WARNING, (errcode_for_file_access(),
 							errmsg("Current position mismatch actual "
 								   INT64_FORMAT ", expected " INT64_FORMAT " in table \"%s\" for file \"%s\"",
 								   currentWritePosition, bufferedAppend->largeWritePosition,
