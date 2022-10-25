@@ -126,7 +126,7 @@ ao_insert_replay(XLogRecord *record)
 							  xlrec->target.segment_filenum,
 							  file);
 
-	FileClose(file);
+	smgrao_curr->smgr_FileClose(file);
 }
 
 /*
