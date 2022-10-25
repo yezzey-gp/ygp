@@ -36,9 +36,10 @@ class GPReader : public Reader {
         return params;
     }
 
+    S3BucketReader bucketReader;
+
    protected:
     S3Params params;
-    S3BucketReader bucketReader;
     S3CommonReader commonReader;
     S3RESTfulService restfulService;
 
