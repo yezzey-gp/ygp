@@ -31,6 +31,7 @@ class S3BucketReader : public Reader {
 
 
     bool is_empty = false;
+    S3Params constructReaderParams(BucketContent &key);
 
    private:
     S3Params params;
@@ -55,7 +56,6 @@ class S3BucketReader : public Reader {
     uint64_t iter;
 
     BucketContent &getNextKey();
-    S3Params constructReaderParams(BucketContent &key);
 };
 
 #endif
