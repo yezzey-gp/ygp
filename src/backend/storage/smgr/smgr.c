@@ -74,6 +74,7 @@ static const f_smgr_ao smgrswao[] = {
 		.smgr_NonVirtualCurSeek = FileNonVirtualCurSeek,
 		.smgr_FileSeek = FileSeek,
 		.smgr_FileClose = FileClose,
+		.smgr_FileTruncate = FileTruncate,
 		.smgr_PathNameOpenFile = PathNameOpenFile,
 		.smgr_FileWrite = FileWrite,
 		.smgr_FileRead = FileRead,
@@ -345,7 +346,7 @@ smgrclose(SMgrRelation reln)
 	if (hash_search(SMgrRelationHash,
 					(void *) &(reln->smgr_rnode),
 					HASH_REMOVE, NULL) == NULL)
-		elog(ERROR, "SMgrRelation hashtable corrupted");
+		elog(WARNING, "SMgrRelation hashtable corrupted");
 
 	/*
 	 * Unhook the owner pointer, if any.  We do this last since in the remote
