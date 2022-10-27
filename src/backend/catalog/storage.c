@@ -145,6 +145,26 @@ log_smgrcreate(RelFileNode *rnode, ForkNumber forkNum)
  * RelationDropStorage
  *		Schedule unlinking of physical storage at transaction commit.
  */
+
+void
+RelationDropStorageNoClose(Relation rel)
+{
+	PendingRelDelete *pending;
+
+	/* Add the relation to the list of stuff to delete at commit */
+	pending = (PendingRelDelete *)
+		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
+	pending->relnode.node = rel->rd_node;
+	pending->relnode.relstorage = rel->rd_rel->relstorage;
+	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
+	pending->atCommit = true;	/* delete if commit */
+	pending->nestLevel = GetCurrentTransactionNestLevel();
+	pending->next = pendingDeletes;
+	pendingDeletes = pending;
+}
+
+
+
 void
 RelationDropStorage(Relation rel)
 {
