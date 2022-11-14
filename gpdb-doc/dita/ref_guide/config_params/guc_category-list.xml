@@ -1284,6 +1284,10 @@
                 >gp_external_enable_filter_pushdown</xref>
             </p>
             <p>
+              <xref href="guc-list.xml#gp_external_fail_on_eof" type="section"
+                >gp_external_fail_on_eof</xref>
+            </p>
+            <p>
               <xref href="guc-list.xml#gp_external_max_segs" type="section"
                 >gp_external_max_segs</xref>
             </p>

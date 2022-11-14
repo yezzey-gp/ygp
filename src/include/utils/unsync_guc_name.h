@@ -194,6 +194,7 @@
 		"gp_enable_sort_limit",
 		"gp_encoding_check_locale_compatibility",
 		"gp_external_enable_exec",
+		"gp_external_fail_on_eof",
 		"gp_external_max_segs",
 		"gp_fts_mark_mirror_down_grace_period",
 		"gp_fts_probe_interval",

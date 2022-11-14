@@ -336,6 +336,12 @@ bool		gp_enable_direct_dispatch = true;
 /* Force core dump on memory context error */
 bool		coredump_on_memerror = false;
 
+/*
+ * When using custom formatter with external tables:
+ * ERROR instead of WARNING on unexpected end of file
+ */
+bool		gp_external_fail_on_eof = false;
+
 /* Experimental feature for MPP-4082. Please read doc before setting this guc */
 int			gp_autostats_mode;
 char	   *gp_autostats_mode_string;
