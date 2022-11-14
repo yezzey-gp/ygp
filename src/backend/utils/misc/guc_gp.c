@@ -3378,7 +3378,16 @@ struct config_bool ConfigureNamesBool_gp[] =
 		 gettext_noop("Enable synchronized sequential scans for VACUUM FULL for catalog tables. Given by default now syncscans are not used for VACUUM FULL on catalog tables, this GUC will help in-case wish to fix pre-existing catalog state"),
 		 NULL
 		},
-		&gp_use_synchronize_seqscans_catalog_vacuum_full,
+		&gp_use_synchronize_seqscans_catalog_vacuum_full,		false,
+		NULL, NULL, NULL
+	},
+	
+	{
+		{"gp_external_fail_on_eof", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Fail with ERROR and rollback on 'unexpected end of file' error when used with a CUSTOM formatter."),
+			NULL,
+		},
+		&gp_external_fail_on_eof,
 		false,
 		NULL, NULL, NULL
 	},

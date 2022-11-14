@@ -273,6 +273,9 @@
               <xref href="#gp_external_enable_filter_pushdown"/>
             </li>
             <li>
+              <xref href="#gp_external_fail_on_eof"/>
+            </li>
+            <li>
               <xref href="#gp_fts_probe_interval"/>
             </li>
             <li>
@@ -3597,6 +3600,35 @@
             <row>
               <entry colname="col1">Boolean</entry>
               <entry colname="col2">on</entry>
+              <entry colname="col3">master<p>session</p><p>reload</p></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </body>
+  </topic>
+  <topic id="gp_external_fail_on_eof">
+    <title>gp_external_fail_on_eof</title>
+    <body>
+      <p>Treat unexpected end of file as an ERROR instead of WARNING when using CUSTOM formatters
+        with external tables. When turned on, any such error leads to transacton rollback.
+        When turned off, operation continues normally with a WARNING.</p>
+      <table id="gp_external_fail_on_eof">
+        <tgroup cols="3">
+          <colspec colnum="1" colname="col1" colwidth="1*"/>
+          <colspec colnum="2" colname="col2" colwidth="1*"/>
+          <colspec colnum="3" colname="col3" colwidth="1*"/>
+          <thead>
+            <row>
+              <entry colname="col1">Value Range</entry>
+              <entry colname="col2">Default</entry>
+              <entry colname="col3">Set Classifications</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry colname="col1">Boolean</entry>
+              <entry colname="col2">off</entry>
               <entry colname="col3">master<p>session</p><p>reload</p></entry>
             </row>
           </tbody>

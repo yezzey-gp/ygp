@@ -882,6 +882,11 @@ extern int	gp_autostats_on_change_threshold;
 extern bool	gp_autostats_allow_nonowner;
 extern bool	log_autostats;
 
+/*
+ * When using custom formatter with external tables:
+ * ERROR instead of WARNING on unexpected end of file
+ */
+extern bool	gp_external_fail_on_eof;
 
 /* --------------------------------------------------------------------------------------------------
  * Server debugging

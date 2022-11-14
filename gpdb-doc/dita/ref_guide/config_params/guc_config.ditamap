@@ -115,6 +115,7 @@
             <topicref href="guc-list.xml#gp_external_enable_exec"/>
             <topicref href="guc-list.xml#gp_external_max_segs"/>
             <topicref href="guc-list.xml#gp_external_enable_filter_pushdown"/>
+            <topicref href="guc-list.xml#gp_external_fail_on_eof"/>
             <topicref href="guc-list.xml#gp_fts_probe_interval"/>
             <topicref href="guc-list.xml#gp_fts_probe_retries"/>
             <topicref href="guc-list.xml#gp_fts_probe_timeout"/>
