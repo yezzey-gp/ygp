@@ -54,6 +54,7 @@ typedef struct qdnode_t {
 	apr_int64_t last_updated_generation;
 	int recorded;
 	int num_metrics_packets;
+	int deleted;
 	gpmon_qlog_t qlog;
 	apr_hash_t* qexec_hash;
 	apr_hash_t*	query_seginfo_hash;
@@ -354,6 +355,7 @@ static apr_status_t agg_put_qlog(agg_t* agg, const gpmon_qlog_t* qlog,
 
 		node->qlog = *qlog;
 		node->recorded = 0;
+		node->deleted = 0;
 		node->qlog.cpu_elapsed = 0;
 		node->qlog.p_metrics.cpu_pct = 0.0;
 		node->num_metrics_packets = 0;
@@ -411,7 +413,7 @@ static apr_status_t agg_put_qexec(agg_t* agg, const qexec_packet_t* qexec_packet
 	else {
 		/* not found, make new hash entry */
 		if (! (mmon_qexec_existing = apr_palloc(agg->pool, sizeof(mmon_qexec_t))))
-			return APR_ENOMEM;		
+			return APR_ENOMEM;
 
 		memcpy(&mmon_qexec_existing->key, &qexec_packet->data.key, sizeof(gpmon_qexeckey_t));
 		mmon_qexec_existing->_cpu_elapsed = qexec_packet->data._cpu_elapsed;
@@ -502,7 +504,7 @@ apr_status_t agg_dup(agg_t** retagg, agg_t* oldagg, apr_pool_t* parent_pool, apr
 		status = get_query_status(dp->qlog.key.tmid, dp->qlog.key.ssid, dp->qlog.key.ccnt);
 
 		apr_int32_t age = newagg->generation - dp->last_updated_generation - 1;
-		if (age > 0)
+		if (age > 0 && dp->deleted == 1)
 		{
 			if (  (status != GPMON_QLOG_STATUS_SUBMIT
 			       && status != GPMON_QLOG_STATUS_CANCELING
@@ -627,7 +629,7 @@ struct bloom_t {
 static void bloom_init(bloom_t* bloom);
 static void bloom_set(bloom_t* bloom, const char* name);
 static int  bloom_isset(bloom_t* bloom, const char* name);
-static void delete_old_files(bloom_t* bloom);
+static void delete_old_files(agg_t* agg, bloom_t* bloom);
 static void write_fsinfo(agg_t* agg, const char* nowstr, PGconn*);
 static void write_system(agg_t* agg, const char* nowstr, PGconn*);
 static void write_segmentinfo(agg_t* agg, char* nowstr, PGconn*);
@@ -743,7 +745,7 @@ apr_status_t agg_dump(agg_t* agg)
 	PQfinish(conn);
 
 	/* clean up ... delete all old files by checking our bloom filter */
-	delete_old_files(&bloom);
+	delete_old_files(agg, &bloom);
 
 	return 0;
 }
@@ -751,12 +753,13 @@ apr_status_t agg_dump(agg_t* agg)
 extern int gpmmon_quantum(void);
 extern char* gpmmon_username(void);
 
-static void delete_old_files(bloom_t* bloom)
+static void delete_old_files(agg_t* agg, bloom_t* bloom)
 {
 	char findDir[256] = {0};
 	char findCmd[512] = {0};
 	FILE* fp = NULL;
 	time_t cutoff = time(0) - gpmmon_quantum() * 3;
+	time_t orphan_cutoff = time(0) - gpmmon_quantum() * 20;
 
 	/* Need to remove trailing / in dir so find results are consistent
      * between platforms
@@ -790,32 +793,51 @@ static void delete_old_files(bloom_t* bloom)
 			{
 #if defined(linux)
 				int expired = stbuf.st_mtime < cutoff;
+				int is_orphan = stbuf.st_mtime < orphan_cutoff;
 #else
 				int expired = stbuf.st_mtimespec.tv_sec < cutoff;
+				int is_orphan = stbuf.st_mtimespec.tv_sec < orphan_cutoff;
 #endif
 				TR2(("File %s expired: %d\n", p, expired));
 				if (expired)
 				{
 					apr_int32_t tmid = 0, ssid = 0, ccnt = 0;
-					if (bloom_isset(bloom, p))
+					sscanf(p, GPMON_DIR "q%d-%d-%d.txt", &tmid, &ssid, &ccnt);
+					TR2(("tmid: %d, ssid: %d, ccnt: %d\n", tmid, ssid, ccnt));
+					gpmon_qlogkey_t	key = {tmid, ssid, ccnt};
+					qdnode_t		*node = apr_hash_get(agg->qtab, &key, sizeof(key));
+					if (!node && !is_orphan)
+					{
+						TR2(("Cannot delete file %s: there is no qlog entry for it yet", p));
+					}
+					else if (bloom_isset(bloom, p))
 					{
 						TR2(("File %s has bloom set.  Checking status\n", p));
 						/* Verify no bloom collision */
-						sscanf(p, GPMON_DIR "q%d-%d-%d.txt", &tmid, &ssid, &ccnt);
-						TR2(("tmid: %d, ssid: %d, ccnt: %d\n", tmid, ssid, ccnt));
 						status = get_query_status(tmid, ssid, ccnt);
 						TR2(("File %s has status of %d\n", p, status));
 						if (status == GPMON_QLOG_STATUS_DONE ||
 						   status == GPMON_QLOG_STATUS_ERROR)
 						{
-							TR2(("Deleting file %s\n", p));
-							unlink(p);
+							if (node && node->qlog.status != status)
+							{
+								TR2(("Statuses don't match, will delete %s after they are in sync\n", p));
+							}
+							else
+							{
+								TR2(("Deleting file %s\n", p));
+								unlink(p);
+								if (node)
+									node->deleted = 1;
+							}
 						}
 					}
 					else
 					{
 						TR2(("Deleting file %s\n", p));
 						unlink(p);
+						if (node)
+							node->deleted = 1;
 					}
 				}
 			}
