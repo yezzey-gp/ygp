@@ -121,6 +121,11 @@ int			gp_fts_probe_retries = 5;
 /*
  * Probe timeout for fts prober.
  */
+int			gp_fts_retry_interval = 1;
+
+/*
+ * Probe timeout for fts prober.
+ */
 int			gp_fts_probe_timeout = 20;
 
 /*

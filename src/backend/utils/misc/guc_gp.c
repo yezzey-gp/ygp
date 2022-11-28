@@ -4103,6 +4103,18 @@ struct config_int ConfigureNamesInt_gp[] =
 		NULL, NULL, NULL
 	},
 
+
+	{
+		{"gp_fts_retry_interval", PGC_SIGHUP, GP_ARRAY_TUNING,
+			gettext_noop("Minumum time (in seconds) between FTS checks."),
+			gettext_noop("Used by the fts-probe process."),
+			GUC_UNIT_S
+		},
+		&gp_fts_retry_interval,
+		1, 0, 3600,
+		NULL, NULL, NULL
+	},
+
 	{
 		{"gp_fts_probe_timeout", PGC_SIGHUP, GP_ARRAY_TUNING,
 			gettext_noop("Maximum time (in seconds) allowed for FTS to complete probing a segment."),
