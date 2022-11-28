@@ -199,6 +199,7 @@
 		"gp_fts_mark_mirror_down_grace_period",
 		"gp_fts_probe_interval",
 		"gp_fts_probe_retries",
+		"gp_fts_retry_interval",
 		"gp_fts_probe_timeout",
 		"gp_fts_replication_attempt_count",
 		"gp_gang_creation_retry_count",
