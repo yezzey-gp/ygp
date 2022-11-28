@@ -310,6 +310,7 @@ extern int	gp_segment_connect_timeout; /* GUC var - timeout specifier for gang c
 extern int	gp_snapshotadd_timeout; /* GUC var - timeout specifier for snapshot-creation wait */
 
 extern int	gp_fts_probe_retries; /* GUC var - specifies probe number of retries for FTS */
+extern int	gp_fts_retry_interval; /* GUC var - specifies probe timeout between tries for FTS */
 extern int	gp_fts_probe_timeout; /* GUC var - specifies probe timeout for FTS */
 extern int	gp_fts_probe_interval; /* GUC var - specifies polling interval for FTS */
 extern int	gp_fts_mark_mirror_down_grace_period;
