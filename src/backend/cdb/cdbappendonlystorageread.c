@@ -277,7 +277,6 @@ AppendOnlyStorageRead_FinishOpenFile(AppendOnlyStorageRead *storageRead,
 	 */
 	// 
 	seekResult = storageRead->smgr->smgr_FileSeek(file, 0, SEEK_SET);
-	//seekResult = FileSeek(file, 0, SEEK_SET);
 	if (seekResult != 0)
 	{
 		storageRead->smgr->smgr_FileClose(file);
