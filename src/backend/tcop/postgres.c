@@ -4889,7 +4889,7 @@ PostgresMain(int argc, char *argv[],
 	 */
 	ereport(DEBUG3,
 			(errmsg_internal("InitPostgres")));
-	InitPostgres(dbname, InvalidOid, username, NULL);
+	InitPostgres(dbname, InvalidOid, username, InvalidOid, NULL);
 
 	/*
 	 * If the PostmasterContext is still around, recycle the space; we don't
