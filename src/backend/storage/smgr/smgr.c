@@ -275,7 +275,15 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which, Relation rel)
 		reln->smgr_targblock = InvalidBlockNumber;
 		for (int i = 0; i <= MAX_FORKNUM; ++i)
 			reln->smgr_cached_nblocks[i] = InvalidBlockNumber;
-		reln->smgr_which = which; /* GPDB add SMGR_AO*/
+		reln->smgr_fsm_nblocks = InvalidBlockNumber;
+		reln->smgr_vm_nblocks = InvalidBlockNumber;
+		reln->smgr_which = which;
+		reln->storageManager = smgr(backend, rnode, which);
+		reln->storageManagerAO = smgrao();
+
+		/* mark it not open */
+		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
+			reln->md_num_open_segs[forknum] = 0;
 
 		/* it has no owner yet */
 		dlist_push_tail(&unowned_relns, &reln->node);
