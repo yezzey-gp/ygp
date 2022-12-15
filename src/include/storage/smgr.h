@@ -76,8 +76,9 @@ typedef struct SMgrRelationData
 	 * Fields below here are intended to be private to smgr.c and its
 	 * submodules.  Do not touch them from elsewhere.
 	 */
-
 	const struct f_smgr * storageManager;
+	const struct f_smgr_ao * storageManagerAO;
+	/* Obsolete storage manager selector, should not be used for any particular purpose */
 	SMgrImpl smgr_which;
 
 	/*

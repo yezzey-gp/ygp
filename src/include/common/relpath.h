@@ -55,7 +55,9 @@ typedef enum ForkNumber
 	 * reverting unlogged tables and indexes back to their initial state during
 	 * recovery.
 	 */
-	INIT_FORKNUM
+	INIT_FORKNUM,
+
+	YEZZEY_FORKNUM
 
 	/*
 	 * NOTE: if you add a new fork, change MAX_FORKNUM and possibly
@@ -64,9 +66,9 @@ typedef enum ForkNumber
 	 */
 } ForkNumber;
 
-#define MAX_FORKNUM		INIT_FORKNUM
+#define MAX_FORKNUM		YEZZEY_FORKNUM
 
-#define FORKNAMECHARS	4		/* max chars for a fork name */
+#define FORKNAMECHARS	8		/* max chars for a fork name */
 
 extern const char *const forkNames[];
 
