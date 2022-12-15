@@ -252,6 +252,7 @@ smgropen(RelFileNode rnode, BackendId backend)
 		reln->smgr_vm_nblocks = InvalidBlockNumber;
 
 		reln->smgr = smgr(backend, rnode);
+		reln->smgr_ao = smgrao();
 
 		/* mark it not open */
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
