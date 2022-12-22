@@ -194,6 +194,7 @@ extern void AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite
 								int version,
 								int64 logicalEof,
 								int64 fileLen_uncompressed,
+								int64 modcount,
 								RelFileNodeBackend *relFileNode,
 								int32 segmentFileNum);
 extern void AppendOnlyStorageWrite_FlushAndCloseFile(AppendOnlyStorageWrite *storageWrite,

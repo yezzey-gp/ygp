@@ -302,6 +302,7 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 								int version,
 								int64 logicalEof,
 								int64 fileLen_uncompressed,
+								int64 modcount,
 								RelFileNodeBackend *relFileNode,
 								int32 segmentFileNum)
 {
@@ -331,7 +332,7 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 	errno = 0;
 
 	int			fileFlags = O_RDWR | PG_BINARY;
-	file = storageWrite->smgr->smgr_PathNameOpenFile(path, fileFlags, 0600);
+	file = storageWrite->smgr->smgr_AORelOpenSegFile(storageWrite->relationName, path, fileFlags, 0600, modcount);
 	if (file < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
