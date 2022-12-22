@@ -8444,6 +8444,18 @@ GetFlushRecPtr(void)
 	return recptr;
 }
 
+
+/*
+ * GetXLOGInsertionTimeLine -- Returns the current timeline of a system that
+ * is not in recovery.
+ */
+TimeLineID
+GetXLOGInsertionTimeLine(void)
+{
+	/* Since the value can't be changing, no lock is required. */
+	return ThisTimeLineID;
+}
+
 /*
  * Get the time of the last xlog segment switch
  */
