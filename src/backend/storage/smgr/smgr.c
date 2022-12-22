@@ -68,6 +68,10 @@ static const f_smgr smgrsw[] = {
 	},
 };
 
+SMGRFile AORelOpenSegFile(char * nspname, char * relname, FileName fileName, int fileFlags, int fileMode, int64 modcount) {
+	return PathNameOpenFile(fileName, fileFlags, fileMode);
+}
+
 static const f_smgr_ao smgrswao[] = {
 	/* regular file */
 	{
@@ -75,7 +79,7 @@ static const f_smgr_ao smgrswao[] = {
 		.smgr_FileSeek = FileSeek,
 		.smgr_FileClose = FileClose,
 		.smgr_FileTruncate = FileTruncate,
-		.smgr_PathNameOpenFile = PathNameOpenFile,
+		.smgr_AORelOpenSegFile = AORelOpenSegFile,
 		.smgr_FileWrite = FileWrite,
 		.smgr_FileRead = FileRead,
 		.smgr_FileSync = FileSync,

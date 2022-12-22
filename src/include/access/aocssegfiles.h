@@ -56,7 +56,7 @@ aocs_vpinfo_size(int nvp)
 static inline AOCSVPInfo *
 create_aocs_vpinfo(int nvp)
 {
-	AOCSVPInfo *vpinfo = palloc0(aocs_vpinfo_size(nvp));
+	AOCSVPInfo *vpinfo = (AOCSVPInfo*)palloc0(aocs_vpinfo_size(nvp));
 
 	SET_VARSIZE(vpinfo, aocs_vpinfo_size(nvp));
 	vpinfo->nEntry = nvp;

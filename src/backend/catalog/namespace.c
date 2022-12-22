@@ -2877,6 +2877,13 @@ CheckSetNamespace(Oid oldNspOid, Oid nspOid, Oid classid, Oid objid)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
+	
+
+	/* same for AO SEGMENT schema */
+	if (nspOid == YEZZEY_AUX_NAMESPACE || oldNspOid == YEZZEY_AUX_NAMESPACE)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot move objects into or out of Yezzey schema")));
 }
 
 /*
