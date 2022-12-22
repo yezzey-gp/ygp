@@ -407,6 +407,7 @@ extern SessionBackupState get_backup_status(void);
 
 /* Greenplum additions */
 extern bool IsCrashRecoveryOnly(void);
+TimeLineID GetXLOGInsertionTimeLine(void);
 extern DBState GetCurrentDBState(void);
 extern XLogRecPtr last_xlog_replay_location(void);
 extern void wait_for_mirror(void);

@@ -532,6 +532,26 @@ pg_walfile_name(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text(xlogfilename));
 }
 
+
+/* Yezzey Patch */
+/*
+ * Return xlog current timeline id
+ */
+Datum
+pg_xlog_timeline(PG_FUNCTION_ARGS)
+{
+	if (RecoveryInProgress())
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("recovery is in progress"),
+				 errhint("%s cannot be executed during recovery.",
+						 "pg_xlog_timeline()")));
+
+	PG_RETURN_INT32(GetXLOGInsertionTimeLine());
+}
+
+/* Yezzey Patch */
+
 /*
  * pg_wal_replay_pause - pause recovery now
  *

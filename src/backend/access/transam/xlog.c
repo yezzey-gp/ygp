@@ -8935,6 +8935,18 @@ GetLastImportantRecPtr(void)
 	return res;
 }
 
+
+/*
+ * GetXLOGInsertionTimeLine -- Returns the current timeline of a system that
+ * is not in recovery.
+ */
+TimeLineID
+GetXLOGInsertionTimeLine(void)
+{
+	/* Since the value can't be changing, no lock is required. */
+	return ThisTimeLineID;
+}
+
 /*
  * Get the time and LSN of the last xlog segment switch
  */
