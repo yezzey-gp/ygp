@@ -137,7 +137,14 @@ typedef struct f_smgr_ao {
 	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
 	void 		(*smgr_FileClose)(SMGRFile file);
 	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset);
-	SMGRFile    (*smgr_PathNameOpenFile) (FileName fileName, int fileFlags, int fileMode);
+	SMGRFile    (*smgr_AORelOpenSegFile) (
+		Oid reloid,
+		char * nspname, 
+		char * relname,
+		FileName fileName,
+		int fileFlags,
+		int fileMode,
+		int64 modcount);
 	int         (*smgr_FileWrite)(SMGRFile file, char *buffer, int amount);
     int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount);
 	int	        (*smgr_FileSync)(SMGRFile file);
