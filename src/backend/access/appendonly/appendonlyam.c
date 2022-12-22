@@ -499,6 +499,7 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									aoInsertDesc->fsInfo->formatversion,
 									eof,
 									eof_uncompressed,
+									aoInsertDesc->fsInfo->modcount,
 									&rnode,
 									aoInsertDesc->cur_segno);
 

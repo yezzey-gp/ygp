@@ -246,7 +246,7 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	/*
 	 * Open the file for read.
 	 */
-	file = storageRead->smgr->smgr_PathNameOpenFile(filePathName, fileFlags, fileMode);
+	file = storageRead->smgr->smgr_AORelOpenSegFile(storageRead->relationName, filePathName, fileFlags, fileMode, -1 /*FIXME*/);
 
 	return file;
 }
