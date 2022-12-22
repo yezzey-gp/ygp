@@ -64,6 +64,7 @@ extern AppendOnlyBlockDirectory *GetAOBlockDirectory(Relation relation);
 typedef struct AppendOnlyInsertDescData
 {
 	Relation		aoi_rel;
+	Relation		from_aoi_rel;
 	Snapshot		appendOnlyMetaDataSnapshot;
 	MemTupleBinding *mt_bind;
 	File			appendFile;
@@ -471,6 +472,8 @@ extern bool appendonly_fetch(
 extern void appendonly_fetch_finish(AppendOnlyFetchDesc aoFetchDesc);
 extern AppendOnlyIndexOnlyDesc appendonly_index_only_init(Relation relation,
 														  Snapshot snapshot);
+
+extern AppendOnlyInsertDesc appendonly_insert_init(Relation fromrel, Relation rel, int segno, bool update_mode);
 extern bool appendonly_index_only_check(AppendOnlyIndexOnlyDesc indexonlydesc,
 										AOTupleId *aotid,
 										Snapshot snapshot);

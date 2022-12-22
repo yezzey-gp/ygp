@@ -47,4 +47,6 @@ FOREIGN_KEY(spcowner REFERENCES pg_authid(oid));
  */
 typedef FormData_pg_tablespace *Form_pg_tablespace;
 
+#define YEZZEYTABLESPACE_OID 8555
+
 #endif							/* PG_TABLESPACE_H */

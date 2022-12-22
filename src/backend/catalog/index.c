@@ -1026,6 +1026,7 @@ index_create(Relation heapRelation,
 			case PG_TOAST_NAMESPACE:
 			case PG_BITMAPINDEX_NAMESPACE:
 			case PG_AOSEGMENT_NAMESPACE:
+			case YEZZEY_AUX_NAMESPACE:
 				doIt = false;
 				break;
 			default:
@@ -3884,6 +3885,7 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 			case PG_TOAST_NAMESPACE:
 			case PG_BITMAPINDEX_NAMESPACE:
 			case PG_AOSEGMENT_NAMESPACE:
+			case YEZZEY_AUX_NAMESPACE:
 				doIt = false;
 				break;
 			default:

@@ -490,6 +490,7 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 		case RELKIND_VIEW:
 		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:

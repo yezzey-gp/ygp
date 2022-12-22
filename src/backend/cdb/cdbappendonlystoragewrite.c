@@ -66,7 +66,9 @@ void
 AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 							MemoryContext memoryContext,
 							int32 maxBufferLen,
+							char *relationNamespace,
 							char *relationName,
+							Oid reloid,
 							char *title,
 							AppendOnlyStorageAttributes *storageAttributes,
 							bool needsWAL)
@@ -80,6 +82,7 @@ AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 	/* UNDONE: Range check maxBufferLen */
 
 	Assert(relationName != NULL);
+	Assert(relationNamespace != NULL);
 	Assert(storageAttributes != NULL);
 
 	/* UNDONE: Range check fields in storageAttributes */
@@ -108,6 +111,9 @@ AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 		storageWrite->regularHeaderLen += 2 * sizeof(pg_crc32);
 
 	storageWrite->relationName = pstrdup(relationName);
+	storageWrite->relationNamespace = pstrdup(relationNamespace);
+	storageWrite->relationOid = reloid;
+	
 	storageWrite->title = title;
 
 	/*
@@ -204,6 +210,13 @@ AppendOnlyStorageWrite_FinishSession(AppendOnlyStorageWrite *storageWrite)
 		storageWrite->relationName = NULL;
 	}
 
+
+	if (storageWrite->relationNamespace != NULL)
+	{
+		pfree(storageWrite->relationNamespace);
+		storageWrite->relationNamespace = NULL;
+	}
+
 	if (storageWrite->uncompressedBuffer != NULL)
 	{
 		pfree(storageWrite->uncompressedBuffer);
@@ -294,12 +307,12 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 								int version,
 								int64 logicalEof,
 								int64 fileLen_uncompressed,
+								int64 modcount,
 								RelFileNodeBackend *relFileNode,
 								int32 segmentFileNum)
 {
 	File		file;
 	MemoryContext oldMemoryContext;
-
 	Assert(storageWrite != NULL);
 	Assert(storageWrite->isActive);
 
@@ -323,7 +336,14 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 
 	int			fileFlags = O_RDWR | PG_BINARY;
 	/* Yezzey path, open by smgr */
-	file = storageWrite->smgr->smgr_PathNameOpenFile(path, fileFlags, 0600);
+	file = storageWrite->smgr->smgr_AORelOpenSegFile(
+		storageWrite->relationOid,
+		storageWrite->relationNamespace, 
+		storageWrite->relationName,
+		path, 
+		fileFlags,
+		modcount);
+
 	if (file < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
