@@ -36,6 +36,8 @@
 #include "utils/guc.h"
 #include "catalog/pg_compression.h"
 #include "utils/faultinjector.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 typedef enum AOCSBK
 {
@@ -497,7 +499,9 @@ create_datumstreamwrite(
 						int32 safeFSWriteSize,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
+						Oid reloid,
 						char *title,
 						bool needsWAL,
 						RelFileNodeBackend *rnode)
@@ -566,7 +570,9 @@ create_datumstreamwrite(
 								&acc->ao_write,
 								 /* memoryContext */ NULL,
 								acc->maxAoBlockSize,
+								relnamespace,
 								relname,
+								reloid,
 								title,
 								&acc->ao_attr,
 								needsWAL);
@@ -643,9 +649,11 @@ create_datumstreamread(
 					   int32 safeFSWriteSize,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
-					   char *title,
-					   RelFileNode *relFileNode)
+					   Oid reloid,
+					   RelFileNode *relFileNode,
+					   char *title)
 {
 	DatumStreamRead *acc = palloc0(sizeof(DatumStreamRead));
 
@@ -697,8 +705,10 @@ create_datumstreamread(
 
 	AppendOnlyStorageRead_Init(
 							   &acc->ao_read,
+							   /* relation Oid */ reloid,
 								/* memoryContext */ NULL,
 							   acc->maxAoBlockSize,
+							   relnamespace,
 							   relname,
 							   title,
 							   &acc->ao_attr,
@@ -798,7 +808,7 @@ destroy_datumstreamread(DatumStreamRead * ds)
 
 
 void
-datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofUncompressed,
+datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofUncompressed, int64 modcount,
 						   RelFileNodeBackend *relFileNode, int32 segmentFileNum, int version)
 {
 	ds->eof = eof;
@@ -827,6 +837,7 @@ datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofU
 									version,
 									eof,
 									eofUncompressed,
+									modcount,
 									relFileNode,
 									segmentFileNum);
 

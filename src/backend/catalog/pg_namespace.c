@@ -96,7 +96,13 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 
 	tup = heap_form_tuple(tupDesc, values, nulls);
 
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(nspName, "yezzey") == 0) {
+		HeapTupleSetOid(tup, YEZZEY_AUX_NAMESPACE);
+	}
+	
 	CatalogTupleInsert(nspdesc, tup);
+	
 	Assert(OidIsValid(nspoid));
 
 	table_close(nspdesc, RowExclusiveLock);

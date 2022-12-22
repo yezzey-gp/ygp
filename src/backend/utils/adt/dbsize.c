@@ -1180,6 +1180,7 @@ pg_relation_filenode(PG_FUNCTION_ARGS)
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_DIRECTORY_TABLE:
+		case RELKIND_YEZZEYINDEX:
 			/* okay, these have storage */
 			if (relform->relfilenode)
 				result = relform->relfilenode;
@@ -1265,6 +1266,7 @@ pg_relation_filepath(PG_FUNCTION_ARGS)
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_DIRECTORY_TABLE:
+		case RELKIND_YEZZEYINDEX:
 			/* okay, these have storage */
 
 			/* This logic should match RelationInitPhysicalAddr */

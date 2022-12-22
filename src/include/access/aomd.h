@@ -17,6 +17,7 @@
 
 #include "htup_details.h"
 #include "storage/fd.h"
+#include "storage/smgr.h"
 #include "utils/rel.h"
 
 extern int AOSegmentFilePathNameLen(Relation rel);
@@ -35,11 +36,9 @@ extern void MakeAOSegmentFileName(
 					  int32 *fileSegNo,
 					  char *filepathname);
 
-extern File OpenAOSegmentFile(Relation rel,
-				  char *filepathname,
-				  int64	logicalEof);
+extern File OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount);
 
-extern void CloseAOSegmentFile(File fd);
+extern void CloseAOSegmentFile(Relation aorel, File fd);
 
 extern void
 TruncateAOSegmentFile(File fd,
@@ -65,6 +64,6 @@ typedef bool (*ao_extent_callback)(int segno, void *ctx);
 
 extern void ao_foreach_extent_file(ao_extent_callback callback, void *ctx);
 
-extern void register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd);
+extern void register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd, struct f_smgr_ao *smgrao);
 
 #endif							/* AOMD_H */

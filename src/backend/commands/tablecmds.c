@@ -1580,7 +1580,8 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	(namespaceId != PG_TOAST_NAMESPACE &&	\
 	 namespaceId != PG_BITMAPINDEX_NAMESPACE && \
 	 namespaceId != PG_EXTAUX_NAMESPACE && \
-	 namespaceId != PG_AOSEGMENT_NAMESPACE )
+	 namespaceId != PG_AOSEGMENT_NAMESPACE && \
+	 namespaceId != YEZZEY_AUX_NAMESPACE)
 
 /* check for valid namespace and valid relkind */
 static bool
@@ -7548,6 +7549,7 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			/*
 			 * Allow ALTER TABLE operations in standard alone mode on
 			 * AO segment tables.
@@ -16121,6 +16123,44 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 		return;
 	}
 
+	/* Yezzey pathes */
+
+	if (newTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move to this tablespace. Use yezzey SQL API");
+	}
+
+	if (oldTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move from this tablespace. Use yezzey SQL API");
+	}
+
+
+	/* Yezzey pathes end */
+
+	/*
+	 * We cannot support moving mapped relations into different tablespaces.
+	 * (In particular this eliminates all shared catalogs.)
+	 */
+	if (RelationIsMapped(rel))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot move system relation \"%s\"",
+						RelationGetRelationName(rel))));
+
+	/* Can't move a non-shared relation into pg_global */
+	if (newTableSpace == GLOBALTABLESPACE_OID)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("only shared relations can be placed in pg_global tablespace")));
+
+	/*
+	 * Don't allow moving temp tables of other backends ... their local buffer
+	 * manager is not going to cope.
+	 */
+	if (RELATION_IS_OTHER_TEMP(rel))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot move temporary tables of other sessions")));
+
 	reltoastrelid = rel->rd_rel->reltoastrelid;
 	/* Fetch the list of indexes on toast relation if necessary */
 	if (OidIsValid(reltoastrelid))
@@ -16465,6 +16505,10 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 	 * holding exclusive lock on the rel.
 	 */
 	FlushRelationBuffers(rel);
+
+	if (origtablespace == YEZZEYTABLESPACE_OID) {
+
+	}
 
 	/*
 	 * Create and copy all forks of the relation, and schedule unlinking of

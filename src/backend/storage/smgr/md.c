@@ -248,6 +248,10 @@ mdcreate_ao(RelFileNodeBackend rnode, int32 segmentFileNum, bool isRedo)
 	char		buf[MAXPGPATH];
 	File		fd;
 
+	if (rnode.node.spcNode == YEZZEYTABLESPACE_OID) {
+		return;
+	}
+
 	path = aorelpath(rnode, segmentFileNum);
 
 	fd = PathNameOpenFile(path, O_RDWR | O_CREAT | O_EXCL | PG_BINARY);
@@ -1055,7 +1059,7 @@ register_dirty_segment(SMgrRelation reln, ForkNumber forknum, MdfdVec *seg)
  * for AO segment files.
  */
 void
-register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
+register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd, struct f_smgr_ao *smgrao)
 {
 	FileTag		tag;
 
@@ -1066,8 +1070,8 @@ register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
 		ereport(DEBUG1,
 				(errmsg("could not forward AO fsync request because request queue is full")));
 
-		if (FileSync(vfd, WAIT_EVENT_DATA_FILE_SYNC) < 0)
-			ereport(data_sync_elevel(ERROR),
+		if (smgrao->smgr_FileSync(vfd, WAIT_EVENT_DATA_FILE_SYNC) < 0)
+			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not fsync AO file \"%s\": %m",
 							FilePathName(vfd))));

@@ -60,5 +60,6 @@ DECLARE_UNIQUE_INDEX_PKEY(pg_tablespace_oid_index, 2697, on pg_tablespace using 
 #define TablespaceOidIndexId  2697
 DECLARE_UNIQUE_INDEX(pg_tablespace_spcname_index, 2698, on pg_tablespace using btree(spcname name_ops));
 #define TablespaceNameIndexId  2698
+#define YEZZEYTABLESPACE_OID 8555
 
 #endif							/* PG_TABLESPACE_H */

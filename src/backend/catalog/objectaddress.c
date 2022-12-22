@@ -4395,6 +4395,10 @@ getRelationDescription(StringInfo buffer, Oid relid, bool missing_ok)
 			appendStringInfo(buffer, _("foreign table %s"),
 							 relname);
 			break;
+		case RELKIND_YEZZEYINDEX:			
+			appendStringInfo(buffer, _("yezzey virtual index %s"),
+							 relname);
+			break;
 		default:
 			/* shouldn't get here */
 			appendStringInfo(buffer, _("relation %s"),

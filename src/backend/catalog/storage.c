@@ -29,6 +29,7 @@
 #include "catalog/storage.h"
 #include "catalog/storage_directory_table.h"
 #include "catalog/storage_xlog.h"
+#include "catalog/pg_tablespace.h"
 #include "common/relpath.h"
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
@@ -196,41 +197,6 @@ log_smgrcreate(const RelFileNode *rnode, ForkNumber forkNum, SMgrImpl impl)
 	XLogRegisterData((char *) &xlrec, sizeof(xlrec));
 	XLogInsert(RM_SMGR_ID, XLOG_SMGR_CREATE | XLR_SPECIAL_REL_UPDATE);
 }
-
-/*
- * RelationDropStorage
- *		Schedule unlinking of physical storage at transaction commit.
- */
-
-void
-RelationDropStorageNoClose(Relation rel)
-{
-	PendingRelDelete *pending;
-
-	/* Add the relation to the list of stuff to delete at commit */
-	pending = (PendingRelDelete *)
-		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
-	pending->relnode.node = rel->rd_node;
-	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
-	pending->atCommit = true;	/* delete if commit */
-	pending->nestLevel = GetCurrentTransactionNestLevel();
-	pending->relnode.smgr_which =
-		RelationIsAppendOptimized(rel) ? SMGR_AO : SMGR_MD;
-	pending->next = pendingDeletes;
-	pendingDeletes = pending;
-
-	/*
-	 * NOTE: if the relation was created in this transaction, it will now be
-	 * present in the pending-delete list twice, once with atCommit true and
-	 * once with atCommit false.  Hence, it will be physically deleted at end
-	 * of xact in either case (and the other entry will be ignored by
-	 * smgrDoPendingDeletes, so no error will occur).  We could instead remove
-	 * the existing list entry and delete the physical file immediately, but
-	 * for now I'll keep the logic simple.
-	 */
-}
-
-
 
 void
 RelationDropStorage(Relation rel)

@@ -260,7 +260,9 @@ extern DatumStreamWrite *create_datumstreamwrite(
 						int32 safeFSWriteSize,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
+						Oid reloid,
 						char *title,
 						bool needsWAL,
 						RelFileNodeBackend *rnode);
@@ -272,15 +274,18 @@ extern DatumStreamRead *create_datumstreamread(
 					   int32 safeFSWriteSize,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
-					   char *title,
-					   RelFileNode *relFileNode);
+					   Oid reloid,
+					   RelFileNode *relFileNode,
+					   char *title);
 
 extern void datumstreamwrite_open_file(
 						   DatumStreamWrite * ds,
 						   char *fn,
 						   int64 eof,
 						   int64 eofUncompressed,
+						   int64 modcount,
 						   RelFileNodeBackend *relFileNode,
 						   int32 segmentFileNum,
 						   int version);

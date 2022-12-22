@@ -498,6 +498,7 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_AOVISIMAP:
 			amoptsfn = relation->rd_tableam->amoptions;
 			break;
+		case RELKIND_YEZZEYINDEX:
 		case RELKIND_VIEW:
 		case RELKIND_PARTITIONED_TABLE:
 			amoptsfn = NULL;
