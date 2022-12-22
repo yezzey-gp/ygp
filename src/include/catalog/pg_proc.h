@@ -3183,6 +3183,8 @@ DATA(insert OID = 2850 ( pg_xlogfile_name_offset	PGNSP PGUID 12 1 0 0 0 f f f f 
 DESCR("xlog filename and byte offset, given an xlog location");
 DATA(insert OID = 2851 ( pg_xlogfile_name			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 25 "3220" _null_ _null_ _null_ _null_ pg_xlogfile_name _null_ _null_ _null_ ));
 DESCR("xlog filename, given an xlog location");
+DATA(insert OID = 5455 ( pg_xlog_timeline			PGNSP PGUID 12 1 0 0 0 f f f f t f i 0 0 23 "" _null_ _null_ _null_ _null_ pg_xlog_timeline _null_ _null_ _null_ ));
+DESCR("xlog timeline id");
 
 DATA(insert OID = 3165 ( pg_xlog_location_diff		PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 1700 "3220 3220" _null_ _null_ _null_ _null_ pg_xlog_location_diff _null_ _null_ _null_ ));
 DESCR("difference in bytes, given two xlog locations");
