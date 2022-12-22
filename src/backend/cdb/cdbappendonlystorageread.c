@@ -58,8 +58,10 @@
  */
 void
 AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
+						   Oid reloid,
 						   MemoryContext memoryContext,
 						   int32 maxBufferLen,
+						   char *relationNamespace,
 						   char *relationName,
 						   char *title,
 						   AppendOnlyStorageAttributes *storageAttributes)
@@ -73,6 +75,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 	/* UNDONE: Range check maxBufferLen */
 
 	Assert(relationName != NULL);
+	Assert(relationNamespace != NULL);
 	Assert(storageAttributes != NULL);
 
 	/* UNDONE: Range check fields in storageAttributes */
@@ -93,6 +96,8 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 		   sizeof(AppendOnlyStorageAttributes));
 
 	storageRead->relationName = pstrdup(relationName);
+	storageRead->relationOid = reloid;
+	storageRead->relationNamespace = pstrdup(relationNamespace);
 	storageRead->title = title;
 
 	storageRead->minimumHeaderLen =
@@ -118,8 +123,9 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 					 relationName);
 
 	elogif(Debug_appendonly_print_scan || Debug_appendonly_print_read_block, LOG,
-		   "Append-Only Storage Read initialize for table '%s' "
+		   "Append-Only Storage Read initialize for table '%s.%s' "
 		   "(compression = %s, compression level %d, maximum buffer length %d, large read length %d)",
+		   storageRead->relationNamespace,
 		   storageRead->relationName,
 		   (storageRead->storageAttributes.compress ? "true" : "false"),
 		   storageRead->storageAttributes.compressLevel,
@@ -184,6 +190,12 @@ AppendOnlyStorageRead_FinishSession(AppendOnlyStorageRead *storageRead)
 		storageRead->relationName = NULL;
 	}
 
+	if (storageRead->relationNamespace != NULL)
+	{
+		pfree(storageRead->relationNamespace);
+		storageRead->relationNamespace = NULL;
+	}
+
 	if (storageRead->segmentFileName != NULL)
 	{
 		pfree(storageRead->segmentFileName);
@@ -246,7 +258,13 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	/*
 	 * Open the file for read.
 	 */
-	file = storageRead->smgr->smgr_PathNameOpenFile(filePathName, fileFlags, fileMode);
+	file = storageRead->smgr->smgr_AORelOpenSegFile(
+		storageRead->relationOid /* Oid should be needed and used */,
+		storageRead->relationNamespace,
+		storageRead->relationName,
+		filePathName,
+		fileFlags,
+		fileMode, -1 /*FIXME*/);
 
 	return file;
 }
