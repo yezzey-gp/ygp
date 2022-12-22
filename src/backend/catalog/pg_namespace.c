@@ -76,6 +76,11 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 
 	tup = heap_form_tuple(tupDesc, values, nulls);
 
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(nspName, "yezzey") == 0) {
+		HeapTupleSetOid(tup, YEZZEY_AUX_NAMESPACE);
+	}
+
 	nspoid = simple_heap_insert(nspdesc, tup);
 	Assert(OidIsValid(nspoid));
 

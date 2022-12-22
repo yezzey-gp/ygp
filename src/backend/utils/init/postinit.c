@@ -633,7 +633,7 @@ static void check_superuser_connection_limit()
  */
 void
 InitPostgres(const char *in_dbname, Oid dboid, const char *username,
-			 Oid useroid, char *out_dbname)
+			 Oid useroid, char *out_dbname, bool skip_cdb_init)
 {
 	bool		bootstrap = IsBootstrapProcessingMode();
 	bool		am_superuser;
@@ -1218,7 +1218,7 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
      * This is SKIPPED when the database is in bootstrap mode or 
      * Is not UnderPostmaster.
      */
-    if (!bootstrap && IsUnderPostmaster)
+    if (!skip_cdb_init && !bootstrap && IsUnderPostmaster)
     {
 		cdb_setup();
 		on_proc_exit( cdb_cleanup, 0 );

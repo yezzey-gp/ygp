@@ -94,7 +94,12 @@ ao_insert_replay(XLogRecord *record)
 	/* When writing from the beginning of the file, it might not exist yet. Create it. */
 	if (xlrec->target.offset == 0)
 		fileFlags |= O_CREAT;
-	file = smgrao_curr->smgr_PathNameOpenFile(path, fileFlags, 0600);
+	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
+		NULL,
+		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
+		path, 
+		fileFlags, 0600, -1 /* FIXME */);
 	if (file < 0)
 	{
 		XLogAOSegmentFile(xlrec->target.node, xlrec->target.segment_filenum);
@@ -124,7 +129,7 @@ ao_insert_replay(XLogRecord *record)
 
 	register_dirty_segment_ao(xlrec->target.node,
 							  xlrec->target.segment_filenum,
-							  file);
+							  file, smgrao_curr);
 
 	smgrao_curr->smgr_FileClose(file);
 }
@@ -170,7 +175,13 @@ ao_truncate_replay(XLogRecord *record)
 	pfree(dbPath);
 	dbPath = NULL;
 
-	file = smgrao_curr->smgr_PathNameOpenFile(path, O_RDWR | PG_BINARY, 0600);
+	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
+		NULL,
+		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
+		path, 
+		O_RDWR | PG_BINARY, 
+		0600, -1 /* FIXME */);
 	if (file < 0)
 	{
 		/*
