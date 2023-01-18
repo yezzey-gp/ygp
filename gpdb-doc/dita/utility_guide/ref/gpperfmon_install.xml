@@ -179,19 +179,6 @@ host       all           gpmon  ::1/128        <b>password</b></codeblock></p>
           </stentry>
         </strow>
         <strow>
-          <stentry>max_log_size</stentry>
-          <stentry>
-            <p>This parameter is not included in <codeph>gpperfmon.conf</codeph>, but it may be
-              added to this file.</p>
-            <p>To prevent the log files from growing to excessive size, you can add the
-                <codeph>max_log_size</codeph> parameter to <codeph>gpperfmon.conf</codeph>. The
-              value of this parameter is measured in bytes. For example:</p>
-            <codeblock>max_log_size = 10485760</codeblock>
-            <p>With this setting, the log files will grow to 10MB before the system rolls over to a
-              new log file.</p>
-          </stentry>
-        </strow>
-        <strow>
           <stentry>partition_age</stentry>
           <stentry>The number of months that gpperfmon statistics data will be retained. The default
             value is 0, which means that partitions are never dropped automatically.</stentry>

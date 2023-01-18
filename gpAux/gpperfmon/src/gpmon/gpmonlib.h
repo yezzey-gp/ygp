@@ -122,7 +122,6 @@ typedef struct mmon_options_t
 	char* smon_hadoop_swonly_logdir;
 	char* smon_hadoop_swonly_binfile;
 	char* smdw_aliases;
-	apr_uint64_t max_log_size;
 	int max_fd; /* this is the max fd value we ever seen */
 	int v;
 	int quantum;
