@@ -40,7 +40,6 @@ static struct
 	int D;
 	const char* arg_port;
 	const char* log_dir;
-	apr_uint64_t max_log_size;
 	// The timeout in seconds for smon to restart if no requests
 	// come during that period.
 	apr_uint64_t terminate_timeout;
@@ -1559,7 +1558,7 @@ void gx_main(int port, apr_int64_t signature)
 	}
 
 	update_log_filename();
-	FILE* f = freopen(log_filename, "w", stdout);
+	FILE* f = freopen(log_filename, "a", stdout);
 	setlinebuf(stdout);
 
 	if (!get_and_allocate_hostname())
@@ -1619,25 +1618,9 @@ void gx_main(int port, apr_int64_t signature)
 		{
 		    gx.rotate = 0;
 		    TR0(("sigusr1 received, reopening log file\n"));
-		    update_log_filename();
 		    f = freopen(log_filename, "w", stdout);
 		    setlinebuf(stdout);
 		    TR0(("finished reopening log file\n"));
-		}
-
-		/* check log size */
-		if (gx.tick % 60 == 0)
-		{
-			apr_finfo_t finfo;
-			if (0 == apr_stat(&finfo, log_filename, APR_FINFO_SIZE, gx.pool))
-			{
-				if (opt.max_log_size != 0 && finfo.size > opt.max_log_size)
-				{
-					update_log_filename();
-					f = freopen(log_filename, "w", stdout);
-					setlinebuf(stdout);
-				}
-			}
 		}
 	}
 }
@@ -1693,7 +1676,6 @@ static void parse_command_line(int argc, const char* const argv[])
 
 	opt.pname = bin_start;
 	opt.v = opt.D = 0;
-	opt.max_log_size = 0;
 	opt.terminate_timeout = 0;
 
 	if (0 != (e = apr_getopt_init(&os, pool, argc, argv)))
@@ -1716,9 +1698,6 @@ static void parse_command_line(int argc, const char* const argv[])
 			break;
 		case 'l':
 			opt.log_dir = strdup(arg);
-			break;
-		case 'm':
-			opt.max_log_size = apr_atoi64(arg);
 			break;
 		case 't':
 			opt.terminate_timeout = apr_atoi64(arg);

@@ -410,7 +410,6 @@ static void* event_main(apr_thread_t* thread_, void* arg_)
 		{
 		    TR0(("sigusr1 received, reopening log file\n"));
 		    ax.rotate = 0;
-		    update_mmonlog_filename();
 		    apr_thread_mutex_lock(logfile_mutex);
 		    freopen(mmon_log_filename, "w", stdout);
 		    apr_thread_mutex_unlock(logfile_mutex);
@@ -620,12 +619,12 @@ static void* conm_main(apr_thread_t* thread_, void* arg_)
 
 					if (h->smon_bin_location) { //if this if filled, then use it as the directory for smon istead of the default
 						snprintf(line, line_size, "ssh -v -o 'BatchMode yes' -o 'StrictHostKeyChecking no'"
-								" %s '%s echo -e \"%" APR_INT64_T_FMT "\\n\\n\" | %s -m %" FMT64 " -t %" FMT64 " -l %s%s -v %d %d' 2>&1",
-								active_hostname, kill_gpsmon, ax.signature, h->smon_bin_location, opt.max_log_size, smon_terminate_timeout, ptr_smon_log_location, ptr_smon_log_location_suffix, opt.v, ax.port);
+								" %s '%s echo -e \"%" APR_INT64_T_FMT "\\n\\n\" | %s -t %" FMT64 " -l %s%s -v %d %d' 2>&1",
+								active_hostname, kill_gpsmon, ax.signature, h->smon_bin_location, smon_terminate_timeout, ptr_smon_log_location, ptr_smon_log_location_suffix, opt.v, ax.port);
 					} else {
 						snprintf(line, line_size, "ssh -v -o 'BatchMode yes' -o 'StrictHostKeyChecking no'"
-								" %s '%s echo -e \"%" APR_INT64_T_FMT "\\n\\n\" | %s/bin/gpsmon -m %" FMT64 " -t %" FMT64 " -l %s%s -v %d %d' 2>&1",
-								active_hostname, kill_gpsmon, ax.signature, ax.gphome, opt.max_log_size, smon_terminate_timeout, ptr_smon_log_location, ptr_smon_log_location_suffix, opt.v, ax.port);
+								" %s '%s echo -e \"%" APR_INT64_T_FMT "\\n\\n\" | %s/bin/gpsmon -t %" FMT64 " -l %s%s -v %d %d' 2>&1",
+								active_hostname, kill_gpsmon, ax.signature, ax.gphome, smon_terminate_timeout, ptr_smon_log_location, ptr_smon_log_location_suffix, opt.v, ax.port);
 
 					}
 
@@ -786,8 +785,6 @@ static void gpmmon_main(void)
 	apr_status_t retCode;
 	apr_threadattr_t* ta;
 	time_t this_cycle_ts = 0;
-	/* log check is not exact. do it every X loops */
-	int ticks_since_last_log_check = 0;
 	const unsigned int log_check_interval = 60;
 
 	const int safety_ticks = 2 * opt.quantum;
@@ -921,7 +918,6 @@ static void gpmmon_main(void)
 		this_cycle_ts = time(NULL);
 		send_msg_safety_ticks--;
 		dump_to_file_safety_ticks--;
-		ticks_since_last_log_check++;
 
 		/* SEND MESSAGE */
 		if ((this_cycle_ts >= next_send_msg_ts) || (send_msg_safety_ticks < 1))
@@ -980,23 +976,6 @@ static void gpmmon_main(void)
 			next_send_msg_ts = next_dump_to_file_ts - dump_request_time_allowance;
 			dump_to_file_safety_ticks = safety_ticks;
 		}
-
-		if (!opt.console && (ticks_since_last_log_check > log_check_interval))
-		{
-			apr_finfo_t finfo;
-			//it is ok to use the parent pool here b/c it is not for used for allocation in apr_stat
-			if (0 == apr_stat(&finfo, mmon_log_filename, APR_FINFO_SIZE, ax.pool))
-			{
-				if (opt.max_log_size != 0 && finfo.size > opt.max_log_size)
-				{
-					update_mmonlog_filename();
-					apr_thread_mutex_lock(logfile_mutex);
-					freopen(mmon_log_filename, "w", stdout);
-					apr_thread_mutex_unlock(logfile_mutex);
-				}
-			}
-			ticks_since_last_log_check = 0;
-		}
 	}
 }
 
@@ -1015,7 +994,6 @@ static int read_conf_file(char *conffile)
 
 	opt.quantum = quantum;
 	opt.min_query_time = min_query_time;
-	opt.max_log_size = 0;
 	opt.log_dir = strdup(DEFAULT_GPMMON_LOGDIR);
 	opt.max_disk_space_messages_per_interval = MAX_MESSAGES_PER_INTERVAL;
 	opt.disk_space_interval = (60*MINIMUM_MESSAGE_INTERVAL);
@@ -1127,10 +1105,6 @@ static int read_conf_file(char *conffile)
 			else if (apr_strnatcasecmp(pName, "smdw_aliases") == 0)
 			{
 				opt.smdw_aliases = strdup(pVal);
-			}
-			else if (apr_strnatcasecmp(pName, "max_log_size") == 0)
-			{
-				opt.max_log_size = apr_atoi64(pVal);
 			}
 			else if (apr_strnatcasecmp(pName, "warning_disk_space_percentage") == 0)
 			{
@@ -1395,7 +1369,7 @@ int main(int argc, const char* const argv[])
 		}
 
 		update_mmonlog_filename();
-		if (!opt.console && !freopen(mmon_log_filename, "w", stdout))
+		if (!opt.console && !freopen(mmon_log_filename, "a", stdout))
 		{
 			fprintf(stderr, "\nPerformance Monitor -- failed to open perfmon log file %s\n", mmon_log_filename);
 			interuptable_sleep(30); // sleep to prevent loop of forking process and failing
