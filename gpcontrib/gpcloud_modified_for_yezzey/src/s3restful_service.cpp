@@ -242,7 +242,7 @@ Response S3RESTfulService::post(const string &url, HTTPHeaders &headers,
     this->performCurl(curl, response);
 
     if (response.getStatus() == RESPONSE_OK) {
-	return response;
+	    return response;
     }
 
     S3MessageParser s3msg(response);

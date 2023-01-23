@@ -22,20 +22,7 @@ void GPWriter::close() {
 }
 
 string GPWriter::genUniqueKeyName(const S3Url& s3Url) {
-    string fullUrl = s3Url.getFullUrlForCurl();
-
-    while (true) {
-        stringstream ss;
-        ss << this->constructRandomStr() << "." << this->format;
-        //ss << s3ext_segid;
-
-        if (!this->s3InterfaceService.checkKeyExistence(
-                S3Url((fullUrl + ss.str()), (s3Url.getSchema() == "https"), s3Url.getVersion(),
-                      s3Url.getRegion()))) {
-            string keyName = ss.str();
-            return s3Url.getPrefix() + keyName;
-        }
-    }
+    return s3Url.getPrefix();
 }
 
 string GPWriter::constructRandomStr() {
