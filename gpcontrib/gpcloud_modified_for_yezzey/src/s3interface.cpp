@@ -324,6 +324,9 @@ ListBucketResult S3InterfaceService::listBucket(S3Url &s3Url) {
             if (parseBucketXML(&result, xmlContext, marker)) {
                 continue;
             }
+        } else if (resp.getStatus() == RESPONSE_ERROR && resp.getResponseCode() == 404) {
+            /* we listed external storage and got 0 results. Thats ok */
+            return result;
         } else if (resp.getStatus() == RESPONSE_ERROR) {
             S3MessageParser s3msg(resp);
             S3_DIE(S3LogicError, s3msg.getCode(), s3msg.getMessage());
