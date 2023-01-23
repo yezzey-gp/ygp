@@ -345,7 +345,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	if (segfilenum)
 		dstflags |= O_CREAT;
 
-	dstFile = dstSmgr->smgr_AORelOpenSegFile(dstsegpath, dstflags, 0600, 0);
+	dstFile = dstSmgr->smgr_AORelOpenSegFile(NULL/*FIXME: copying yezzey files may not work here*/, dstsegpath, dstflags, 0600, 0);
 	if (dstFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
