@@ -982,18 +982,17 @@ DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *processed)
 	/* Disallow COPY to/from file or program except to superusers. */
 	if (!pipe && !superuser())
 	{
-		if (stmt->is_program)
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to COPY to or from an external program"),
-					 errhint("Anyone can COPY to stdout or from stdin. "
-						   "psql's \\copy command also works for anyone.")));
-		else
+		if (stmt->is_program) {
+			// -- non-upstream patch begin
+			Assert(false);
+			// --- non-upstream patch end
+		} else {
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("must be superuser to COPY to or from a file"),
 					 errhint("Anyone can COPY to stdout or from stdin. "
 						   "psql's \\copy command also works for anyone.")));
+		}
 	}
 
 	if (stmt->relation)

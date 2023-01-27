@@ -3891,6 +3891,19 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 								 errmsg("STDIN/STDOUT not allowed with PROGRAM"),
 								 parser_errposition(@8)));
 
+// -- non-upstream patch begin
+					if (n->is_program) {
+						/*
+						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
+						*/
+						ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+								errhint("Anyone can COPY to stdout or from stdin. "
+										"psql's \\copy command also works for anyone.")));
+					}
+// --- non-upstream patch end
+
 					n->options = NIL;
 					n->skip_ext_partition = $13;
 
@@ -3928,6 +3941,20 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 								(errcode(ERRCODE_SYNTAX_ERROR),
 								 errmsg("STDIN/STDOUT not allowed with PROGRAM"),
 								 parser_errposition(@5)));
+
+// -- non-upstream patch begin
+					if (n->is_program) {
+						/*
+						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
+						*/
+						ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+								errhint("Anyone can COPY to stdout or from stdin. "
+										"psql's \\copy command also works for anyone.")));
+					}
+// --- non-upstream patch end
+
 
 					$$ = (Node *)n;
 				}
