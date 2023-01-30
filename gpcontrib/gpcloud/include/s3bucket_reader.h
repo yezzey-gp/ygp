@@ -16,7 +16,6 @@ class S3BucketReader : public Reader {
     uint64_t read(char *buf, uint64_t count);
     void close();
 
-
     void setS3InterfaceService(S3Interface *s3) {
         this->s3Interface = s3;
     }
@@ -29,10 +28,6 @@ class S3BucketReader : public Reader {
         return keyList;
     }
 
-
-    bool is_empty = false;
-    S3Params constructReaderParams(BucketContent &key);
-
    private:
     S3Params params;
 
@@ -41,7 +36,6 @@ class S3BucketReader : public Reader {
     // upstreamReader is where we get data from.
     Reader *upstreamReader;
     bool needNewReader;
-    int64_t curr_offset;
 
     // when load multiple files on one segment and each of them has a header line,
     // we should read header line only for the 1st file and ignore remainings.
@@ -53,9 +47,9 @@ class S3BucketReader : public Reader {
 
     ListBucketResult keyList;  // List of matched keys/files.
     uint64_t keyIndex;         // BucketContent index of keylist->contents.
-    uint64_t iter;
 
     BucketContent &getNextKey();
+    S3Params constructReaderParams(BucketContent &key);
 };
 
 #endif

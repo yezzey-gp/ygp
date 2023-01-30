@@ -42,7 +42,6 @@ endif
 ifneq ($(with_uuid),no)
 	$(MAKE) -C contrib/uuid-ossp all
 endif
-	$(MAKE) -C contrib/yezzey all
 	$(MAKE) -C gpAux/extensions all
 	$(MAKE) -C gpAux/gpperfmon all
 	$(MAKE) -C gpAux/platform all
