@@ -26,8 +26,7 @@ string GPWriter::genUniqueKeyName(const S3Url& s3Url) {
 
     while (true) {
         stringstream ss;
-        ss << this->constructRandomStr() << "." << this->format;
-        //ss << s3ext_segid;
+        ss << s3ext_segid << this->constructRandomStr() << "." << this->format;
 
         if (!this->s3InterfaceService.checkKeyExistence(
                 S3Url((fullUrl + ss.str()), (s3Url.getSchema() == "https"), s3Url.getVersion(),
