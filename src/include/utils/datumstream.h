@@ -259,6 +259,7 @@ extern DatumStreamWrite *create_datumstreamwrite(
 						int32 safeFSWriteSize,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
 						char *title,
 						bool needsWAL);
@@ -270,6 +271,7 @@ extern DatumStreamRead *create_datumstreamread(
 					   int32 safeFSWriteSize,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
 					   char *title);
 
