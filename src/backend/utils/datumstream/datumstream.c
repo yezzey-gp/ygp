@@ -33,6 +33,8 @@
 #include "utils/guc.h"
 #include "catalog/pg_compression.h"
 #include "utils/faultinjector.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 typedef enum AOCSBK
 {
@@ -493,6 +495,7 @@ create_datumstreamwrite(
 						int32 safeFSWriteSize,
 						int32 maxsz,
 						Form_pg_attribute attr,
+						char *relnamespace,
 						char *relname,
 						char *title,
 						bool needsWAL)
@@ -561,6 +564,7 @@ create_datumstreamwrite(
 								&acc->ao_write,
 								 /* memoryContext */ NULL,
 								acc->maxAoBlockSize,
+								relnamespace,
 								relname,
 								title,
 								&acc->ao_attr,
@@ -636,6 +640,7 @@ create_datumstreamread(
 					   int32 safeFSWriteSize,
 					   int32 maxsz,
 					   Form_pg_attribute attr,
+					   char *relnamespace,
 					   char *relname,
 					   char *title)
 {
@@ -691,6 +696,7 @@ create_datumstreamread(
 							   &acc->ao_read,
 								/* memoryContext */ NULL,
 							   acc->maxAoBlockSize,
+							   relnamespace,
 							   relname,
 							   title,
 							   &acc->ao_attr);

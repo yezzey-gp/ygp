@@ -59,6 +59,8 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/snapmgr.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 /*
  * AppendOnlyDeleteDescData is used for delete data from append-only
@@ -186,14 +188,32 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 	if (!scan->initedStorageRoutines)
 	{
 		PGFunction *fns = NULL;
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(scan->aos_rd->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", scan->aos_rd->rd_rel->relname.data);
+		}
+
+
 
 		AppendOnlyStorageRead_Init(
 								   &scan->storageRead,
 								   scan->aoScanInitContext,
 								   scan->usableBlockSize,
+								   nspname,
 								   NameStr(scan->aos_rd->rd_rel->relname),
 								   scan->title,
 								   &scan->storageAttributes);
+
+		pfree(nspname);
 
 		/*
 		 * There is no guarantee that the current memory context will be
@@ -2174,14 +2194,31 @@ appendonly_fetch_init(Relation relation,
 						  appendOnlyMetaDataSnapshot,
 						  &aoFetchDesc->totalSegfiles);
 
+	HeapTuple tp;
+	char * nspname;
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoFetchDesc->relation->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoFetchDesc->relation->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageRead_Init(
 							   &aoFetchDesc->storageRead,
 							   aoFetchDesc->initContext,
 							   aoFetchDesc->usableBlockSize,
+							   nspname,
 							   NameStr(aoFetchDesc->relation->rd_rel->relname),
 							   aoFetchDesc->title,
 							   &aoFetchDesc->storageAttributes);
 
+	pfree(nspname);
 
 	fns = get_funcs_for_compression(NameStr(relation->rd_appendonly->compresstype));
 	aoFetchDesc->storageRead.compression_functions = fns;
@@ -2736,14 +2773,33 @@ appendonly_insert_init(Relation rel, int segno, bool update_mode)
 					 RelationGetRelationName(aoInsertDesc->aoi_rel));
 	aoInsertDesc->title = titleBuf.data;
 
+	HeapTuple tp;
+	char * nspname;
+
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoInsertDesc->aoi_rel->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoInsertDesc->aoi_rel->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageWrite_Init(
 								&aoInsertDesc->storageWrite,
 								NULL,
 								aoInsertDesc->usableBlockSize,
+								nspname,
 								RelationGetRelationName(aoInsertDesc->aoi_rel),
 								aoInsertDesc->title,
 								&aoInsertDesc->storageAttributes,
 								XLogIsNeeded() && RelationNeedsWAL(aoInsertDesc->aoi_rel));
+
+	pfree(nspname);
 
 	aoInsertDesc->storageWrite.compression_functions = fns;
 	aoInsertDesc->storageWrite.compressionState = cs;

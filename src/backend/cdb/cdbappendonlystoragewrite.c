@@ -65,6 +65,7 @@ void
 AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 							MemoryContext memoryContext,
 							int32 maxBufferLen,
+							char *relationNamespace,
 							char *relationName,
 							char *title,
 							AppendOnlyStorageAttributes *storageAttributes,
@@ -79,6 +80,7 @@ AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 	/* UNDONE: Range check maxBufferLen */
 
 	Assert(relationName != NULL);
+	Assert(relationNamespace != NULL);
 	Assert(storageAttributes != NULL);
 
 	/* UNDONE: Range check fields in storageAttributes */
@@ -107,6 +109,8 @@ AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 		storageWrite->regularHeaderLen += 2 * sizeof(pg_crc32);
 
 	storageWrite->relationName = pstrdup(relationName);
+	storageWrite->relationNamespace = pstrdup(relationNamespace);
+	
 	storageWrite->title = title;
 
 	/*
@@ -201,6 +205,13 @@ AppendOnlyStorageWrite_FinishSession(AppendOnlyStorageWrite *storageWrite)
 	{
 		pfree(storageWrite->relationName);
 		storageWrite->relationName = NULL;
+	}
+
+
+	if (storageWrite->relationNamespace != NULL)
+	{
+		pfree(storageWrite->relationNamespace);
+		storageWrite->relationNamespace = NULL;
 	}
 
 	if (storageWrite->uncompressedBuffer != NULL)
@@ -309,7 +320,6 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 	File		file;
 	int64		seekResult;
 	MemoryContext oldMemoryContext;
-
 	Assert(storageWrite != NULL);
 	Assert(storageWrite->isActive);
 
@@ -332,7 +342,15 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 	errno = 0;
 
 	int			fileFlags = O_RDWR | PG_BINARY;
-	file = storageWrite->smgr->smgr_AORelOpenSegFile(storageWrite->relationName, path, fileFlags, 0600, modcount);
+	
+	file = storageWrite->smgr->smgr_AORelOpenSegFile(
+		storageWrite->relationNamespace, 
+		storageWrite->relationName,
+		path, 
+		fileFlags,
+		0600,
+		modcount);
+
 	if (file < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),

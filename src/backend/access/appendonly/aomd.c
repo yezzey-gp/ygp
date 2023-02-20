@@ -327,9 +327,11 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	srcSmgr = smgrao();
 	dstSmgr = smgrao();
 
-	srcFile = srcSmgr->smgr_AORelOpenSegFile(NULL
+	srcFile = srcSmgr->smgr_AORelOpenSegFile(
+		NULL,
+		NULL
 	/*we dont need to pass original relation name here, because yezzey not need it in r/o case*/,
-	 srcsegpath, O_RDONLY | PG_BINARY, 0600, -1 /* FIXME */);
+		srcsegpath, O_RDONLY | PG_BINARY, 0600, -1 /* FIXME */);
 
 	if (srcFile < 0)
 		ereport(ERROR,
@@ -345,7 +347,10 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	if (segfilenum)
 		dstflags |= O_CREAT;
 
-	dstFile = dstSmgr->smgr_AORelOpenSegFile(NULL/*FIXME: copying yezzey files may not work here*/, dstsegpath, dstflags, 0600, 0);
+	dstFile = dstSmgr->smgr_AORelOpenSegFile(
+		NULL,
+		NULL/*FIXME: copying yezzey files may not work here*/, 
+		dstsegpath, dstflags, 0600, 0);
 	if (dstFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
