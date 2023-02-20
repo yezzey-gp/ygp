@@ -55,6 +55,7 @@ typedef struct AppendOnlyStorageWrite
 	 * Name of the relation to use in system logging and error messages.
 	 */
 	char	   *relationName;
+	char	   *relationNamespace;
 
 	/*
 	 * A phrase that better describes the purpose of the this open.
@@ -180,6 +181,7 @@ typedef struct AppendOnlyStorageWrite
 extern void AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 										MemoryContext memoryContext,
 										int32 maxBufferLen,
+										char *relationNamespace,
 										char *relationName,
 										char *title,
 										AppendOnlyStorageAttributes *storageAttributes,
