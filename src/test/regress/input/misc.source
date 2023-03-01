@@ -277,3 +277,8 @@ drop table oldstyle_test;
 --
 -- rewrite rules
 --
+
+
+--- mdb-related
+
+SELECT mdb_locale_enabled();
