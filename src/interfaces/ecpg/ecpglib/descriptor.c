@@ -15,6 +15,7 @@
 #include "sqlca.h"
 #include "sqlda.h"
 #include "sql3types.h"
+#include "common/mdb_locale.h"
 
 static void descriptor_free(struct descriptor * desc);
 
@@ -490,15 +491,15 @@ ECPGget_desc(int lineno, const char *desc_name, int index,...)
 		/* since the database gives the standard decimal point */
 		/* (see comments in execute.c) */
 #ifdef HAVE_USELOCALE
-		stmt.clocale = newlocale(LC_NUMERIC_MASK, "C", (locale_t) 0);
+		stmt.clocale = NEWLOCALE(LC_NUMERIC_MASK, "C", (locale_t) 0);
 		if (stmt.clocale != (locale_t) 0)
 			stmt.oldlocale = uselocale(stmt.clocale);
 #else
 #ifdef HAVE__CONFIGTHREADLOCALE
 		stmt.oldthreadlocale = _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
 #endif
-		stmt.oldlocale = ecpg_strdup(setlocale(LC_NUMERIC, NULL), lineno);
-		setlocale(LC_NUMERIC, "C");
+		stmt.oldlocale = ecpg_strdup(SETLOCALE(LC_NUMERIC, NULL), lineno);
+		SETLOCALE(LC_NUMERIC, "C");
 #endif
 
 		/* desperate try to guess something sensible */
@@ -513,7 +514,7 @@ ECPGget_desc(int lineno, const char *desc_name, int index,...)
 #else
 		if (stmt.oldlocale)
 		{
-			setlocale(LC_NUMERIC, stmt.oldlocale);
+			SETLOCALE(LC_NUMERIC, stmt.oldlocale);
 			ecpg_free(stmt.oldlocale);
 		}
 #ifdef HAVE__CONFIGTHREADLOCALE

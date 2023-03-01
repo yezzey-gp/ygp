@@ -5231,6 +5231,9 @@ DESCR("aggregate final function");
 DATA(insert OID = 3445 ( pg_import_system_collations  PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 23 "26" _null_ _null_ _null_ _null_ pg_import_system_collations _null_ _null_ _null_ n a ));
 DESCR("import collations from operating system");
 
+DATA(insert OID = 3994 ( mdb_locale_enabled	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 16 "" _null_ _null_ _null_ _null_ mdb_locale_enabled _null_ _null_ _null_ ));
+DESCR("true if mdb locales enabled");
+
 /*
  * Include more definitions from pg_proc_gp.h, for GPDB-added functions. They
  * are kept in a separate file to make diffing and merging with upstream

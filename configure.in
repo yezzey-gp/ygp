@@ -1231,6 +1231,13 @@ fi])
 AC_SUBST(ELF_SYS)
 
 #
+# MDB locales
+#
+PGAC_ARG_BOOL(with, mdblocales, yes, [build without MDB locales],
+              [AC_DEFINE([USE_MDBLOCALES], 1, [Define to 1 to build with MDB locales. (--with-mdblocales)])])
+AC_SUBST(with_mdblocales)
+
+#
 # Assignments
 #
 
@@ -1420,6 +1427,11 @@ If you have readline already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-readline to disable readline support.])
   fi
+fi
+
+if test "$with_mdblocales" = yes; then
+  AC_CHECK_LIB(mdblocales, mdb_setlocale, [],
+               [AC_MSG_ERROR([mdblocales library not found])])
 fi
 
 if test "$with_zlib" = yes; then
@@ -1720,6 +1732,10 @@ if test "$with_zlib" = yes; then
 If you have zlib already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support.])])
+fi
+
+if test "$with_mdblocales" = yes; then
+  AC_CHECK_HEADER(mdblocales.h, [], [AC_MSG_ERROR([mdblocales header not found.])])
 fi
 
 # Check for bzlib.h
