@@ -36,6 +36,10 @@ class GPReader : public Reader {
         return params;
     }
 
+    void BumpArenda(size_t val) {
+        bucketReader.BumpArenda(val);
+    }
+
     S3BucketReader bucketReader;
 
    protected:

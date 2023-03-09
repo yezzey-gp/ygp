@@ -30,10 +30,16 @@ class S3BucketReader : public Reader {
     }
 
 
+    void BumpArenda(size_t val) {
+        arenda = val;
+    }
+
+
     bool is_empty = false;
     S3Params constructReaderParams(BucketContent &key);
 
    private:
+    size_t arenda;
     S3Params params;
 
     S3Interface *s3Interface;

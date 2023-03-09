@@ -10,6 +10,7 @@ S3BucketReader::S3BucketReader() : Reader() {
 
     this->needNewReader = true;
     this->isFirstFile = true;
+    this->arenda = 1;
 }
 
 S3BucketReader::~S3BucketReader() {
@@ -102,8 +103,12 @@ uint64_t S3BucketReader::read(char* buf, uint64_t count) {
     while (this->iter < this->keyList.contents.size()) {
         BucketContent& key = this->keyList.contents[this->iter];
         if (this->needNewReader) {
+            if (arenda == 0) {
+                return readCount;
+            }
             this->upstreamReader->open(constructReaderParams(key));
             this->needNewReader = false;
+            arenda--;
 
             // ignore header line if it is not the first file
             if (hasHeader && !this->isFirstFile) {
