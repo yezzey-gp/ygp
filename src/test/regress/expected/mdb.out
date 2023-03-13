@@ -1,0 +1,66 @@
+SHOW idle_in_transaction_session_timeout;
+ idle_in_transaction_session_timeout 
+-------------------------------------
+ 0
+(1 row)
+
+SET idle_in_transaction_session_timeout to 500;
+SHOW idle_in_transaction_session_timeout;
+ idle_in_transaction_session_timeout 
+-------------------------------------
+ 500ms
+(1 row)
+
+BEGIN;
+CREATE TABLE t();
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+SELECT pg_sleep(1);
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT;
+ERROR:  terminating connection due to idle-in-transaction timeout  (seg0 2a02:6b8:c08:4b8f:0:597d:55eb:0:6002 pid=1694317)
+-- success out of tx
+SELECT pg_sleep(1);
+ pg_sleep 
+----------
+ 
+(1 row)
+
+SET idle_in_transaction_session_timeout to 0;
+-- zero disables feature
+BEGIN;
+CREATE TABLE t();
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+SELECT pg_sleep(1);
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT;
+SHOW idle_session_timeout;
+ idle_session_timeout 
+----------------------
+ 0
+(1 row)
+
+SET idle_session_timeout to 500;
+SHOW idle_session_timeout;
+ idle_session_timeout 
+----------------------
+ 500ms
+(1 row)
+
+-- sleep 10 sec
+\! sleep 10 && echo done
+done
+-- should fail
+SELECT * FROM gp_dist_random('gp_id');
+FATAL:  terminating connection due to idle-session timeout
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+connection to server was lost

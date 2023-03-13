@@ -215,6 +215,9 @@ installcheck-mdb_admin: all
 installcheck-small: all
 	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/parallel_schedule $(EXTRA_TESTS)
 
+installcheck-mdb: all
+	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/mdb_schedule
+
 installcheck-good: all twophase_pqexecparams hooktest query_info_hook_test file_monitor
 	$(pg_regress_installcheck) $(REGRESS_OPTS) --schedule=$(srcdir)/parallel_schedule --schedule=$(srcdir)/greenplum_schedule $(EXTRA_TESTS)
 

@@ -117,6 +117,8 @@
 		"statement_mem",
 		"statement_timeout",
 		"synchronize_seqscans",
+		"idle_in_transaction_session_timeout",
+		"idle_session_timeout",
 		"temp_buffers",
 		"test_copy_qd_qe_split",
 		"test_print_prefetch_joinqual",
