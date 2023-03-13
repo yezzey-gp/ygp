@@ -43,6 +43,8 @@ volatile int32 CritSectionCount = 0;
 
 volatile bool ImmediateDieOK = false;
 volatile bool TermSignalReceived = false;
+volatile bool IdleInTransactionSessionTimeoutPending = false;
+volatile bool IdleSessionTimeoutPending = false;
 
 int			MyProcPid;
 pg_time_t	MyStartTime;
