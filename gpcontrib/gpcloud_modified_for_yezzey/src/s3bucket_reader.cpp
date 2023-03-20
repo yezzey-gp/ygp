@@ -55,6 +55,7 @@ S3Params S3BucketReader::constructReaderParams(BucketContent& key) {
 }
 
 uint64_t S3BucketReader::readWithoutHeaderLine(char* buf, uint64_t count) {
+    return  this->upstreamReader->read(buf, count);
     char* current = NULL;
     char* end = NULL;
     char* currentEOL = eolString;

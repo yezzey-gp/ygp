@@ -98,6 +98,7 @@ bool writer_transfer_data(GPWriter* writer, char* data_buf, int data_len) {
         }
 
         uint64_t write_len = writer->write(data_buf, data_len);
+        writer->tot_write += write_len;
 
         S3_CHECK_OR_DIE(write_len == (uint64_t)data_len, S3RuntimeError,
                         "Failed to upload the data completely.");

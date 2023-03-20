@@ -583,7 +583,7 @@ transientrel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 		tuple = ExecCopySlotMemTuple(slot);
 		if (myState->ao_insertDesc == NULL)
-			myState->ao_insertDesc = appendonly_insert_init(myState->transientrel, RESERVED_SEGNO, false);
+			myState->ao_insertDesc = appendonly_insert_init(NULL, myState->transientrel, RESERVED_SEGNO, false);
 
 		appendonly_insert(myState->ao_insertDesc, tuple, InvalidOid, &aoTupleId);
 		pfree(tuple);

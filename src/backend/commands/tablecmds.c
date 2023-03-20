@@ -6673,7 +6673,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 			MemTupleBinding*		mt_bind;
 
 			if(newrel)
-				aoInsertDesc = appendonly_insert_init(newrel, segno, false);
+				aoInsertDesc = appendonly_insert_init(oldrel, newrel, segno, false);
 
 			mt_bind = (newrel ? aoInsertDesc->mt_bind : create_memtuple_binding(newTupDesc));
 
@@ -13081,6 +13081,10 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 	List	   *reltoastidxids = NIL;
 	ListCell   *lc;
 
+	if (newTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move to this tablespace. Use yezzey SQL API");
+	}
+
 	/*
 	 * Need lock here in case we are recursing to toast table or index
 	 */
@@ -17707,7 +17711,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			if (!(*targetAODescPtr))
 			{
 				MemoryContextSwitchTo(oldCxt);
-				*targetAODescPtr = appendonly_insert_init(targetRelation,
+				*targetAODescPtr = appendonly_insert_init(NULL, targetRelation,
 														  RESERVED_SEGNO, false);
 				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
 			}

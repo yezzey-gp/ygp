@@ -2570,7 +2570,7 @@ appendonly_update_init(Relation rel, Snapshot appendOnlyMetaDataSnapshot, int se
 	 */
 	AppendOnlyUpdateDesc aoUpdateDesc = (AppendOnlyUpdateDesc) palloc0(sizeof(AppendOnlyUpdateDescData));
 
-	aoUpdateDesc->aoInsertDesc = appendonly_insert_init(rel, segno, true);
+	aoUpdateDesc->aoInsertDesc = appendonly_insert_init(NULL, rel, segno, true);
 
 	AppendOnlyVisimap_Init(&aoUpdateDesc->visibilityMap,
 						   aoUpdateDesc->aoInsertDesc->aoi_rel->rd_appendonly->visimaprelid,
@@ -2643,7 +2643,7 @@ appendonly_update(AppendOnlyUpdateDesc aoUpdateDesc,
  * append only tables.
  */
 AppendOnlyInsertDesc
-appendonly_insert_init(Relation rel, int segno, bool update_mode)
+appendonly_insert_init(Relation fromrel, Relation rel, int segno, bool update_mode)
 {
 	AppendOnlyInsertDesc aoInsertDesc;
 	int			maxtupsize;
@@ -2666,6 +2666,7 @@ appendonly_insert_init(Relation rel, int segno, bool update_mode)
 	aoInsertDesc = (AppendOnlyInsertDesc) palloc0(sizeof(AppendOnlyInsertDescData));
 
 	aoInsertDesc->aoi_rel = rel;
+	aoInsertDesc->from_aoi_rel = fromrel;
 
 	/*
 	 * Writers uses this since they have exclusive access to the lock acquired
@@ -2794,7 +2795,7 @@ appendonly_insert_init(Relation rel, int segno, bool update_mode)
 								NULL,
 								aoInsertDesc->usableBlockSize,
 								nspname,
-								RelationGetRelationName(aoInsertDesc->aoi_rel),
+								aoInsertDesc->from_aoi_rel ? RelationGetRelationName(aoInsertDesc->from_aoi_rel) : RelationGetRelationName(aoInsertDesc->aoi_rel),
 								aoInsertDesc->title,
 								&aoInsertDesc->storageAttributes,
 								XLogIsNeeded() && RelationNeedsWAL(aoInsertDesc->aoi_rel));
