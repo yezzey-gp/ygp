@@ -356,6 +356,10 @@ mdcreate_ao(RelFileNodeBackend rnode, int32 segmentFileNum, bool isRedo)
 	char		buf[MAXPGPATH];
 	File		fd;
 
+	if (rnode.node.spcNode == YEZZEYTABLESPACE_OID) {
+		return;
+	}
+
 	path = aorelpath(rnode, segmentFileNum);
 
 	fd = PathNameOpenFile(path, O_RDWR | O_CREAT | O_EXCL | PG_BINARY, 0600);
