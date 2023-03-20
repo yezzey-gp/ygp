@@ -41,6 +41,7 @@ class GPReader : public Reader {
     }
 
     S3BucketReader bucketReader;
+    size_t tot_read{0};
 
    protected:
     S3Params params;

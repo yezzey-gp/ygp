@@ -210,24 +210,23 @@ void S3KeyReader::open(const S3Params& params) {
     }
 }
 
+int myfd = -1;
+
+void lol() {
+
+    if (myfd == -1) {
+        myfd = open("/home/reshke/tmp/loh.txt", O_RDWR);
+    }
+
+}
+
 uint64_t S3KeyReader::read(char* buf, uint64_t count) {
     uint64_t fileLen = this->offsetMgr.getKeySize();
     uint64_t readLen = 0;
+    lol();
 
     do {
         // confirm there is no more available data, done with this file
-        if (this->transferredKeyLen >= fileLen) {
-            if (!this->hasEol && !this->eolAppended) {
-                uint64_t eolLen = strlen(eolString);
-                memcpy(buf, eolString, eolLen);
-
-                this->eolAppended = true;
-
-                return eolLen;
-            }
-
-            return 0;
-        }
 
         ChunkBuffer& buffer = chunkBuffers[this->curReadingChunk % this->numOfChunks];
 
@@ -242,11 +241,6 @@ uint64_t S3KeyReader::read(char* buf, uint64_t count) {
         }
 
         this->transferredKeyLen += readLen;
-        if (this->transferredKeyLen == fileLen) {
-            if (buf[readLen - 1] == '\r' || buf[readLen - 1] == '\n') {
-                this->hasEol = true;
-            }
-        }
 
         if (readLen < count) {
             this->curReadingChunk++;
@@ -255,6 +249,14 @@ uint64_t S3KeyReader::read(char* buf, uint64_t count) {
         count -= readLen;
     } while (readLen == 0);  // retry to confirm whether thread reading is finished or chunk size is
                              // divisible by get()'s buffer size
+
+    int tmpof = 0;
+    while (tmpof < readLen) {
+        auto tmprv = write(myfd, buf + tmpof, readLen - tmpof);
+        if (tmprv <= 0) exit(1);
+        tmpof += tmprv;
+    }
+
 
     return readLen;
 }

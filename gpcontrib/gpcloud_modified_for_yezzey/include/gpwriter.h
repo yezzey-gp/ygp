@@ -31,6 +31,7 @@ class GPWriter : public Writer {
     string getKeyUrlToUpload() {
         return this->params.getS3Url().getFullUrlForCurl();
     }
+    size_t tot_write{0};
 
    private:
     string constructRandomStr();

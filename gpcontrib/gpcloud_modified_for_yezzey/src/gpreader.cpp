@@ -133,6 +133,7 @@ bool reader_transfer_data(GPReader* reader, char* data_buf, int& data_len) {
 
         // sure read_len <= data_len here, hence truncation will never happen
         data_len = (int)read_len;
+        reader->tot_read += read_len;
     } catch (S3Exception& e) {
         s3extErrorMessage =
             "reader_transfer_data caught a " + e.getType() + " exception: " + e.getFullMessage();
