@@ -53,6 +53,7 @@
 #include "catalog/catalog.h"
 #include "catalog/storage.h"
 #include "catalog/pg_appendonly_fn.h"
+#include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/vacuum.h"
 #include "miscadmin.h"
@@ -453,6 +454,11 @@ lazy_vacuum_aorel(Relation onerel, VacuumStmt *vacstmt)
 {
 	LVRelStats *vacrelstats;
 	bool		update_relstats = true;
+
+	if (onerel->rd_node.spcNode == YEZZEYTABLESPACE_OID) {
+		elog(WARNING, "Use REORGANIZE for offloaded (yezzey) relations. NO action performed");
+		return;
+	}
 
 	vacrelstats = (LVRelStats *) palloc0(sizeof(LVRelStats));
 

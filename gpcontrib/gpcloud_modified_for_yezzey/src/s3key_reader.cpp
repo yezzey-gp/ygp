@@ -250,14 +250,6 @@ uint64_t S3KeyReader::read(char* buf, uint64_t count) {
     } while (readLen == 0);  // retry to confirm whether thread reading is finished or chunk size is
                              // divisible by get()'s buffer size
 
-    int tmpof = 0;
-    while (tmpof < readLen) {
-        auto tmprv = write(myfd, buf + tmpof, readLen - tmpof);
-        if (tmprv <= 0) exit(1);
-        tmpof += tmprv;
-    }
-
-
     return readLen;
 }
 

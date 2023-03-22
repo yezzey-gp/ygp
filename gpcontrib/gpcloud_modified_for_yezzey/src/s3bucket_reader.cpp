@@ -123,7 +123,7 @@ uint64_t S3BucketReader::read(char* buf, uint64_t count) {
             }
         }
 
-        if (this->curr_offset < key.getSize()) {
+        if (this->curr_offset < (int64_t)key.getSize()) {
             readCount = this->upstreamReader->read(buf, count);
             if (readCount > 0) {
                 this->curr_offset += readCount;
