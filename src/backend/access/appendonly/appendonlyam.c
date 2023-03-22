@@ -202,8 +202,6 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 			elog(ERROR, "yezzey: failed to get namescape name of relation %s", scan->aos_rd->rd_rel->relname.data);
 		}
 
-
-
 		AppendOnlyStorageRead_Init(
 								   &scan->storageRead,
 								   scan->aoScanInitContext,
