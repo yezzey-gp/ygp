@@ -1601,7 +1601,7 @@ register_dirty_segment(SMgrRelation reln, ForkNumber forknum, MdfdVec *seg)
  * for AO segment files.
  */
 void
-register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
+register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd, struct f_smgr_ao *smgrao)
 {
 	if (pendingOpsTable)
 	{
@@ -1616,7 +1616,7 @@ register_dirty_segment_ao(RelFileNode rnode, int segno, File vfd)
 		ereport(DEBUG1,
 				(errmsg("could not forward AO fsync request because request queue is full")));
 
-		if (FileSync(vfd) < 0)
+		if (smgrao->smgr_FileSync(vfd) < 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not fsync AO file \"%s\": %m",
