@@ -1199,6 +1199,11 @@ mdsync(void)
 	hash_seq_init(&hstat, pendingOpsTable);
 	while ((entry = (PendingOperationEntry *) hash_seq_search(&hstat)) != NULL)
 	{
+		if (entry->rnode.spcNode == YEZZEYTABLESPACE_OID) {
+			/* skip offloaded relations */
+			continue;
+		}
+		
 		ForkNumber	forknum;
 
 		/*
