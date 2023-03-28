@@ -533,6 +533,7 @@ vacuumStatement_IsTemporary(Relation onerel)
 		case PG_TOAST_NAMESPACE:
 		case PG_BITMAPINDEX_NAMESPACE:
 		case PG_AOSEGMENT_NAMESPACE:
+		case YEZZEY_AUX_NAMESPACE:
 			bTemp = true;
 			break;
 		default:
@@ -750,7 +751,8 @@ vacuumStatement_Relation(VacuumStmt *vacstmt, Oid relid,
 		 onerel->rd_rel->relkind != RELKIND_TOASTVALUE &&
 		 onerel->rd_rel->relkind != RELKIND_AOSEGMENTS &&
 		 onerel->rd_rel->relkind != RELKIND_AOBLOCKDIR &&
-		 onerel->rd_rel->relkind != RELKIND_AOVISIMAP)
+		 onerel->rd_rel->relkind != RELKIND_AOVISIMAP &&
+		 onerel->rd_rel->relkind != RELKIND_YEZZEYINDEX)
 		|| RelationIsExternal(onerel) || RelationIsForeign(onerel))
 	{
 		ereport(WARNING,
