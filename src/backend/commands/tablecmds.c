@@ -1076,7 +1076,8 @@ EvaluateDeferredStatements(List *deferredStmts)
 #define METATRACK_VALIDNAMESPACE(namespaceId) \
 	(namespaceId != PG_TOAST_NAMESPACE &&	\
 	 namespaceId != PG_BITMAPINDEX_NAMESPACE && \
-	 namespaceId != PG_AOSEGMENT_NAMESPACE )
+	 namespaceId != PG_AOSEGMENT_NAMESPACE && \
+	 namespaceId != YEZZEY_AUX_NAMESPACE)
 
 /* check for valid namespace and valid relkind */
 static bool
@@ -7085,6 +7086,7 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			/*
 			 * Allow ALTER TABLE operations in standard alone mode on
 			 * AO segment tables.
@@ -12337,6 +12339,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			if (recursing)
 				break;
 			/* FALL THRU */
@@ -12924,6 +12927,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			if (RelationIsAppendOptimized(rel))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),

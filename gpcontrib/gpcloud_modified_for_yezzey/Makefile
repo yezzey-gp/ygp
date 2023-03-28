@@ -55,7 +55,6 @@ format:
 cleanall:
 	@-$(MAKE) clean # incase PGXS not included
 	@-$(MAKE) -C bin/gpcheckcloud clean
-	@$(MAKE) -C test clean
 	rm -f *.o *.so *.a
 	rm -f *.gcov src/*.gcov src/*.gcda src/*.gcno
 	rm -f src/*.o src/*.d bin/gpcheckcloud/*.o bin/gpcheckcloud/*.d test/*.o test/*.d test/*.a lib/*.o lib/*.d
