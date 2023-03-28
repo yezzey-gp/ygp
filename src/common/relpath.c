@@ -121,7 +121,7 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 	}
 	/* -- yezzey patch */
 	else if (spcNode == YEZZEYTABLESPACE_OID) {
-		return psprintf("yezzey/%u");
+		return psprintf("yezzey/%u", dbNode);
 	}
 	/* -- yezzey patch */
 	else
