@@ -57,6 +57,8 @@ typedef struct AppendOnlyStorageWrite
 	char	   *relationName;
 	char	   *relationNamespace;
 
+	Oid			relationOid;
+
 	/*
 	 * A phrase that better describes the purpose of the this open.
 	 *
@@ -183,6 +185,7 @@ extern void AppendOnlyStorageWrite_Init(AppendOnlyStorageWrite *storageWrite,
 										int32 maxBufferLen,
 										char *relationNamespace,
 										char *relationName,
+										Oid reloid,
 										char *title,
 										AppendOnlyStorageAttributes *storageAttributes,
 										bool needsWAL);
