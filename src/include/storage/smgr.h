@@ -138,6 +138,7 @@ typedef struct f_smgr_ao {
 	void 		(*smgr_FileClose)(SMGRFile file);
 	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset);
 	SMGRFile    (*smgr_AORelOpenSegFile) (
+		Oid reloid,
 		char * nspname, 
 		char * relname,
 		FileName fileName,

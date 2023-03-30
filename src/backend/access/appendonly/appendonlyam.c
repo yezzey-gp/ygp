@@ -2794,6 +2794,7 @@ appendonly_insert_init(Relation fromrel, Relation rel, int segno, bool update_mo
 								aoInsertDesc->usableBlockSize,
 								nspname,
 								aoInsertDesc->from_aoi_rel ? RelationGetRelationName(aoInsertDesc->from_aoi_rel) : RelationGetRelationName(aoInsertDesc->aoi_rel),
+								aoInsertDesc->from_aoi_rel ? RelationGetRelid(aoInsertDesc->from_aoi_rel) : RelationGetRelid(aoInsertDesc->aoi_rel),
 								aoInsertDesc->title,
 								&aoInsertDesc->storageAttributes,
 								XLogIsNeeded() && RelationNeedsWAL(aoInsertDesc->aoi_rel));

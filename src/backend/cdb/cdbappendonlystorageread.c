@@ -257,6 +257,7 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	 * Open the file for read.
 	 */
 	file = storageRead->smgr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be needed and used */,
 		storageRead->relationNamespace,
 		storageRead->relationName,
 		filePathName,
