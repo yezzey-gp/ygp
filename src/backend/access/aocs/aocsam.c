@@ -184,6 +184,7 @@ open_ds_write(Relation rel, DatumStreamWrite **ds, TupleDesc relationTupleDesc,
 										attr,
 										nspname,
 										RelationGetRelationName(rel),
+										RelationGetRelid(rel),
 										/* title */ titleBuf.data,
 										XLogIsNeeded() && RelationNeedsWAL(rel));
 
@@ -1973,6 +1974,7 @@ aocs_addcol_init(Relation rel,
 
 		desc->dsw[i] = create_datumstreamwrite(ct, clvl, rel->rd_appendonly->checksum, 0, blksz /* safeFSWriteSize */ ,
 											   attr, nspname, RelationGetRelationName(rel),
+											   RelationGetRelid(rel),
 											   titleBuf.data,
 											   XLogIsNeeded() && RelationNeedsWAL(rel));
 

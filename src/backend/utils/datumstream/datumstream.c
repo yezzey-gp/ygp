@@ -497,6 +497,7 @@ create_datumstreamwrite(
 						Form_pg_attribute attr,
 						char *relnamespace,
 						char *relname,
+						Oid reloid,
 						char *title,
 						bool needsWAL)
 {
@@ -566,6 +567,7 @@ create_datumstreamwrite(
 								acc->maxAoBlockSize,
 								relnamespace,
 								relname,
+								reloid,
 								title,
 								&acc->ao_attr,
 								needsWAL);

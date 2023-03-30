@@ -95,6 +95,7 @@ ao_insert_replay(XLogRecord *record)
 	if (xlrec->target.offset == 0)
 		fileFlags |= O_CREAT;
 	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
 		NULL,
 		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
 		path, 
@@ -175,6 +176,7 @@ ao_truncate_replay(XLogRecord *record)
 	dbPath = NULL;
 
 	file = smgrao_curr->smgr_AORelOpenSegFile(
+		InvalidOid /* should be be neede and used */,
 		NULL,
 		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
 		path, 

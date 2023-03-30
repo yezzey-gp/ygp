@@ -147,9 +147,10 @@ OpenAOSegmentFile(Relation aorel, char *nspname, char *relname, char *filepathna
 	File		fd;
 
 	errno = 0;
+	
 
 
-	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(nspname, relname, filepathname, O_RDWR | PG_BINARY, 0600, modcount);
+	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, relname, filepathname, O_RDWR | PG_BINARY, 0600, modcount);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -331,6 +332,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	dstSmgr = smgrao();
 
 	srcFile = srcSmgr->smgr_AORelOpenSegFile(
+		InvalidOid /* dont need reloid */,
 		NULL,
 		NULL
 	/*we dont need to pass original relation name here, because yezzey not need it in r/o case*/,
@@ -351,6 +353,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		dstflags |= O_CREAT;
 
 	dstFile = dstSmgr->smgr_AORelOpenSegFile(
+		InvalidOid /*FIXME: copying yezzey files may not work here */,
 		NULL,
 		NULL/*FIXME: copying yezzey files may not work here*/, 
 		dstsegpath, dstflags, 0600, 0);
