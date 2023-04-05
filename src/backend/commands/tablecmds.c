@@ -457,7 +457,6 @@ static void RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid,
 static void RemoveInheritance(Relation child_rel, Relation parent_rel, bool is_partition);
 static void ATExecExpandTable(List **wqueue, Relation rel, AlterTableCmd *cmd);
 static void ATExecExpandPartitionTablePrepare(Relation rel);
-static void ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd);
 
 static void ATExecSetDistributedBy(Relation rel, Node *node,
 								   AlterTableCmd *cmd);
@@ -15186,6 +15185,7 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	Oid					tmprelid;
 	Oid					relid = RelationGetRelid(rel);
 	char				relstorage = rel->rd_rel->relstorage;
+	Oid                 origtablespace;
 	ExpandStmtSpec		*spec = (ExpandStmtSpec *)rootCmd->def;
 
 	/*--
@@ -15311,6 +15311,9 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	heap_close(rel, NoLock);
 	rel = NULL;
 	tmprelid = RangeVarGetRelid(tmprv, NoLock, false);
+
+	origtablespace = rel->rd_node.spcNode;
+
 	swap_relation_files(relid, tmprelid,
 						false, /* target_is_pg_class */
 						false, /* swap_toast_by_content */
@@ -15319,6 +15322,10 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 						RecentXmin,
 						ReadNextMultiXactId(),
 						NULL);
+
+	if (origtablespace == YEZZEYTABLESPACE_OID) {
+
+	}
 
 	/*
 	 * Make changes from swapping relation files visible before updating
