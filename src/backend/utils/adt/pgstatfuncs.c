@@ -29,6 +29,7 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/timestamp.h"
+#include "utils/acl.h"
 
 /* bogus ... these externs should be in a header file */
 extern Datum pg_stat_get_numscans(PG_FUNCTION_ARGS);
@@ -670,6 +671,7 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 		HeapTuple	tuple;
 		LocalPgBackendStatus *local_beentry;
 		PgBackendStatus *beentry;
+		Oid	mdb_admin;
 
 		MemSet(values, 0, sizeof(values));
 		MemSet(nulls, 0, sizeof(nulls));
@@ -719,8 +721,10 @@ pg_stat_get_activity(PG_FUNCTION_ARGS)
 		else
 			nulls[15] = true;
 
+		mdb_admin = get_role_oid("mdb_admin", true);
+
 		/* Values only available to same user or superuser */
-		if (superuser() || beentry->st_userid == GetUserId())
+		if (superuser() || beentry->st_userid == GetUserId() || is_member_of_role(GetUserId(), mdb_admin))
 		{
 			SockAddr	zero_clientaddr;
 
