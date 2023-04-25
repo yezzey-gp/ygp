@@ -81,7 +81,7 @@ S3Params InitConfig(const string& urlWithOptions) {
                         "' does not exist, please check your configuration file",
                     configSection);
 
-    bool useHttps = s3Cfg.GetBool(configSection, "encryption", "true");
+    bool useHttps = true;
 
     string version = s3Cfg.Get(configSection, "version", "");
 
