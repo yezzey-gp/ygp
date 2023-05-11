@@ -140,6 +140,10 @@ typedef struct Port
 	 */
 	char	   *database_name;
 	char	   *user_name;
+	/*
+	* MDB-23247: service role name to perform auth - passthrough 
+	*/
+	char       *service_auth_role;
 	char	   *cmdline_options;
 	List	   *guc_options;
 

@@ -2350,6 +2350,8 @@ retry1:
 				break;			/* missing value, will complain below */
 			valptr = ((char *) buf) + valoffset;
 
+			elog(DEBUG5, "startup got %s %s", nameptr, valptr);
+
 			if (strcmp(nameptr, "database") == 0)
 				port->database_name = pstrdup(valptr);
 			else if (strcmp(nameptr, "user") == 0)
@@ -2380,13 +2382,18 @@ retry1:
 			}
 			else if (strncmp(nameptr, "_pq_.", 5) == 0)
 			{
-				/*
-				 * Any option beginning with _pq_. is reserved for use as a
-				 * protocol-level option, but at present no such options are
-				 * defined.
-				 */
-				unrecognized_protocol_options =
-					lappend(unrecognized_protocol_options, pstrdup(nameptr));
+				/* MDB-23247: parse service auth role from  startup options */
+				if (strcmp(nameptr, "_pq_.service_auth_role") == 0) {
+					port->service_auth_role = pstrdup(valptr);
+				} else {
+					/*
+					* Any option beginning with _pq_. is reserved for use as a
+					* protocol-level option, but at present no such options are
+					* defined.
+					*/
+					unrecognized_protocol_options =
+						lappend(unrecognized_protocol_options, pstrdup(nameptr));
+				}
 			}
 			else if (strcmp(nameptr, GPCONN_TYPE) == 0)
 			{

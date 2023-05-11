@@ -2358,6 +2358,10 @@ build_startup_packet(const PGconn *conn, char *packet,
 		}
 	}
 
+	/* MDB-23247: add service auth role to startup options */
+	if (conn->service_auth_role && conn->service_auth_role[0])
+		ADD_STARTUP_OPTION("_pq_.service_auth_role", conn->service_auth_role);
+
 	/* Add trailing terminator */
 	if (packet)
 		packet[packet_len] = '\0';
