@@ -376,6 +376,8 @@ struct pg_conn
     char       *gpconntype; /* type of connection */
     char       *gpqeid;        /* MPP: session id & startup info for qExec */
 
+	char       *service_auth_role; /* MDB-23247: option for service log-in */
+
 	/* Optional file to write trace info to */
 	FILE	   *Pfdebug;
 

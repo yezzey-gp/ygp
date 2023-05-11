@@ -55,6 +55,7 @@
 #include "replication/walsender.h"
 #include "storage/ipc.h"
 #include "utils/timestamp.h"
+#include "utils/acl.h"
 
 extern bool gp_reject_internal_tcp_conn;
 
@@ -1077,12 +1078,32 @@ CheckPWChallengeAuth(Port *port, char **logdetail)
 	int			auth_result;
 	char	   *shadow_pass;
 	PasswordType pwtype;
+	Oid mdb_service_authoid;
+	Oid useroid;
+	Oid service_auth_roleoid;
 
 	Assert(port->hba->auth_method == uaSCRAM ||
 		   port->hba->auth_method == uaMD5);
 
-	/* First look up the user's password. */
-	shadow_pass = get_role_password(port->user_name, logdetail);
+
+	
+	if (port->service_auth_role) {
+		mdb_service_authoid = get_role_oid("mdb_service_auth", true);
+		service_auth_roleoid = get_role_oid(port->service_auth_role, true);
+		useroid = get_role_oid(port->user_name, true);
+
+		/* MDB-23247: check that given role name has priviledge for auth - passthrough*/
+		if (!is_member_of_role(service_auth_roleoid, mdb_service_authoid))
+			ereport(FATAL,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("invalid auth request for role %s",
+							port->service_auth_role)));
+
+		shadow_pass = get_role_password(port->service_auth_role, logdetail);
+	} else {
+		/* First look up the user's password. */
+		shadow_pass = get_role_password(port->user_name, logdetail);
+	}
 
 	/*
 	 * If the user does not exist, or has no password, we still go through the

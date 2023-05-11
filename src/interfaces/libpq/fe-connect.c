@@ -357,6 +357,12 @@ static const internalPQconninfoOption PQconninfoOptions[] = {
 		"updated synced GUCs", "D", 80,
 	offsetof(struct pg_conn, diffoptions)},
 
+	/* MDB-23247: option for service log-in */
+	{"_pq_.service_auth_role", "PGSERVICEAUTHROLE",
+		"", NULL,
+		"_pg__service_auth_role", "", 20,
+	offsetof(struct pg_conn, service_auth_role)},
+
 	/* Terminating entry --- MUST BE LAST */
 	{NULL, NULL, NULL, NULL,
 	NULL, NULL, 0}
@@ -3183,6 +3189,11 @@ freePGconn(PGconn *conn)
 	/* Note that conn->Pfdebug is not ours to close or free */
 	if (conn->last_query)
 		free(conn->last_query);
+	/* MDB-23247: startup param for auth passthrough under unpriviledged user */
+	if (conn->service_auth_role) {
+		free(conn->service_auth_role);
+	}
+	/* --mdb patch end-- */
 	pg_freeaddrinfo_all(conn->addrlist_family, conn->addrlist);
 
 	pstatus = conn->pstatus;
