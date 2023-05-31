@@ -329,7 +329,7 @@ ListBucketResult S3InterfaceService::listBucket(S3Url &s3Url) {
             return result;
         } else if (resp.getStatus() == RESPONSE_ERROR) {
             S3MessageParser s3msg(resp);
-            S3_DIE(S3LogicError, s3msg.getCode(), s3msg.getMessage());
+            S3_DIE(S3LogicError, s3msg.getCode(), s3msg.getMessage() + " : " + resp.getMessage());
         } else {
             S3_DIE(S3RuntimeError, "unexpected response status");
         }
