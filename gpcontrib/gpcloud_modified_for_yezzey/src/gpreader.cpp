@@ -122,6 +122,34 @@ GPReader* reader_init(const char* url_with_options) {
     }
 }
 
+
+// not exception safe
+GPReader* reader_init_unsafe(const char* url_with_options) {
+    GPReader* reader = NULL;
+    s3extErrorMessage.clear();
+    if (!url_with_options) {
+        return NULL;
+    }
+
+    string urlWithOptions(url_with_options);
+
+    S3Params params = InitConfig(urlWithOptions);
+
+    InitRemoteLog();
+
+    // Prepare memory to be used for thread chunk buffer.
+    PrepareS3MemContext(params);
+
+    reader = new GPReader(params);
+    if (reader == NULL) {
+        return NULL;
+    }
+
+    reader->open(params);
+    return reader;
+}
+
+
 // invoked by s3_import(), need to be exception safe
 bool reader_transfer_data(GPReader* reader, char* data_buf, int& data_len) {
     try {
@@ -173,6 +201,24 @@ bool reader_cleanup(GPReader** reader) {
 
     return result;
 }
+
+
+
+// not exception safe
+bool reader_cleanup_unsafe(GPReader** reader) {
+    bool result = true;
+    
+    if (*reader) {
+        (*reader)->close();
+        delete *reader;
+        *reader = NULL;
+    } else {
+        result = false;
+    }
+
+    return result;
+}
+
 
 bool GPReader::empty() {
     return this->bucketReader.is_empty;

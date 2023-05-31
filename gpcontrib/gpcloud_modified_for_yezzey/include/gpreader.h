@@ -61,6 +61,10 @@ bool reader_empty(GPReader * reader);
 bool reader_transfer_data(GPReader *reader, char *data_buf, int &data_len);
 bool reader_cleanup(GPReader **reader);
 
+/* not ex-safe */
+GPReader *reader_init_unsafe(const char *url_with_options);
+bool reader_cleanup_unsafe(GPReader **reader);
+
 // Two thread related functions, called only by gpreader and gpcheckcloud
 int thread_setup(void);
 int thread_cleanup(void);
