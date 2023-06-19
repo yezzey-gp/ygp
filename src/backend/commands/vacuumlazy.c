@@ -456,8 +456,8 @@ lazy_vacuum_aorel(Relation onerel, VacuumStmt *vacstmt)
 	bool		update_relstats = true;
 
 	if (onerel->rd_node.spcNode == YEZZEYTABLESPACE_OID) {
-		elog(WARNING, "Use REORGANIZE for offloaded (yezzey) relations. NO action performed");
-		return;
+		// elog(WARNING, "Use REORGANIZE for offloaded (yezzey) relations. NO action performed");
+		// return;
 	}
 
 	vacrelstats = (LVRelStats *) palloc0(sizeof(LVRelStats));

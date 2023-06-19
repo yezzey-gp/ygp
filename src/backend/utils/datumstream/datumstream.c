@@ -644,6 +644,7 @@ create_datumstreamread(
 					   Form_pg_attribute attr,
 					   char *relnamespace,
 					   char *relname,
+					   Oid reloid,
 					   char *title)
 {
 	DatumStreamRead *acc = palloc0(sizeof(DatumStreamRead));
@@ -696,6 +697,7 @@ create_datumstreamread(
 
 	AppendOnlyStorageRead_Init(
 							   &acc->ao_read,
+							   /* relation Oid */ reloid,
 								/* memoryContext */ NULL,
 							   acc->maxAoBlockSize,
 							   relnamespace,

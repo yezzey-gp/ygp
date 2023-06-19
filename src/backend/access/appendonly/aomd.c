@@ -141,7 +141,7 @@ MakeAOSegmentFileName(Relation rel,
  * the File* routines can be used to read, write, close, etc, the file.
  */
 File
-OpenAOSegmentFile(Relation aorel, char *nspname, char *relname, char *filepathname, int64 logicalEof, int64 modcount)
+OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount)
 {
 	int			fileFlags = O_RDWR | PG_BINARY;
 	File		fd;
@@ -150,7 +150,7 @@ OpenAOSegmentFile(Relation aorel, char *nspname, char *relname, char *filepathna
 	
 
 
-	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, relname, filepathname, O_RDWR | PG_BINARY, 0600, modcount);
+	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, 0600, modcount);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -537,7 +537,7 @@ truncate_ao_perFile(const int segno, void *ctx)
 
 	RelationOpenSmgr(aorel);
 
-	fd = OpenAOSegmentFile(aorel, relname, nspname, segPath, 0, -1);
+	fd = OpenAOSegmentFile(aorel, nspname, segPath, 0, -1);
 
 	if (fd >= 0)
 	{
