@@ -274,6 +274,7 @@ extern DatumStreamRead *create_datumstreamread(
 					   Form_pg_attribute attr,
 					   char *relnamespace,
 					   char *relname,
+					   Oid reloid,
 					   char *title);
 
 extern void datumstreamwrite_open_file(

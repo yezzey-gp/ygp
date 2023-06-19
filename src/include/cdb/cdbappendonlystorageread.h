@@ -125,11 +125,14 @@ typedef struct AppendOnlyStorageRead
 	 */
 	int32		largeReadLen;
 
+
+	char	   *relationNamespace;
 	/*
 	 * Name of the relation to use in system logging and error messages.
 	 */
 	char	   *relationName;
-	char	   *relationNamespace;
+	Oid        relationOid;
+
 	/*
 	 * A phrase that better describes the purpose of the this open.
 	 *
@@ -195,6 +198,7 @@ typedef struct AppendOnlyStorageRead
 } AppendOnlyStorageRead;
 
 extern void AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
+						   Oid reloid,
 						   MemoryContext memoryContext,
 						   int32 maxBufferLen,
 						   char * relationNamespace,
