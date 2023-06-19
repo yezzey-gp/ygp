@@ -58,6 +58,7 @@
  */
 void
 AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
+						   Oid reloid,
 						   MemoryContext memoryContext,
 						   int32 maxBufferLen,
 						   char *relationNamespace,
@@ -95,6 +96,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 		   sizeof(AppendOnlyStorageAttributes));
 
 	storageRead->relationName = pstrdup(relationName);
+	storageRead->relationOid = reloid;
 	storageRead->relationNamespace = pstrdup(relationNamespace);
 	storageRead->title = title;
 
@@ -257,7 +259,7 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	 * Open the file for read.
 	 */
 	file = storageRead->smgr->smgr_AORelOpenSegFile(
-		InvalidOid /* should be be needed and used */,
+		storageRead->relationOid /* Oid should be needed and used */,
 		storageRead->relationNamespace,
 		storageRead->relationName,
 		filePathName,

@@ -204,6 +204,7 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 
 		AppendOnlyStorageRead_Init(
 								   &scan->storageRead,
+								   scan->aos_rd->rd_id,
 								   scan->aoScanInitContext,
 								   scan->usableBlockSize,
 								   nspname,
@@ -2209,6 +2210,7 @@ appendonly_fetch_init(Relation relation,
 
 	AppendOnlyStorageRead_Init(
 							   &aoFetchDesc->storageRead,
+							   RelationGetRelid(aoFetchDesc->relation),
 							   aoFetchDesc->initContext,
 							   aoFetchDesc->usableBlockSize,
 							   nspname,

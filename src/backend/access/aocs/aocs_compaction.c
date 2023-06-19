@@ -78,7 +78,7 @@ AOCSCompaction_DropSegmentFile(Relation aorel,
 
 		RelationOpenSmgr(aorel);
 
-		fd = OpenAOSegmentFile(aorel, relname, nspname, filenamepath, 0, -1);
+		fd = OpenAOSegmentFile(aorel, nspname, filenamepath, 0, -1);
 		pfree(nspname);
 		if (fd >= 0)
 		{
@@ -148,7 +148,7 @@ AOCSSegmentFileTruncateToEOF(Relation aorel,
 
 		RelationOpenSmgr(aorel);
 
-		fd = OpenAOSegmentFile(aorel, relname, nspname, filenamepath, segeof, -1);
+		fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1);
 		if (fd >= 0)
 		{
 			TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof);

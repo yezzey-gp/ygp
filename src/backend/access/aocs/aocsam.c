@@ -267,6 +267,7 @@ open_ds_read(Relation rel, DatumStreamRead **ds, TupleDesc relationTupleDesc,
 										   attr,
 										   nspname,
 										   RelationGetRelationName(rel),
+										   rel->rd_id,
 										    /* title */ titleBuf.data);
 
 		pfree(nspname);
@@ -1396,8 +1397,9 @@ aocs_fetch_init(Relation relation,
 																		 * column */
 									   blksz,
 									   tupleDesc->attrs[colno],
-									   relation->rd_rel->relname.data,
+									   RelationGetRelationName(relation),
 									   nspname,
+									   relation->rd_id,
 									    /* title */ titleBuf.data);
 
 
@@ -1861,7 +1863,9 @@ aocs_begin_headerscan(Relation rel, int colno)
 	}
 
 
-	AppendOnlyStorageRead_Init(&hdesc->ao_read,
+	AppendOnlyStorageRead_Init(
+							   &hdesc->ao_read,
+							   rel->rd_id,
 							   NULL, //current memory context
 							   opts[colno]->blocksize,
 							   nspname,
