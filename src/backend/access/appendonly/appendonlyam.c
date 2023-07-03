@@ -2549,6 +2549,8 @@ appendonly_delete(AppendOnlyDeleteDesc aoDeleteDesc,
 	/* tableName */
 #endif
 
+	pgstat_count_heap_delete(aoDeleteDesc->aod_rel);
+
 	return AppendOnlyVisimapDelete_Hide(&aoDeleteDesc->visiMapDelete, aoTupleId);
 }
 
