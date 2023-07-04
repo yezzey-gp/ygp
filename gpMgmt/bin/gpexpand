@@ -10,6 +10,7 @@ import copy
 import datetime
 import os
 import random
+import re
 import sys
 import json
 import shutil
@@ -2166,7 +2167,17 @@ class ExpandTable():
         # check is atomic in python
         if not cancel_flag:
             if sql:
-                dbconn.execSQL(table_conn, sql)
+                try:
+                    dbconn.execSQL(table_conn, sql)
+                except DatabaseError, ex:
+                    if re.search('DETAIL:\s*table has already been expanded', ex.message):
+                        logger.info('Table %s.%s seems to be already expanded, marking as done' % (self.dbname.decode('utf-8'), self.fq_name.decode('utf-8')))
+                    elif re.search('ERROR:\s+relation not found', ex.message):
+                        logger.warn('Table %s.%s seems to be partially droppend, skipping' % (self.dbname.decode('utf-8'), self.fq_name.decode('utf-8')))
+                        table_conn.rollback()
+                        return True
+                    else:
+                        raise
                 table_conn.commit()
             if self.options.analyze:
                 sql = 'ANALYZE %s' % (self.fq_name)
