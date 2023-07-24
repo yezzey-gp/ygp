@@ -115,6 +115,10 @@ class S3Params {
         return memoryContext;
     }
 
+    S3MemoryContext& getMemoryContextV() {
+        return memoryContext;
+    }
+
     S3Url& getS3Url() {
         return s3Url;
     }

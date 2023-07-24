@@ -35,7 +35,7 @@ class GPReader : public Reader {
     const S3Params &getParams() {
         return params;
     }
-    
+
     S3BucketReader bucketReader;
     size_t tot_read{0};
 
@@ -59,6 +59,8 @@ bool reader_cleanup(GPReader **reader);
 
 /* not ex-safe */
 GPReader *reader_init_unsafe(const char *url_with_options);
+/* not ex-safe */
+GPReader *reader_reinit_unsafe(const char *url_with_options, std::shared_ptr<PreAllocatedMemory> prealloc);
 bool reader_cleanup_unsafe(GPReader **reader);
 
 // Two thread related functions, called only by gpreader and gpcheckcloud

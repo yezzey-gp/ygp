@@ -93,6 +93,12 @@ struct PGAllocator {
         prealloc = other.prealloc;
     }
 
+    void
+    SetPrealloc(std::shared_ptr<PreAllocatedMemory> prealloc){
+        this->prealloc = prealloc;
+    }
+
+
     typedef size_t size_type;
     typedef ptrdiff_t difference_type;
     typedef T* pointer;
