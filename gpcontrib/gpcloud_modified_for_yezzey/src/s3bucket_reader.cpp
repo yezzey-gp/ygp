@@ -33,12 +33,6 @@ void S3BucketReader::open(const S3Params& params) {
     this->keyList = this->s3Interface->listBucket(s3Url);
 }
 
-BucketContent& S3BucketReader::getNextKey() {
-    BucketContent& key = this->keyList.contents[this->keyIndex];
-    this->keyIndex += s3ext_segnum;
-    return key;
-}
-
 S3Params S3BucketReader::constructReaderParams(BucketContent& key) {
     // encode the key name but leave the "/"
     // "/encoded_path/encoded_name"
@@ -101,47 +95,27 @@ uint64_t S3BucketReader::readWithoutHeaderLine(char* buf, uint64_t count) {
 uint64_t S3BucketReader::read(char* buf, uint64_t count) {
     S3_CHECK_OR_DIE(this->upstreamReader != NULL, S3RuntimeError, "upstreamReader is NULL");
     uint64_t readCount = 0;
-    while (this->iter < this->keyList.contents.size()) {
+
+    /* only one key */
+    if (this->iter != this->keyList.contents.size()) {
         BucketContent& key = this->keyList.contents[this->iter];
         if (this->needNewReader) {
-            if (arenda == 0) {
-                return readCount;
-            }
             this->upstreamReader->open(constructReaderParams(key));
-            this->needNewReader = false;
-            arenda--;
-
-            // ignore header line if it is not the first file
-            if (hasHeader && !this->isFirstFile) {
-                readCount = readWithoutHeaderLine(buf, count);
-                if (readCount > 0) {
-                    this->curr_offset += readCount;
-                }
-                if (readCount != 0) {
-                    return readCount;
-                }
-            }
+            this->needNewReader = false;            
         }
 
         if (this->curr_offset < (int64_t)key.getSize()) {
             readCount = this->upstreamReader->read(buf, count);
-            if (readCount > 0) {
-                this->curr_offset += readCount;
+            this->curr_offset += readCount;
+            if (this->curr_offset == key.getSize()) {
+                this->is_empty = true;
             }
-            if (readCount != 0) {
-                return readCount;
-            }
+            return readCount;
         }
 
         // Finished one file, continue to next
-        this->upstreamReader->close();
-        this->needNewReader = true;
-        this->isFirstFile = false;
-        this->curr_offset = 0;
-        this->iter++;
-        if (this->iter == this->keyList.contents.size()) {
-            this->is_empty = true;
-        }
+        /* no next file */
+        return 0;
     }
     this->upstreamReader = NULL;
     return 0;

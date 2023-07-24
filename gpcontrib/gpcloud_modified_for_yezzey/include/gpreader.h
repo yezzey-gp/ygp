@@ -35,11 +35,7 @@ class GPReader : public Reader {
     const S3Params &getParams() {
         return params;
     }
-
-    void BumpArenda(size_t val) {
-        bucketReader.BumpArenda(val);
-    }
-
+    
     S3BucketReader bucketReader;
     size_t tot_read{0};
 
