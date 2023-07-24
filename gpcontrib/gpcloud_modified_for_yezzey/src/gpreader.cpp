@@ -150,6 +150,29 @@ GPReader* reader_init_unsafe(const char* url_with_options) {
 }
 
 
+// not exception safe
+GPReader* reader_reinit_unsafe(const char* url_with_options, std::shared_ptr<PreAllocatedMemory> prealloc) {
+    GPReader* reader = NULL;
+    s3extErrorMessage.clear();
+    if (!url_with_options) {
+        return NULL;
+    }
+
+    string urlWithOptions(url_with_options);
+
+    S3Params params = InitConfig(urlWithOptions);
+    params.getMemoryContextV().SetPrealloc(prealloc);
+
+    reader = new GPReader(params);
+    if (reader == NULL) {
+        return NULL;
+    }
+
+    reader->open(params);
+    return reader;
+}
+
+
 // invoked by s3_import(), need to be exception safe
 bool reader_transfer_data(GPReader* reader, char* data_buf, int& data_len) {
     try {
