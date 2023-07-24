@@ -29,12 +29,6 @@ class S3BucketReader : public Reader {
         return keyList;
     }
 
-
-    void BumpArenda(size_t val) {
-        arenda = val;
-    }
-
-
     bool is_empty = false;
     S3Params constructReaderParams(BucketContent &key);
 
