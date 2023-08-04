@@ -55,8 +55,8 @@ yezzey:
 
 gpcloud:
 	@if [ "$(enable_gpcloud)" = "yes" ]; then \
-		$(MAKE) -C gpcloud_modified_for_yezzey && \
-		$(MAKE) -C gpcloud_modified_for_yezzey/bin/gpcheckcloud; \
+		$(MAKE) -C gpcloud && \
+		$(MAKE) -C gpcloud/bin/gpcheckcloud; \
 	fi
 
 mapreduce:
@@ -71,8 +71,8 @@ orafce:
 
 install:
 	@if [ "$(enable_gpcloud)" = "yes" ]; then \
-		$(MAKE) -C gpcloud_modified_for_yezzey install && \
-		$(MAKE) -C gpcloud_modified_for_yezzey/bin/gpcheckcloud install; \
+		$(MAKE) -C gpcloud install && \
+		$(MAKE) -C gpcloud/bin/gpcheckcloud install; \
 	fi
 	@if [ "$(enable_yezzey)" = "yes" ]; then \
 		$(MAKE) -C yezzey install; \
@@ -86,14 +86,14 @@ install:
 
 clean:
 	if [ "$(enable_mapreduce)" = "yes" ]; then $(MAKE) -C gpmapreduce clean; fi
-	if [ "$(enable_gpcloud)" = "yes" ]; then $(MAKE) -C gpcloud_modified_for_yezzey cleanall; fi
+	if [ "$(enable_gpcloud)" = "yes" ]; then $(MAKE) -C gpcloud cleanall; fi
 	if [ "$(enable_yezzey)" = "yes" ]; then $(MAKE) -C yezzey cleanall; fi
 	if [ "${enable_orafce}" = "yes" ]; then $(MAKE) -C orafce NO_PGXS=true clean; fi
 
 
 distclean:
 	if [ "$(enable_mapreduce)" = "yes" ]; then $(MAKE) -C gpmapreduce distclean; fi
-	if [ "$(enable_gpcloud)" = "yes" ]; then $(MAKE) -C gpcloud_modified_for_yezzey distclean; fi
+	if [ "$(enable_gpcloud)" = "yes" ]; then $(MAKE) -C gpcloud distclean; fi
 	if [ "$(enable_yezzey)" = "yes" ]; then $(MAKE) -C yezzey distclean; fi
 	if [ "${enable_orafce}" = "yes" ]; then $(MAKE) -C orafce NO_PGXS=true distclean; fi
 
