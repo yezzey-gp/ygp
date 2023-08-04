@@ -929,6 +929,10 @@ void MetaTrackDropObject(Oid		classid,
 	systable_endscan(desc);
 	heap_close(rel, RowExclusiveLock);
 
+	/* if yezzey relation, we nned to update relation expire lsn */
+
+	//YezzeyRecordRelationExpireLsn(relid);
+
 } /* end MetaTrackDropObject */
 
 /*
