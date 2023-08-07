@@ -8,8 +8,8 @@ apt-get install -y \
   curl \
   flex \
   git-core \
-  gcc \
-  g++ \
+  gcc-8 \
+  g++-8 \
   inetutils-ping \
   krb5-kdc \
   krb5-admin-server \
@@ -31,11 +31,12 @@ apt-get install -y \
   openssh-client \
   openssh-server \
   openssl \
-  python-dev \
-  python-pip \
+  python2-dev \
+  python3-pip \
   python-psutil \
   python-yaml \
-  zlib1g-dev
+  zlib1g-dev \
+  libpstreams-dev
 
 
 pip install conan
