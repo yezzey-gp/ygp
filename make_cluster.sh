@@ -1,6 +1,16 @@
 #!/bin/bash
 set -ex
 
+ssh-keygen -f ~/.ssh/id_rsa -N ''
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_rsa
+sudo service ssh start
+ssh -o StrictHostKeyChecking=no krebs@$(hostname) "echo 'Hello world'"
+
+git config --global --add safe.directory '*'
+
 sudo bash -c 'cat >> /etc/ld.so.conf <<-EOF
 /usr/local/lib
 
@@ -43,12 +53,6 @@ sudo bash -c 'cat >> /etc/security/limits.conf <<-EOF
 * hard nproc 131072
 
 EOF'
-
-ssh-keygen -f ~/.ssh/id_rsa -N ''
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_rsa
 
 export GPHOME=/usr/local/gpdb
 source $GPHOME/greenplum_path.sh
