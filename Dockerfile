@@ -18,6 +18,8 @@ RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/Lond
   ninja-build python-dev python-setuptools quilt unzip wget zlib1g-dev libuv1-dev \
   libgpgme-dev libgpgme11 sudo iproute2 less
 
+RUN ["./install-wal-g.sh"]
+
 RUN apt-get install -y locales \
 && locale-gen "en_US.UTF-8" \
 && update-locale LC_ALL="en_US.UTF-8"
