@@ -19,13 +19,9 @@ RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/Lond
   ninja-build python-dev python-setuptools quilt unzip wget zlib1g-dev libuv1-dev \
   libgpgme-dev libgpgme11 sudo iproute2 less software-properties-common
 
-COPY ./install-wal-g.sh /home/krebs
+COPY yezzey_test/install-wal-g.sh /home/krebs
 
 RUN ["/home/krebs/install-wal-g.sh"]
-
-COPY ./yezzey_test/generate_gpg_key.sh /home/krebs
-
-RUN ["/home/krebs/generate_gpg_key.sh"]
 
 RUN apt-get install -y locales \
 && locale-gen "en_US.UTF-8" \
@@ -35,6 +31,10 @@ RUN echo 'krebs ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers
 
 USER krebs
 WORKDIR /home/krebs
+
+COPY yezzey_test/generate_gpg_key.sh /home/krebs/
+
+RUN ["/home/krebs/generate_gpg_key.sh"]
 
 RUN cd /tmp/ \
 && git clone https://github.com/greenplum-db/gp-xerces.git \
@@ -54,5 +54,3 @@ RUN sudo DEBIAN_FRONTEND=noninteractive ./README.ubuntu.bash \
 
 RUN sudo mkdir /usr/local/gpdb \
 && sudo chown krebs:root /usr/local/gpdb
-
-RUN ["./make_cluster.sh"]
