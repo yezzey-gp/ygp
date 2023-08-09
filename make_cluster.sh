@@ -19,6 +19,8 @@ sudo ldconfig
 
 git submodule update --init
 
+sed '/^trusted/d' gpcontrib/yezzey/yezzey.control
+
 ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread'
 make -j && make -j install
 
@@ -58,5 +60,25 @@ export GPHOME=/usr/local/gpdb
 source $GPHOME/greenplum_path.sh
 ulimit -n 65536
 make create-demo-cluster
+export USER=krebs
 source gpAux/gpdemo/gpdemo-env.sh
+
+gpconfig -c yezzey.storage_prefix -v "'wal-e/mdbrhqjnl6k5duk7loi2/6'"
+gpconfig -c yezzey.storage_bucket -v "'yezzey_test_bucket'"
+gpconfig -c yezzey.storage_config -v "'/home/krebs/yezzey_test/yezzey-s3.conf'"
+gpconfig -c yezzey.storage_host -v "'s3'"
+gpconfig -c yezzey.gpg_key_id -v  "'$(gpg --list-keys | head -n 4 | tail -n 1)'"
+gpconfig -c yezzey.walg_bin_path -v  "'wal-g'"
+gpconfig -c yezzey.walg_config_path -v  "'/home/reshke/yezzey_test/wal-g-conf.yaml'"
+
+gpconfig -c max_worker_processes -v 10
+
+gpconfig -c yezzey.autooffload -v  "on"
+
+gpconfig -c shared_preload_libraries -v yezzey
+
+gpstop -a -i && gpstart -a
+
+
+createdb $USER
 
