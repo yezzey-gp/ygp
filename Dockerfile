@@ -1,6 +1,7 @@
 FROM ubuntu:focal
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN useradd -rm -d /home/krebs -s /bin/bash -g root -G sudo -u 1001 krebs
 
@@ -16,9 +17,11 @@ RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/Lond
   libssl-dev libxml2-dev libyaml-dev libzstd-dev libaprutil1-dev \
   libpam0g-dev libpam0g libcgroup1 libyaml-0-2 libldap-2.4-2 libssl1.1 \
   ninja-build python-dev python-setuptools quilt unzip wget zlib1g-dev libuv1-dev \
-  libgpgme-dev libgpgme11 sudo iproute2 less
+  libgpgme-dev libgpgme11 sudo iproute2 less software-properties-common
 
-RUN ["./install-wal-g.sh"]
+COPY ./install-wal-g.sh /home/krebs
+
+RUN ["/home/krebs/install-wal-g.sh"]
 
 RUN apt-get install -y locales \
 && locale-gen "en_US.UTF-8" \
