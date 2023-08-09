@@ -55,4 +55,4 @@ RUN sudo DEBIAN_FRONTEND=noninteractive ./README.ubuntu.bash \
 RUN sudo mkdir /usr/local/gpdb \
 && sudo chown krebs:root /usr/local/gpdb
 
-
+RUN ["./make_cluster.sh"]
