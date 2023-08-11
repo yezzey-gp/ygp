@@ -64,7 +64,7 @@ export USER=krebs
 source gpAux/gpdemo/gpdemo-env.sh
 
 gpconfig -c yezzey.storage_prefix -v "'wal-e/mdbrhqjnl6k5duk7loi2/6'"
-gpconfig -c yezzey.storage_bucket -v "'yezzey_test_bucket'"
+gpconfig -c yezzey.storage_bucket -v "'yezzey-test-bucket'"
 gpconfig -c yezzey.storage_config -v "'/home/krebs/yezzey_test/yezzey-s3.conf'"
 gpconfig -c yezzey.storage_host -v "'s3:9000'"
 gpconfig -c yezzey.gpg_key_id -v  "'$(gpg --list-keys | head -n 4 | tail -n 1)'"
@@ -81,4 +81,4 @@ gpstop -a -i && gpstart -a
 
 
 createdb $USER
-psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simple.sql
