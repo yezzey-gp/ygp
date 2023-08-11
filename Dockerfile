@@ -23,6 +23,10 @@ COPY yezzey_test/install-wal-g.sh /home/krebs
 
 RUN ["/home/krebs/install-wal-g.sh"]
 
+COPY yezzey_test/.minio/certs/CAs/ca.cert.pem /usr/local/share/ca-certificates/ca.cert.crt
+
+RUN ["update-ca-certificates"]
+
 RUN apt-get install -y locales \
 && locale-gen "en_US.UTF-8" \
 && update-locale LC_ALL="en_US.UTF-8"
