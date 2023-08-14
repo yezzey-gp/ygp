@@ -79,6 +79,6 @@ RUN sed -i "s/\$ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yezzey-s3.conf \
 && sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf \
 && sed -i "s/\$AWS_ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/wal-g-conf.yaml \
 && sed -i "s/\$AWS_SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/wal-g-conf.yaml \
-&& sed -i "s/\$WALG_S3_PREFIX/${WALG_S3_PREFIX}/g" yezzey_test/wal-g-conf.yaml 
+&& sed -i "s/\$WALG_S3_PREFIX/s3:\/\/${bucketName}\/yezzey-test-files/g" yezzey_test/wal-g-conf.yaml 
 
 ENTRYPOINT ["./yezzey_test/run_tests.sh"]
