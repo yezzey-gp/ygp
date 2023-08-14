@@ -17,7 +17,8 @@ RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/Lond
   libssl-dev libxml2-dev libyaml-dev libzstd-dev libaprutil1-dev \
   libpam0g-dev libpam0g libcgroup1 libyaml-0-2 libldap-2.4-2 libssl1.1 \
   ninja-build python-dev python-setuptools quilt unzip wget zlib1g-dev libuv1-dev \
-  libgpgme-dev libgpgme11 sudo iproute2 less software-properties-common
+  libgpgme-dev libgpgme11 sudo iproute2 less software-properties-common \
+  openssh-client openssh-server
 
 COPY yezzey_test/install-wal-g.sh /home/krebs
 
@@ -67,4 +68,4 @@ RUN git config --global --add safe.directory '*' \
 && git submodule update --init \
 && sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control \
 && ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
-&& make -j && make -j install
+&& make -j8 && make -j8 install
