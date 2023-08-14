@@ -1,28 +1,13 @@
 #!/bin/bash
 set -ex
 
-ssh-keygen -f ~/.ssh/id_rsa -N ''
-cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_rsa
-sudo service ssh start
-ssh -o StrictHostKeyChecking=no krebs@$(hostname) "echo 'Hello world'"
-
-git config --global --add safe.directory '*'
 
 sudo bash -c 'cat >> /etc/ld.so.conf <<-EOF
 /usr/local/lib
 
 EOF'
 sudo ldconfig
-
-git submodule update --init
-
-sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control
-
-./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread'
-make -j && make -j install
 
 sudo bash -c 'cat >> /etc/sysctl.conf <<-EOF
 kernel.shmmax = 500000000
