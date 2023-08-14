@@ -1,7 +1,10 @@
 #!/bin/bash
 set -ex
 
+eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_rsa
+sudo service ssh start
+ssh -o StrictHostKeyChecking=no krebs@$(hostname) "echo 'Hello world'"
 
 sudo bash -c 'cat >> /etc/ld.so.conf <<-EOF
 /usr/local/lib
@@ -44,7 +47,7 @@ EOF'
 export GPHOME=/usr/local/gpdb
 source $GPHOME/greenplum_path.sh
 ulimit -n 65536
-make create-demo-cluster
+make destroy-demo-cluster && make create-demo-cluster
 export USER=krebs
 source gpAux/gpdemo/gpdemo-env.sh
 
