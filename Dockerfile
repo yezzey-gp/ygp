@@ -1,5 +1,14 @@
 FROM ubuntu:focal
 
+ARG accessKeyId
+ARG secretAccessKey
+ARG bucketName
+
+ENV AWS_ACCESS_KEY_ID=${accessKeyId}
+ENV AWS_SECRET_ACCESS_KEY=${secretAccessKey}
+ENV S3_BUCKET=${bucketName}
+ENV WALG_S3_PREFIX=s3://${bucketName}
+
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -23,10 +32,6 @@ RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/Lond
 COPY yezzey_test/install-wal-g.sh /home/krebs
 
 RUN ["/home/krebs/install-wal-g.sh"]
-
-COPY yezzey_test/.minio/certs/CAs/ca.cert.pem /usr/local/share/ca-certificates/ca.cert.crt
-
-RUN ["update-ca-certificates"]
 
 RUN apt-get install -y locales \
 && locale-gen "en_US.UTF-8" \
@@ -69,3 +74,6 @@ RUN git config --global --add safe.directory '*' \
 && sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control \
 && ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
 && make -j8 && make -j8 install
+
+RUN sed -i "s/\$ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yezzey-s3.conf \
+&& sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf
