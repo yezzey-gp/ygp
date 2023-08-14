@@ -77,3 +77,5 @@ RUN git config --global --add safe.directory '*' \
 
 RUN sed -i "s/\$ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yezzey-s3.conf \
 && sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf
+
+ENTRYPOINT ["./yezzey_test/run_tests.sh"]
