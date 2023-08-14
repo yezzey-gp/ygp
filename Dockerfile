@@ -40,6 +40,10 @@ COPY yezzey_test/generate_gpg_key.sh /home/krebs/
 
 RUN ["/home/krebs/generate_gpg_key.sh"]
 
+COPY yezzey_test/generate_ssh_key.sh /home/krebs/
+
+RUN ["/home/krebs/generate_ssh_key.sh"]
+
 RUN cd /tmp/ \
 && git clone https://github.com/greenplum-db/gp-xerces.git \
 && cd ./gp-xerces/ && mkdir build && cd build && ../configure --prefix=/usr/local && make -j \
@@ -58,3 +62,9 @@ RUN sudo DEBIAN_FRONTEND=noninteractive ./README.ubuntu.bash \
 
 RUN sudo mkdir /usr/local/gpdb \
 && sudo chown krebs:root /usr/local/gpdb
+
+RUN git config --global --add safe.directory '*' \
+&& git submodule update --init \
+&& sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control \
+&& ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
+&& make -j && make -j install
