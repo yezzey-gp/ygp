@@ -23,8 +23,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ACCESS_KEY: "AKIAIOSFODNN7EXAMPLE"
-      MINIO_SECRET_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      MINIO_ROOT_USER: "AKIAIOSFODNN7EXAMPLE"
+      MINIO_ROOT_PASSWORD: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
     volumes:
       - ./yezzey_test/.minio:/root/.minio
   
@@ -36,7 +36,7 @@ services:
       /bin/sh -c "
       /usr/bin/mc alias set --insecure myminio https://s3:9000 AKIAIOSFODNN7EXAMPLE wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY;
       /usr/bin/mc mb --insecure myminio/yezzey-test-bucket;
-      /usr/bin/mc policy set --insecure public myminio/yezzey-test-bucket;
+      # /usr/bin/mc policy set --insecure public myminio/yezzey-test-bucket;
       exit 0;
       "
 
