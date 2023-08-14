@@ -7,7 +7,7 @@ ARG bucketName
 ENV AWS_ACCESS_KEY_ID=${accessKeyId}
 ENV AWS_SECRET_ACCESS_KEY=${secretAccessKey}
 ENV S3_BUCKET=${bucketName}
-ENV WALG_S3_PREFIX=s3://${bucketName}
+ENV WALG_S3_PREFIX=s3://${bucketName}/yezzey-test-files
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
@@ -76,6 +76,9 @@ RUN git config --global --add safe.directory '*' \
 && make -j8 && make -j8 install
 
 RUN sed -i "s/\$ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yezzey-s3.conf \
-&& sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf
+&& sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf \
+&& sed -i "s/\$AWS_ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/wal-g-conf.yaml \
+&& sed -i "s/\$AWS_SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/wal-g-conf.yaml \
+&& sed -i "s/\$WALG_S3_PREFIX/${WALG_S3_PREFIX}/g" yezzey_test/wal-g-conf.yaml 
 
 ENTRYPOINT ["./yezzey_test/run_tests.sh"]

@@ -51,13 +51,13 @@ make destroy-demo-cluster && make create-demo-cluster
 export USER=krebs
 source gpAux/gpdemo/gpdemo-env.sh
 
-gpconfig -c yezzey.storage_prefix -v "'wal-e/mdbrhqjnl6k5duk7loi2/6'"
+gpconfig -c yezzey.storage_prefix -v "'yezzey-test-files'"
 gpconfig -c yezzey.storage_bucket -v "'${S3_BUCKET}'"
 gpconfig -c yezzey.storage_config -v "'/home/krebs/yezzey_test/yezzey-s3.conf'"
 gpconfig -c yezzey.storage_host -v "'https://storage.yandexcloud.net'"
 gpconfig -c yezzey.gpg_key_id -v  "'$(gpg --list-keys | head -n 4 | tail -n 1)'"
 gpconfig -c yezzey.walg_bin_path -v  "'wal-g'"
-gpconfig -c yezzey.walg_config_path -v  "'/home/reshke/yezzey_test/wal-g-conf.yaml'"
+gpconfig -c yezzey.walg_config_path -v  "'/home/krebs/yezzey_test/wal-g-conf.yaml'"
 
 gpconfig -c max_worker_processes -v 10
 
