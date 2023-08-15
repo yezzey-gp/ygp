@@ -42,9 +42,11 @@ RUN echo 'krebs ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers
 USER krebs
 WORKDIR /home/krebs
 
-COPY yezzey_test/generate_gpg_key.sh /home/krebs/
+COPY yezzey_test/import_gpg_keys.sh /home/krebs/
+COPY yezzey_test/priv.gpg /home/krebs/yezzey_test/priv.gpg
+COPY yezzey_test/pub.gpg /home/krebs/yezzey_test/pub.gpg
 
-RUN ["/home/krebs/generate_gpg_key.sh"]
+RUN ["/home/krebs/import_gpg_keys.sh"]
 
 COPY yezzey_test/generate_ssh_key.sh /home/krebs/
 
