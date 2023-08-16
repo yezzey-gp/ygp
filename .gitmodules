@@ -11,3 +11,4 @@
 [submodule "gpcontrib/yezzey"]
 	path = gpcontrib/yezzey
 	url = https://github.com/yezzey-gp/yezzey.git
+	branch = v1.8
