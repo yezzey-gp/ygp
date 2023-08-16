@@ -72,6 +72,7 @@ RUN sudo mkdir /usr/local/gpdb \
 
 RUN git config --global --add safe.directory '*' \
 && git submodule update --init \
+&& cd gpcontrib/yezzey && git checkout ${YEZZEY_REF} \
 && sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control \
 && ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
 && make -j8 && make -j8 install
