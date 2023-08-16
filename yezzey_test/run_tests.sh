@@ -71,21 +71,20 @@ gpstop -a -i && gpstart -a
 createdb $USER
 
 # Run tests
-psql postgres -f ./gpcontrib/yezzey/test/regress/${TEST_NAME}
-# psql postgres -f ./gpcontrib/yezzey/test/regress/expirity.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/metadata.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/simple_alter.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/simplebig.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/simplelol.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/simple.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/simple_vac.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/vacuum-yezzey.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yao.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-alter.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-exp.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-large.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-reorg.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-trunc.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-vindex.sql
-# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey_wal.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/expirity.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/metadata.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simple_alter.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simplebig.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simplelol.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simple.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/simple_vac.sql
+# psql postgres -f ./gpcontrib/yezzey/test/regress/vacuum-yezzey.sql  # fails
+psql postgres -f ./gpcontrib/yezzey/test/regress/yao.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-alter.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-exp.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-large.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-reorg.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey.sql
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-trunc.sql
+# psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey-vindex.sql  # broken
+psql postgres -f ./gpcontrib/yezzey/test/regress/yezzey_wal.sql
