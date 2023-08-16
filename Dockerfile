@@ -15,7 +15,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN useradd -rm -d /home/krebs -s /bin/bash -g root -G sudo -u 1001 krebs
 
 RUN ln -snf /usr/share/zoneinfo/Europe/London /etc/localtime && echo Europe/London > /etc/timezone \
-&& sed -i "s/archive.ubuntu.com/mirror.yandex.ru/g" /etc/apt/sources.list \
 && apt-get update -o Acquire::AllowInsecureRepositories=true && apt-get install -y --no-install-recommends --allow-unauthenticated \
   build-essential libssl-dev gnupg devscripts \
   openssl libssl-dev debhelper debootstrap \
