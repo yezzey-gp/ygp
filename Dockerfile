@@ -80,6 +80,8 @@ RUN  git submodule update --init \
 && ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
 && make -j8 && make -j8 install
 
+RUN echo ${accessKeyId} ${secretAccessKey}
+
 RUN sed -i "s/\$ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/yezzey-s3.conf \
 && sed -i "s/\$SECRET_ACCESS_KEY/${secretAccessKey}/g" yezzey_test/yezzey-s3.conf \
 && sed -i "s/\$AWS_ACCESS_KEY_ID/${accessKeyId}/g" yezzey_test/wal-g-conf.yaml \
