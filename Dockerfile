@@ -3,6 +3,7 @@ FROM ubuntu:focal
 ARG accessKeyId
 ARG secretAccessKey
 ARG bucketName
+ARG yezzeyRef
 
 ENV AWS_ACCESS_KEY_ID=${accessKeyId}
 ENV AWS_SECRET_ACCESS_KEY=${secretAccessKey}
@@ -70,9 +71,11 @@ RUN sudo DEBIAN_FRONTEND=noninteractive ./README.ubuntu.bash \
 RUN sudo mkdir /usr/local/gpdb \
 && sudo chown krebs:root /usr/local/gpdb
 
-RUN git config --global --add safe.directory '*' \
-&& git submodule update --init \
-&& cd gpcontrib/yezzey && git checkout ${YEZZEY_REF} \
+RUN sudo chown -R krebs:root /home/krebs \
+&& git status
+
+RUN  git submodule update --init \
+&& cd gpcontrib/yezzey && git checkout ${yezzeyRef} && cd /home/krebs \
 && sed -i '/^trusted/d' gpcontrib/yezzey/yezzey.control \
 && ./configure --prefix=/usr/local/gpdb/ --with-openssl --enable-debug-extensions --enable-gpperfmon --with-python --with-libxml CFLAGS='-fno-omit-frame-pointer -Wno-implicit-fallthrough -O3 -pthread' \
 && make -j8 && make -j8 install
