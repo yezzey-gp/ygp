@@ -1964,6 +1964,12 @@ get_tablespace_name(Oid spc_oid)
 	HeapTuple	tuple;
 	ScanKeyData entry[1];
 
+	/* Yezzey fixes */
+	if (spc_oid == YEZZEYTABLESPACE_OID) {
+		return pstrdup("yezzey(cloud-storage)");
+	}
+	/* Yezzey fixes end*/
+
 	/*
 	 * Search pg_tablespace.  We use a heapscan here even though there is an
 	 * index on oid, on the theory that pg_tablespace will usually have just a
