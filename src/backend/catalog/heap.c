@@ -100,7 +100,6 @@
 
 #include "utils/guc.h"
 
-
 static void MetaTrackAddUpdInternal(Oid			classid,
 									Oid			objoid,
 									Oid			relowner,
@@ -875,6 +874,7 @@ void MetaTrackUpdObject(Oid		classid,
 						   subtype);
 
 } /* end MetaTrackUpdObject */
+
 void MetaTrackDropObject(Oid		classid, 
 						 Oid		objoid)
 {
@@ -928,11 +928,6 @@ void MetaTrackDropObject(Oid		classid,
 
 	systable_endscan(desc);
 	heap_close(rel, RowExclusiveLock);
-
-	/* if yezzey relation, we nned to update relation expire lsn */
-
-	//YezzeyRecordRelationExpireLsn(relid);
-
 } /* end MetaTrackDropObject */
 
 /*
@@ -2535,7 +2530,6 @@ heap_drop_with_catalog(Oid relid)
 	/* MPP-6929: metadata tracking */
 	MetaTrackDropObject(RelationRelationId,
 						relid);
-
 }
 
 
