@@ -112,6 +112,8 @@ AddPendingSync(const RelFileNode *rnode)
 	pending->is_truncated = false;
 }
 
+TrackDropObject_hook_type TrackDropObject_hook = NULL;
+
 /*
  * RelationCreateStorage
  *		Create physical storage for a relation.
@@ -214,6 +216,15 @@ RelationDropStorage(Relation rel)
 		RelationIsAppendOptimized(rel) ? SMGR_AO : SMGR_MD;
 	pending->action = &storage_pending_rel_deletes_action;
 	RegisterPendingDelete(pending);
+
+
+	/* if yezzey relation, we nned to update relation expire lsn */
+	/*
+	 * Set expiration of the relation's external files.
+	 */
+	if (TrackDropObject_hook) {
+		TrackDropObject_hook(rel);
+	}
 
 	/*
 	 * NOTE: if the relation was created in this transaction, it will now be
