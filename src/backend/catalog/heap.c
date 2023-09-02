@@ -110,7 +110,6 @@
 #include "utils/relcache.h"
 #include "utils/timestamp.h"
 
-
 static void MetaTrackAddUpdInternal(Oid			classid,
 									Oid			objoid,
 									Oid			relowner,
@@ -1006,6 +1005,7 @@ void MetaTrackUpdObject(Oid		classid,
 						   subtype);
 
 } /* end MetaTrackUpdObject */
+
 void MetaTrackDropObject(Oid		classid, 
 						 Oid		objoid)
 {
@@ -1061,9 +1061,6 @@ void MetaTrackDropObject(Oid		classid,
 	table_close(rel, RowExclusiveLock);
 
 	/* if yezzey relation, we nned to update relation expire lsn */
-
-	//YezzeyRecordRelationExpireLsn(relid);
-
 } /* end MetaTrackDropObject */
 
 /*

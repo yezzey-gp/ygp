@@ -42,4 +42,9 @@ extern void PostPrepare_smgr(void);
 /* yezzey patch */
 extern void RelationDropStoragePure(Relation rel);
 
-#endif							/* STORAGE_H */
+/* Hook for yezzey meta-related logic */
+typedef void (*TrackDropObject_hook_type) (Relation);
+
+extern PGDLLIMPORT TrackDropObject_hook_type TrackDropObject_hook;
+
+#endif   /* STORAGE_H */
