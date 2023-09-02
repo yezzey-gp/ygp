@@ -157,6 +157,7 @@ extern void CheckAttributeType(const char *attname,
 				   bool allow_system_table_mods);
 extern void SetRelationNumChecks(Relation rel, int numchecks);
 
+
 /* MPP-6929: metadata tracking */
 extern void MetaTrackAddObject(Oid		classid, 
 							   Oid		objoid, 
