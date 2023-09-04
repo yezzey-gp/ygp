@@ -186,6 +186,37 @@ RelationDropStorage(Relation rel)
 	RelationCloseSmgr(rel);
 }
 
+
+void
+RelationDropStoragePure(Relation rel)
+{
+	PendingRelDelete *pending;
+
+	/* Add the relation to the list of stuff to delete at commit */
+	pending = (PendingRelDelete *)
+		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
+	pending->relnode.node = rel->rd_node;
+	pending->relnode.relstorage = rel->rd_rel->relstorage;
+	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
+	pending->atCommit = true;	/* delete if commit */
+	pending->nestLevel = GetCurrentTransactionNestLevel();
+	pending->next = pendingDeletes;
+	pendingDeletes = pending;
+
+	/*
+	 * NOTE: if the relation was created in this transaction, it will now be
+	 * present in the pending-delete list twice, once with atCommit true and
+	 * once with atCommit false.  Hence, it will be physically deleted at end
+	 * of xact in either case (and the other entry will be ignored by
+	 * smgrDoPendingDeletes, so no error will occur).  We could instead remove
+	 * the existing list entry and delete the physical file immediately, but
+	 * for now I'll keep the logic simple.
+	 */
+
+	RelationCloseSmgr(rel);
+}
+
+
 /*
  * RelationPreserveStorage
  *		Mark a relation as not to be deleted after all.

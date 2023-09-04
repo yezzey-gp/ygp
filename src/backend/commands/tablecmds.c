@@ -15631,7 +15631,7 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 	FlushRelationBuffers(rel);
 
 	if (origtablespace == YEZZEYTABLESPACE_OID) {
-
+		/* do we need any additional logic here? */
 	}
 
 	/*
