@@ -1780,6 +1780,10 @@ get_tablespace_oid(const char *tablespacename, bool missing_ok)
 	HeapTuple	tuple;
 	ScanKeyData entry[1];
 
+	if (strcmp(tablespacename, "yezzey(cloud-storage)") == 0) {
+		return YEZZEYTABLESPACE_OID;
+	}
+
 	/*
 	 * Search pg_tablespace.  We use a heapscan here even though there is an
 	 * index on name, on the theory that pg_tablespace will usually have just
