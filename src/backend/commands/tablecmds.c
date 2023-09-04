@@ -15279,11 +15279,13 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	 * the cache, we keep the lock though. ATRewriteCatalogs() knows
 	 * that we've closed the relation here.
 	 */
+
+	origtablespace = rel->rd_node.spcNode;
+
 	heap_close(rel, NoLock);
 	rel = NULL;
 	tmprelid = RangeVarGetRelid(tmprv, NoLock, false);
 
-	origtablespace = rel->rd_node.spcNode;
 
 	swap_relation_files(relid, tmprelid,
 						false, /* target_is_pg_class */
@@ -15295,7 +15297,7 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 						NULL);
 
 	if (origtablespace == YEZZEYTABLESPACE_OID) {
-
+		/* do we need any additional logic here? */
 	}
 
 	/*
