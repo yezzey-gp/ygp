@@ -5134,6 +5134,11 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
+	Oid	mdb_admin = get_role_oid("mdb_admin", true);
+	if (is_member_of_role(roleid, mdb_admin) && mode == ACL_USAGE) {
+		return ACLCHECK_OK;
+	}
+
 	if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
 		return ACLCHECK_OK;
 	else
