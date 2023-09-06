@@ -20,6 +20,8 @@ def get_segments_with_running_basebackup():
     At present gp_stat_replication table does not contain any info about datadir and dbid of the target of running pg_basebackup
     """
 
+    # XXX: fix this
+    return []
     sql = "select gp_segment_id from gp_stat_replication where application_name = 'pg_basebackup'"
 
     try:
