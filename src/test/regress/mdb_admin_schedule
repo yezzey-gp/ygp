@@ -8,4 +8,5 @@
 # mdb admin simple checks
 
 test: mdb_admin
+test: mdb_admin_fdw
 
