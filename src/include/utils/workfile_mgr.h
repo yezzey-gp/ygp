@@ -112,4 +112,8 @@ extern Datum gp_workfile_mgr_cache_entries_internal(PG_FUNCTION_ARGS);
 extern workfile_set *workfile_mgr_cache_entries_get_copy(int* num_actives);
 extern uint64 WorkfileSegspace_GetSize(void);
 
+extern uint64 WorkfileTotalBytesWritten(void);
+extern uint64 WorkfileTotalFilesCreated(void);
+extern uint64 WorkfileResetBackendStats(void);
+
 #endif /* __WORKFILE_MGR_H__ */
