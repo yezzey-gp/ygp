@@ -243,7 +243,12 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 	/*
 	 * Open the file for read. Use smgr iface. Pass filename, as it needed by Yezzey
 	 */
-	file = storageRead->smgr->smgr_PathNameOpenFile(filePathName, fileFlags, fileMode);
+	file = storageRead->smgr->smgr_AORelOpenSegFile(
+		storageRead->relationOid /* Oid should be needed and used */,
+		storageRead->relationNamespace,
+		storageRead->relationName,
+		filePathName,
+		fileFlags, -1 /*FIXME*/);
 
 	return file;
 }

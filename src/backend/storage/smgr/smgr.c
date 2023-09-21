@@ -91,8 +91,6 @@ static const f_smgr smgrsw[] = {
 static const f_smgr_ao smgrswao[] = {
 	/* regular file */
 	{
-		.smgr_NonVirtualCurSeek = FileNonVirtualCurSeek,
-		.smgr_FileSeek = FileSeek,
 		.smgr_FileClose = FileClose,
 		.smgr_FileTruncate = FileTruncate,
 		.smgr_PathNameOpenFile = PathNameOpenFile,
