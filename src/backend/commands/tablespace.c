@@ -411,7 +411,14 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	tablespaceoid = GetNewOidForTableSpace(rel, TablespaceOidIndexId,
 										   Anum_pg_tablespace_oid,
 										   stmt->tablespacename);
-	values[Anum_pg_tablespace_oid - 1] = ObjectIdGetDatum(tablespaceoid);
+
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(stmt->tablespacename, "yezzey") == 0) {
+		values[Anum_pg_tablespace_oid - 1] = YEZZEYTABLESPACE_OID;
+	} else {
+		values[Anum_pg_tablespace_oid - 1] = ObjectIdGetDatum(tablespaceoid);
+	}
+
 	values[Anum_pg_tablespace_spcname - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(stmt->tablespacename));
 	values[Anum_pg_tablespace_spcowner - 1] =
@@ -430,10 +437,6 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 
 	tuple = heap_form_tuple(rel->rd_att, values, nulls);
 
-	// assign pre-defined oid to yezzey tablespace
-	if (strcmp(stmt->tablespacename, "yezzey") == 0) {
-		HeapTupleSetOid(tuple, YEZZEYTABLESPACE_OID);
-	}
 
 	CatalogTupleInsert(rel, tuple);
 
