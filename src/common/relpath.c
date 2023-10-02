@@ -20,6 +20,7 @@
 #endif
 
 #include "catalog/pg_tablespace_d.h"
+#include "catalog/pg_tablespace.h"
 #include "common/relpath.h"
 #include "storage/backendid.h"
 

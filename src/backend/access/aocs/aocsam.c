@@ -2143,7 +2143,7 @@ aocs_addcol_init(Relation rel,
 		}
 
 
-		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz,/* safeFSWriteSize */ ,
+		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz,/* safeFSWriteSize, */
 											   attr, nspname, RelationGetRelationName(rel),
 											   RelationGetRelid(rel),
 											   titleBuf.data,
