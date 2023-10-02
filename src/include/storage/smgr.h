@@ -135,8 +135,8 @@ typedef struct f_smgr_ao {
     int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount,off_t offset, uint32 wait_event_info );
 	SMGRFile    (*smgr_AORelOpenSegFile) (
 		Oid reloid,
-		char * nspname, 
-		char * relname,
+		const char * nspname, 
+		const char * relname,
 		const char * fileName,
 		int fileFlags,
 		int64 modcount);
