@@ -1267,7 +1267,7 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
      * This is SKIPPED when the database is in bootstrap mode or 
      * Is not UnderPostmaster.
      */
-    if (!skip_cdb_init && !bootstrap && IsUnderPostmaster)
+    if (!bootstrap && IsUnderPostmaster)
     {
 		cdb_setup();
 		on_proc_exit( cdb_cleanup, 0 );

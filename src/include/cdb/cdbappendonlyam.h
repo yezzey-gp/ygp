@@ -473,7 +473,6 @@ extern void appendonly_fetch_finish(AppendOnlyFetchDesc aoFetchDesc);
 extern AppendOnlyIndexOnlyDesc appendonly_index_only_init(Relation relation,
 														  Snapshot snapshot);
 
-extern AppendOnlyInsertDesc appendonly_insert_init(Relation fromrel, Relation rel, int segno, bool update_mode);
 extern bool appendonly_index_only_check(AppendOnlyIndexOnlyDesc indexonlydesc,
 										AOTupleId *aotid,
 										Snapshot snapshot);

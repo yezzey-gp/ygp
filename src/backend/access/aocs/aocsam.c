@@ -2523,7 +2523,7 @@ aocs_writecol_init(Relation rel, List *newvals, AOCSWriteColumnOperation op)
 		}
 
 
-		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz,/* safeFSWriteSize */ ,
+		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz,/* safeFSWriteSize, */
 											   attr, nspname, RelationGetRelationName(rel),
 											   RelationGetRelid(rel),
 											   titleBuf.data,

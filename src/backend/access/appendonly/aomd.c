@@ -158,7 +158,7 @@ OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64
 
 	errno = 0;
 
-	fd = aorel->rd_smgr->smgr_ao->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, modcount);
+	fd = aorel->rd_smgr->storageManagerAO->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, modcount);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -180,7 +180,7 @@ OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64
 void
 CloseAOSegmentFile(Relation aorel, File fd)
 {
-	aorel->rd_smgr->smgr_ao->smgr_FileClose(fd);
+	aorel->rd_smgr->storageManagerAO->smgr_FileClose(fd);
 }
 
 /*
@@ -206,7 +206,7 @@ TruncateAOSegmentFile(File fd, Relation rel, int32 segFileNum, int64 offset, AOV
 	 * can be multi-gigabyte to the terabytes...
 	 */
 
-	if (rel->rd_smgr->smgr_ao->smgr_FileTruncate(fd, offset, WAIT_EVENT_DATA_FILE_TRUNCATE) != 0)
+	if (rel->rd_smgr->storageManagerAO->smgr_FileTruncate(fd, offset, WAIT_EVENT_DATA_FILE_TRUNCATE) != 0)
 		ereport(ERROR,
 				(errmsg("\"%s\": failed to truncate data after eof: %m",
 					    relname)));
@@ -429,8 +429,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	srcFile = srcSmgr->smgr_AORelOpenSegFile(
 		InvalidOid /* dont need reloid */,
 		NULL,
-		NULL
-	/*we dont need to pass original relation name here, because yezzey not need it in r/o case*/,
+		NULL, /*we dont need to pass original relation name here, because yezzey not need it in r/o case*/
 		srcsegpath, O_RDONLY | PG_BINARY, -1 /* FIXME */);
 
 	if (srcFile < 0)
@@ -450,14 +449,14 @@ copy_file(char *srcsegpath, char *dstsegpath,
 	dstFile = dstSmgr->smgr_AORelOpenSegFile(
 		InvalidOid /*FIXME: copying yezzey files may not work here */,
 		NULL,
-		NULL/*FIXME: copying yezzey files may not work here*/, 
+		NULL,/*FIXME: copying yezzey files may not work here*/
 		dstsegpath, dstflags, 0);
 	if (dstFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 (errmsg("could not create destination file %s: %m", dstsegpath))));
 
-	left = srcSmgr->FileDiskSize(srcFile); /*   FileDiskSize(srcFile); */
+	left = srcSmgr->smgr_FileDiskSize(srcFile); /*   FileDiskSize(srcFile); */
 	if (left < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -471,13 +470,13 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		CHECK_FOR_INTERRUPTS();
 
 		len = Min(left, BLCKSZ);
-		if (srcSmgr->smgr_FileRead(srcFile, buffer, len, offset, WAIT_EVENT_DATA_FILE_REA) != len)
+		if (srcSmgr->smgr_FileRead(srcFile, buffer, len, offset, WAIT_EVENT_DATA_FILE_READ) != len)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not read %d bytes from file \"%s\": %m",
 							len, srcsegpath)));
 
-		if (dstSmgr->smgr_FileWrite(dstFile, buffer, len, offset, WAIT_EVENT_DATA_FILE_REA) != len)
+		if (dstSmgr->smgr_FileWrite(dstFile, buffer, len, offset, WAIT_EVENT_DATA_FILE_READ) != len)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not write %d bytes to file \"%s\": %m",
