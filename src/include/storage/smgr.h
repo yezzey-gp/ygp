@@ -139,9 +139,9 @@ typedef struct f_smgr_ao {
 		char * relname,
 		const char * fileName,
 		int fileFlags,
-		int fileMode,
 		int64 modcount);
 	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);
+	int			(*smgr_FileDiskSize) (SMGRFile file);
 } f_smgr_ao;
 
 

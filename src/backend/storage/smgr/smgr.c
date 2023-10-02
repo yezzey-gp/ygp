@@ -101,6 +101,7 @@ static const f_smgr_ao smgrswao[] = {
 		.smgr_FileWrite = FileWrite,
 		.smgr_FileRead = FileRead,
 		.smgr_FileSync = FileSync,
+		.smgr_FileDiskSize = FileDiskSize,
 	},
 };
 

@@ -241,8 +241,6 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel, int segno, int64 segeof, AOVa
 	File		fd;
 	int32		fileSegNo;
 	char		filenamepath[MAXPGPATH];
-	int			segno;
-	int64		segeof;
 	char  *nspname;
 
 	Assert(RelationStorageIsAoRows(aorel));

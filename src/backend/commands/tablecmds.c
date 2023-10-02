@@ -15715,9 +15715,6 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 	 */
 	FlushRelationBuffers(rel);
 
-	if (origtablespace == YEZZEYTABLESPACE_OID) {
-
-	}
 
 	/*
 	 * Create and copy all forks of the relation, and schedule unlinking of
