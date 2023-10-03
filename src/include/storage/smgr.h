@@ -113,6 +113,9 @@ typedef struct f_smgr
 	void		(*smgr_close) (SMgrRelation reln, ForkNumber forknum);
 	void		(*smgr_create) (SMgrRelation reln, ForkNumber forknum,
 								bool isRedo);
+
+	void		(*smgr_create_ao) (RelFileNodeBackend reln, ForkNumber forknum,
+								bool isRedo);
 	bool		(*smgr_exists) (SMgrRelation reln, ForkNumber forknum);
 	void		(*smgr_unlink) (RelFileNodeBackend rnode, ForkNumber forknum,
 								bool isRedo);
