@@ -130,7 +130,6 @@ typedef struct f_smgr
 typedef int SMGRFile;
 
 typedef struct f_smgr_ao {
-	int64       (*smgr_NonVirtualCurSeek) (SMGRFile file);
 	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
 	void 		(*smgr_FileClose)(SMGRFile file);
 	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset, uint32 wait_event_info);
