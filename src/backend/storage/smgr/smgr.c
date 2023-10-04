@@ -362,8 +362,9 @@ smgrclose(SMgrRelation reln)
 	SMgrRelation *owner;
 	ForkNumber	forknum;
 
-	for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
+	for (forknum = 0; forknum <= MAX_FORKNUM; forknum++) {
 		(*reln->storageManager).smgr_close(reln, forknum);
+	}
 
 	owner = reln->smgr_owner;
 
