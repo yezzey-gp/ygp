@@ -182,8 +182,7 @@ public:
 
 	// main translation routine for DXL tree -> PlannedStmt
 	PlannedStmt *GetPlannedStmtFromDXL(const CDXLNode *dxlnode,
-									   const Query *orig_query,
-									   bool can_set_tag);
+									   const Query *orig_query);
 
 	// translate the join types from its DXL representation to the GPDB one
 	static JoinType GetGPDBJoinTypeFromDXLJoinType(EdxlJoinType join_type);
