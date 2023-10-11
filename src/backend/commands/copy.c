@@ -395,6 +395,7 @@ typedef struct
 /* Size of the struct, without padding at the end. */
 #define SizeOfCopyFromDispatchError (offsetof(copy_from_dispatch_error, line_buf_converted) + sizeof(bool))
 
+bool yc_allow_copy_to_program;
 
 /*
  * Send copy start/stop messages for frontend copies.  These have changed
@@ -983,10 +984,14 @@ DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *processed)
 	if (!pipe && !superuser())
 	{
 		if (stmt->is_program) {
-			// -- non-upstream patch begin
-			Assert(false);
-			// --- non-upstream patch end
-		} else {
+			if (!yc_allow_copy_to_program) {
+				ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+								errhint("Anyone can COPY to stdout or from stdin. "
+										"psql's \\copy command also works for anyone.")));
+			}
+		} else if (!yc_allow_copy_to_program) {
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("must be superuser to COPY to or from a file"),

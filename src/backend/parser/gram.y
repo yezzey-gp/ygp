@@ -3896,11 +3896,11 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 						/*
 						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
 						*/
-						ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
-								errhint("Anyone can COPY to stdout or from stdin. "
-										"psql's \\copy command also works for anyone.")));
+						// ereport(ERROR,
+						// 	(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						// 		errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+						// 		errhint("Anyone can COPY to stdout or from stdin. "
+						// 				"psql's \\copy command also works for anyone.")));
 					}
 // --- non-upstream patch end
 
@@ -3947,11 +3947,11 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 						/*
 						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
 						*/
-						ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
-								errhint("Anyone can COPY to stdout or from stdin. "
-										"psql's \\copy command also works for anyone.")));
+						// ereport(ERROR,
+						// 	(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						// 		errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+						// 		errhint("Anyone can COPY to stdout or from stdin. "
+						// 				"psql's \\copy command also works for anyone.")));
 					}
 // --- non-upstream patch end
 

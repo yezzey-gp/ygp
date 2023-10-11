@@ -100,6 +100,8 @@
 #define HBA_FILENAME	"pg_hba.conf"
 #define IDENT_FILENAME	"pg_ident.conf"
 
+#include "commands/copy.h"
+
 #ifdef EXEC_BACKEND
 #define CONFIG_EXEC_PARAMS "global/config_exec_params"
 #define CONFIG_EXEC_PARAMS_NEW "global/config_exec_params.new"
@@ -1591,6 +1593,15 @@ static struct config_bool ConfigureNamesBool[] =
 			gettext_noop("Whether to continue running after a failure to sync data files."),
 		},
 		&data_sync_retry,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
+		{"yc_allow_copy_to_program", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("Whether to enable COPY to or from an external program or file in Yandex"),
+		},
+		&yc_allow_copy_to_program,
 		false,
 		NULL, NULL, NULL
 	},

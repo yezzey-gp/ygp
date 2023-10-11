@@ -338,4 +338,7 @@ typedef struct GpDistributionData
 	HTAB	   *hashmap;
 } GpDistributionData;
 
+
+extern PGDLLIMPORT bool yc_allow_copy_to_program;
+
 #endif /* COPY_H */
