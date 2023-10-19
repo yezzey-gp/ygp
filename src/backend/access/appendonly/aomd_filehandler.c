@@ -83,8 +83,11 @@ ao_foreach_extent_file(ao_extent_callback callback, void *ctx)
     /* discover any remaining concurrency levels */
     for (segno = 1; segno < MAX_AOREL_CONCURRENCY; segno++)
     {
-        if (!callback(segno, ctx))
-            continue;
+        if (!callback(segno, ctx)) {
+            if (!callback(AOTupleId_MultiplierSegmentFileNum + segno, ctx)) {
+                continue;
+            }
+        }
         concurrency[concurrencySize] = segno;
         concurrencySize++;
     }
@@ -94,8 +97,11 @@ ao_foreach_extent_file(ao_extent_callback callback, void *ctx)
         for (colnum = 1; colnum < MaxHeapAttributeNumber; colnum++)
         {
             segno = colnum * AOTupleId_MultiplierSegmentFileNum + concurrency[index];
-            if (!callback(segno, ctx))
-                break;
+            if (!callback(segno, ctx)) {
+                if (colnum > 1) {
+                    break;
+                }
+            }
         }
     }
 }
