@@ -300,18 +300,6 @@ mdunlink_ao_perFile(const int segno, void *ctx)
 							errmsg("could not remove file \"%s\": %m", segPath)));
 	}
 
-	appendStringInfo(&buf, "%s_tmpbuf", segPath);
-	if (unlink(buf.data) != 0)
-	{
-		/* ENOENT is expected after the end of the extensions */
-		if (errno != ENOENT)
-			ereport(WARNING,
-					(errcode_for_file_access(),
-							errmsg("could not remove file \"%s\": %m", buf.data)));
-		else
-			return false;
-	}
-
 	return true;
 }
 
