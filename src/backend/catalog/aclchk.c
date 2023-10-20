@@ -4600,7 +4600,7 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (superuser_arg(roleid) || spc_oid == YEZZEYTABLESPACE_OID)
 		return mask;
 
 	/*
@@ -5416,7 +5416,7 @@ pg_tablespace_ownercheck(Oid spc_oid, Oid roleid)
 	Oid			spcowner;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (superuser_arg(roleid) || spc_oid == YEZZEYTABLESPACE_OID)
 		return true;
 
 	/* Search syscache for pg_tablespace */
