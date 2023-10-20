@@ -154,6 +154,9 @@ RelationDropStorage(Relation rel)
 	pending = (PendingRelDelete *)
 		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
 	pending->relnode.node = rel->rd_node;
+	if (pending->relnode.node.spcNode == YEZZEYTABLESPACE_OID) {
+		pending->relnode.node.spcNode = DEFAULTTABLESPACE_OID;
+	}
 	pending->relnode.relstorage = rel->rd_rel->relstorage;
 	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
 	pending->atCommit = true;	/* delete if commit */
@@ -193,6 +196,9 @@ RelationDropStoragePure(Relation rel)
 	pending = (PendingRelDelete *)
 		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
 	pending->relnode.node = rel->rd_node;
+	if (pending->relnode.node.spcNode == YEZZEYTABLESPACE_OID) {
+		pending->relnode.node.spcNode = DEFAULTTABLESPACE_OID;
+	}
 	pending->relnode.relstorage = rel->rd_rel->relstorage;
 	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
 	pending->atCommit = true;	/* delete if commit */
