@@ -298,6 +298,8 @@ mdunlink_ao_perFile(const int segno, void *ctx)
 			ereport(WARNING,
 					(errcode_for_file_access(),
 							errmsg("could not remove file \"%s\": %m", segPath)));
+		else
+			return false;
 	}
 
 	return true;
