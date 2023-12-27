@@ -15569,7 +15569,6 @@ ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd)
 	rel = NULL;
 	tmprelid = RangeVarGetRelid(tmprv, NoLock, false);
 
-
 	swap_relation_files(relid, tmprelid,
 						false, /* target_is_pg_class */
 						false, /* swap_toast_by_content */
