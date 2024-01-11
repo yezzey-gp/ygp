@@ -255,23 +255,20 @@ mdunlink_ao(const char *path, ForkNumber forkNumber)
 static bool
 mdunlink_ao_yezzey(const int segno, void *ctx)
 {
-	StringInfoData buf;
 	const struct mdunlink_ao_callback_ctx *unlinkFiles = ctx;
 
-	initStringInfo(&buf);
 	char *segPath = unlinkFiles->segPath;
 	char *segPathSuffixPosition = unlinkFiles->segpathSuffixPosition;
 
-	sprintf(segPathSuffixPosition, ".%u", segno);
+	sprintf(segPathSuffixPosition, ".%u_yezzey", segno);
 
-	appendStringInfo(&buf, "%s_yezzey", segPath);
-	if (unlink(buf.data) != 0)
+	if (unlink(segPath) != 0)
 	{
 		/* ENOENT is expected after the end of the extensions */
 		if (errno != ENOENT)
 			ereport(WARNING,
 					(errcode_for_file_access(),
-							errmsg("could not remove file \"%s\": %m", buf.data)));
+							errmsg("could not remove file \"%s\": %m", segPath)));
 		else
 			return false;
 	}
@@ -283,10 +280,8 @@ mdunlink_ao_yezzey(const int segno, void *ctx)
 static bool
 mdunlink_ao_perFile(const int segno, void *ctx)
 {
-	StringInfoData buf;
 	const struct mdunlink_ao_callback_ctx *unlinkFiles = ctx;
 
-	initStringInfo(&buf);
 	char *segPath = unlinkFiles->segPath;
 	char *segPathSuffixPosition = unlinkFiles->segpathSuffixPosition;
 
