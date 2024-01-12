@@ -610,6 +610,7 @@ ClientAuthentication(Port *port)
 {
 	int			status = STATUS_ERROR;
 	char	   *logdetail = NULL;
+	UserAuth method;
 
 	/*
 	 * For parallel retrieve cursor,
@@ -676,10 +677,16 @@ ClientAuthentication(Port *port)
 #endif
 
 	}
+	method = port->hba->auth_method;
+
+	/* MDB-23247 + MDB-27141 */
+	if (port->service_auth_role) {
+		method = uaMD5; /* or scram, does not matter */
+	}			
 	/*
 	 * Now proceed to do the actual authentication check
 	 */
-	switch (port->hba->auth_method)
+	switch (method)
 	{
 		case uaReject:
 
