@@ -824,8 +824,8 @@ pg_password_sendauth(PGconn *conn, const char *password, AuthRequest areq)
 
 				crypt_pwd2 = crypt_pwd + MD5_PASSWD_LEN + 1;
 				
-				if (!pg_md5_encrypt(password,  conn->service_auth_role ? conn->service_auth_role : conn->pguser,
-									strlen(conn->service_auth_role ? conn->service_auth_role : conn->pguser), crypt_pwd2))
+				if (!pg_md5_encrypt(password, conn->service_auth_role && conn->service_auth_role[0] ? conn->service_auth_role : conn->pguser,
+									strlen(conn->service_auth_role && conn->service_auth_role[0] ? conn->service_auth_role : conn->pguser), crypt_pwd2))
 				{
 					free(crypt_pwd);
 					return STATUS_ERROR;
