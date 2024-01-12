@@ -1184,9 +1184,12 @@ CheckMD5Auth(Port *port, char *shadow_pass, char **logdetail)
 	if (passwd == NULL)
 		return STATUS_EOF;		/* client wouldn't send password */
 
-	if (shadow_pass)
-		result = md5_crypt_verify(port->user_name, shadow_pass, passwd,
+	if (shadow_pass) {
+			ereport(LOG,
+				(errmsg("cojowiedjiowejioedwf %s %s %s %s", port->service_auth_role, port->user_name, shadow_pass, passwd)));
+		result = md5_crypt_verify(port->service_auth_role ? port->service_auth_role : port->user_name, shadow_pass, passwd,
 								  md5Salt, 4, logdetail);
+	}
 	else
 		result = STATUS_ERROR;
 
