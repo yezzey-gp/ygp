@@ -981,22 +981,16 @@ DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *processed)
 				 errmsg("COPY single row error handling only available using COPY FROM")));
 
 	/* Disallow COPY to/from file or program except to superusers. */
-	if (!pipe && !superuser())
+	if (!pipe)
 	{
-		if (stmt->is_program) {
-			if (!yc_allow_copy_to_program) {
-				ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
-								errhint("Anyone can COPY to stdout or from stdin. "
-										"psql's \\copy command also works for anyone.")));
-			}
-		} else if (!yc_allow_copy_to_program) {
+		/* not pipe (stdin/stdout) means program or some file */
+		/* we allow this only for superuser with `yc_allow_copy_to_program` specified */
+		if (!(superuser() && yc_allow_copy_to_program)) {
 			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to COPY to or from a file"),
-					 errhint("Anyone can COPY to stdout or from stdin. "
-						   "psql's \\copy command also works for anyone.")));
+						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+							errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+							errhint("Anyone can COPY to stdout or from stdin. "
+									"psql's \\copy command also works for anyone.")));
 		}
 	}
 
