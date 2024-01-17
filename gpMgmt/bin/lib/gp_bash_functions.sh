@@ -1339,6 +1339,10 @@ SET_GP_USER_PW () {
     $PSQL --variable=ON_ERROR_STOP=1 \
       -p $MASTER_PORT \
       -d "$DEFAULTDB" \
+      -c log_statement=none \
+      -c log_min_messages=panic \
+      -c log_min_error_statement=panic \
+      -c log_min_duration_statement=-1 \
       --variable=username="$USER_NAME" \
       --variable=password="$GP_PASSWD" <<< "$alter_statement" >> $LOG_FILE 2>&1
 
