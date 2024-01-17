@@ -340,5 +340,7 @@ typedef struct GpDistributionData
 
 
 extern PGDLLIMPORT bool yc_allow_copy_to_program;
+extern PGDLLIMPORT bool yc_allow_copy_to_file;
+extern PGDLLIMPORT bool yc_allow_copy_from_file;
 
 #endif /* COPY_H */
