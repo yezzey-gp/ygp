@@ -1599,10 +1599,28 @@ static struct config_bool ConfigureNamesBool[] =
 
 	{
 		{"ycmdb.yc_allow_copy_to_program", PGC_POSTMASTER, DEVELOPER_OPTIONS,
-			gettext_noop("Whether to enable COPY to or from an external program or file in Yandex"),
+			gettext_noop("Whether to enable COPY to an external program in Yandex Cloud"),
 		},
 		&yc_allow_copy_to_program,
 		false,
+		NULL, NULL, NULL
+	},
+
+	{
+		{"ycmdb.yc_allow_copy_to_file", PGC_POSTMASTER, DEVELOPER_OPTIONS,
+			gettext_noop("Whether to enable COPY to file in Yandex Cloud"),
+		},
+		&yc_allow_copy_to_file,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
+		{"ycmdb.yc_allow_copy_from_file", PGC_POSTMASTER, DEVELOPER_OPTIONS,
+			gettext_noop("Whether to enable COPY to file in Yandex Cloud"),
+		},
+		&yc_allow_copy_from_file,
+		true,
 		NULL, NULL, NULL
 	},
 

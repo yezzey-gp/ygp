@@ -396,6 +396,8 @@ typedef struct
 #define SizeOfCopyFromDispatchError (offsetof(copy_from_dispatch_error, line_buf_converted) + sizeof(bool))
 
 bool yc_allow_copy_to_program;
+bool yc_allow_copy_to_file;
+bool yc_allow_copy_from_file;
 
 /*
  * Send copy start/stop messages for frontend copies.  These have changed
@@ -994,13 +996,25 @@ DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *processed)
 										"psql's \\copy command also works for anyone.")));
 			}
 		} else {
-			// this is copy to/from file. This only could happen in initdb
-			if (!superuser()) {
-				ereport(ERROR,
-							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("forbidden to COPY to or from file in Yandex Cloud"),
-								errhint("Anyone can COPY to stdout or from stdin. "
-										"psql's \\copy command also works for anyone.")));
+			if (is_from) {
+				// this is copy from file. This only could legitimately happen in initdb
+				if (!(superuser() && yc_allow_copy_from_file)) {
+					ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									errmsg("forbidden to COPY from file in Yandex Cloud"),
+									errhint("Anyone can COPY to stdout or from stdin. "
+											"psql's \\copy command also works for anyone.")));
+				}
+			
+			} else {
+				// this is copy to file.
+				if (!(superuser() && yc_allow_copy_to_file)) {
+					ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									errmsg("forbidden to COPY to file in Yandex Cloud"),
+									errhint("Anyone can COPY to stdout or from stdin. "
+											"psql's \\copy command also works for anyone.")));
+				}
 			}
 		}
 	}
