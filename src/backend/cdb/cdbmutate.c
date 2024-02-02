@@ -45,6 +45,8 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbtargeteddispatch.h"
 
+#include "catalog/pg_tablespace.h"
+
 #include "executor/executor.h"
 
 typedef struct
@@ -1103,7 +1105,7 @@ cdbhash_const_list(List *plConsts, int iSegments, Oid *hashfuncs)
 
 	Assert(0 < list_length(plConsts));
 
-	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs);
+	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs, NIL);
 
 	cdbhashinit(pcdbhash);
 
@@ -1838,6 +1840,11 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 	/* Suppose caller already hold proper locks for relation. */
 	rel = relation_open(rte->relid, NoLock);
 	targetPolicy = rel->rd_cdbpolicy;
+	List *yezzey_key_ranges = NIL;
+	if (rel->rd_node.spcNode == HEAPYTABLESPACE_OID) {
+		// !!!! fix this
+		yezzey_key_ranges = NIL;
+	}
 	hashExprs = getExprListFromTargetList(resultplan->plan.targetlist,
 										  targetPolicy->nattrs,
 										  targetPolicy->attrs);
@@ -1887,7 +1894,7 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 			DirectDispatchUpdateContentIdsForInsert(subroot,
 													&resultplan->plan,
 													targetPolicy,
-													hashFuncs);
+													hashFuncs, yezzey_key_ranges);
 
 			/*
 			 * we now either have a hash-code, or we've marked the plan

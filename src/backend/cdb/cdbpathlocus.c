@@ -33,6 +33,9 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbpathlocus.h"	/* me */
 
+#include "catalog/pg_tablespace.h" /* yezzey */
+
+
 static List *cdb_build_distribution_keys(PlannerInfo *root,
 										 Index rti,
 										 GpPolicy *policy);
@@ -347,6 +350,23 @@ cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy)
 	return result;
 }								/* cdbpathlocus_from_baserel */
 
+
+/*
+ * cdbpathlocus_from_yezzey_dist
+ *
+ * Returns a locus describing the distribution of yezzey relation 
+ * key ranges;
+ */
+CdbPathLocus
+cdbpathlocus_from_yezzey_dist(struct RelOptInfo *rel)
+{
+	CdbPathLocus result;
+
+	CdbPathLocus_MakeYezzey(&result, rel->yezzey_key_ranges);
+
+	return result;
+}
+
 /*
  * cdbpathlocus_from_baserel
  *
@@ -356,6 +376,10 @@ CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo *root,
 						  struct RelOptInfo *rel)
 {
+	/* this is yezzey relation */
+	// if (rel->reltablespace == HEAPYTABLESPACE_OID) {
+	// 	return cdbpathlocus_from_yezzey_dist(rel);
+	// }
 	return cdbpathlocus_from_policy(root, rel->relid, rel->cdbpolicy);
 }								/* cdbpathlocus_from_baserel */
 
@@ -1144,6 +1168,7 @@ cdbpathlocus_is_valid(CdbPathLocus locus)
 	if (!CdbPathLocus_IsGeneral(locus) &&
 		!CdbPathLocus_IsEntry(locus) &&
 		!CdbPathLocus_IsOuterQuery(locus) &&
+		!CdbPathLocus_IsYezzey(locus) &&
 		locus.numsegments == -1)
 		goto bad;
 

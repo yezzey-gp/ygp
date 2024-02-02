@@ -27,7 +27,7 @@
 
 extern void DirectDispatchUpdateContentIdsFromPlan(PlannerInfo *root, Plan *plan);
 extern void DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
-													GpPolicy *targetPolicy, Oid *hashfuncs);
+													GpPolicy *targetPolicy, Oid *hashfuncs, List *yezzey_key_ranges);
 
 extern void MergeDirectDispatchCalculationInfo(DirectDispatchInfo *to, DirectDispatchInfo *from);
 

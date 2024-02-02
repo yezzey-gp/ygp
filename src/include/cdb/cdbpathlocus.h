@@ -59,6 +59,7 @@ typedef enum CdbLocusType
     CdbLocusType_Hashed,        /* hash partitioned over all qExecs of N-gang */
     CdbLocusType_HashedOJ,      /* result of hash partitioned outer join, NULLs can be anywhere */
     CdbLocusType_Strewn,        /* partitioned on no known function */
+    CdbLocusType_Yezzey,        /* partitioned with Yezzey hash */
     CdbLocusType_End            /* = last valid CdbLocusType + 1 */
 } CdbLocusType;
 
@@ -148,8 +149,9 @@ typedef enum CdbLocusType
 typedef struct CdbPathLocus
 {
 	CdbLocusType locustype;
-	List	   *distkey;		/* List of DistributionKeys */
-	int			numsegments;
+	/* list of key-ranges in case of CdbLocusType_Yezzey */
+    List	   *distkey;		/* List of DistributionKeys */
+    int			numsegments;
 } CdbPathLocus;
 
 #define CdbPathLocus_NumSegments(locus)         \
@@ -212,6 +214,8 @@ typedef struct CdbPathLocus
             ((locus).locustype == CdbLocusType_SegmentGeneral)
 #define CdbPathLocus_IsOuterQuery(locus)        \
             ((locus).locustype == CdbLocusType_OuterQuery)
+#define CdbPathLocus_IsYezzey(locus)        \
+            ((locus).locustype == CdbLocusType_Yezzey)
 
 #define CdbPathLocus_MakeSimple(plocus, _locustype, numsegments_) \
     do {                                                \
@@ -251,6 +255,15 @@ typedef struct CdbPathLocus
     } while (0)
 #define CdbPathLocus_MakeStrewn(plocus, numsegments_)                 \
             CdbPathLocus_MakeSimple((plocus), CdbLocusType_Strewn, (numsegments_))
+
+#define CdbPathLocus_MakeYezzey(plocus, distkey_)       \
+    do {                                                \
+        CdbPathLocus *_locus = (plocus);                \
+        _locus->locustype = CdbLocusType_Yezzey;		\
+        _locus->numsegments = -1;                       \
+        _locus->distkey = (distkey_);					\
+        Assert(cdbpathlocus_is_valid(*_locus));         \
+    } while (0)
 
 #define CdbPathLocus_MakeOuterQuery(plocus)                 \
 	CdbPathLocus_MakeSimple((plocus), CdbLocusType_OuterQuery, -1)

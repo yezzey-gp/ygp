@@ -1175,7 +1175,7 @@ doSendTuple(Motion *motion, MotionState *node, TupleTableSlot *outerTupleSlot)
 		uint32		hval = 0;
 
 		econtext->ecxt_outertuple = outerTupleSlot;
-
+		
 		hval = evalHashKey(econtext, node->hashExprs, node->cdbhash);
 
 #ifdef USE_ASSERT_CHECKING

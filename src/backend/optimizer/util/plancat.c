@@ -153,6 +153,10 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
      * CDB: Get partitioning key info for distributed relation.
      */
     rel->cdbpolicy = RelationGetPartitioningKey(relation);
+	/*
+     * Yezzey: Get key ranges key info for distributed yezzey relation.
+     */
+    rel->yezzey_key_ranges = RelationGetYezzeyKey(relation);
 	rel->relam = relation->rd_rel->relam;
 
 	/*

@@ -332,6 +332,7 @@ typedef struct GpDistributionData
 {
 	GpPolicy   *policy;		/* partitioning policy for this table */
 	CdbHash	   *cdbHash;	/* corresponding CdbHash object */
+	Relation   rel; 		/* for yezzey/yeneid dist policies */
 } GpDistributionData;
 
 #endif							/* COPY_H */

@@ -27,7 +27,8 @@ typedef enum
 {
 	REDUCE_LAZYMOD = 1,
 	REDUCE_BITMASK,
-	REDUCE_JUMP_HASH
+	REDUCE_JUMP_HASH,
+	REDUCE_YENEID,
 } CdbHashReduce;
 
 /*
@@ -40,6 +41,7 @@ typedef struct CdbHash
 								 * partitioning  */
 	CdbHashReduce reducealg;	/* the algorithm used for reducing to buckets		*/
 	bool		is_legacy_hash;
+	List        *yezzey_key_ranges;
 
 	int			natts;
 	FmgrInfo   *hashfuncs;
@@ -48,7 +50,7 @@ typedef struct CdbHash
 /*
  * Create and initialize a CdbHash in the current memory context.
  */
-extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids);
+extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids, List *);
 extern CdbHash *makeCdbHashForRelation(Relation rel);
 extern void freeCdbHash(CdbHash *h);
 

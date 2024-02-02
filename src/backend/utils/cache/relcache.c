@@ -4556,6 +4556,23 @@ RelationGetPartitioningKey(Relation relation)
 
 
 /*
+ * RelationGetYezzeyKey -- get yezzey key ranges struct for distributed relation
+ *
+ */
+List*
+RelationGetYezzeyKey(Relation relation)
+{
+
+	/*
+	 * Open and lock the yezzey key range catalog.
+	 */
+	// yezzey_kr_rel = table_open(GpPolicyRelationId, RowExclusiveLock);
+
+	return NIL;
+}                                       /* RelationGetYezzeyKey */
+
+
+/*
  * RelationGetFKeyList -- get a list of foreign key info for the relation
  *
  * Returns a list of ForeignKeyCacheInfo structs, one per FK constraining

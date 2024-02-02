@@ -41,6 +41,8 @@
 #include "executor/executor.h"
 #include "commands/defrem.h"
 
+#include "catalog/pg_tablespace.h"
+
 #define PRINT_DISPATCH_DECISIONS_STRING ("print_dispatch_decisions")
 
 /**
@@ -152,6 +154,15 @@ GetContentIdsFromPlanForSingleRelation(PlannerInfo *root, Plan *plan, int rangeT
 		if (rte->rtekind == RTE_RELATION)
 			relation_close(relation, NoLock);
 		result.haveProcessedAnyCalculations = true;
+		return result;
+	}
+
+	// 
+	if (relation != NULL && relation->rd_node.spcNode == HEAPYTABLESPACE_OID) {
+		// use yezzey(yeneid) hash for yezzey(yeneid) relations
+
+		
+
 		return result;
 	}
 
@@ -549,7 +560,7 @@ DirectDispatchUpdateContentIdsFromPlan(PlannerInfo *root, Plan *plan)
 
 void
 DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
-										GpPolicy *targetPolicy, Oid *hashfuncs)
+										GpPolicy *targetPolicy, Oid *hashfuncs, List *yezzey_key_ranges)
 {
 	DirectDispatchInfo dispatchInfo;
 	int			i;
@@ -605,7 +616,7 @@ DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
 		uint32		hashcode;
 		CdbHash    *h;
 
-		h = makeCdbHash(targetPolicy->numsegments, targetPolicy->nattrs, hashfuncs);
+		h = makeCdbHash(targetPolicy->numsegments, targetPolicy->nattrs, hashfuncs, yezzey_key_ranges);
 
 		cdbhashinit(h);
 		for (i = 0; i < targetPolicy->nattrs; i++)
