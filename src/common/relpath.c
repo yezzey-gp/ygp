@@ -19,6 +19,7 @@
 #endif
 
 #include "catalog/pg_tablespace_d.h"
+#include "catalog/pg_tablespace.h"
 #include "common/relpath.h"
 #include "storage/backendid.h"
 
@@ -112,7 +113,7 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 		Assert(dbNode == 0);
 		return pstrdup("global");
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID)
+	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == HEAPYTABLESPACE_OID)
 	{
 		/* The default tablespace is {datadir}/base */
 		return psprintf("base/%u", dbNode);
@@ -159,7 +160,7 @@ GetRelationPath(Oid dbNode, Oid spcNode, Oid relNode,
 		else
 			path = psprintf("global/%u", relNode);
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID)
+	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == HEAPYTABLESPACE_OID)
 	{
 		/* The default tablespace is {datadir}/base */
 		if (backendId == InvalidBackendId)

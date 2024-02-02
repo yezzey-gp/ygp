@@ -75,7 +75,7 @@ static inline int32 jump_consistent_hash(uint64 key, int32 num_segments);
  * The hash value itself will be initialized for every tuple in cdbhashinit()
  */
 CdbHash *
-makeCdbHash(int numsegs, int natts, Oid *hashfuncs)
+makeCdbHash(int numsegs, int natts, Oid *hashfuncs, List * yezzey_key_ranges)
 {
 	CdbHash    *h;
 	int			i;
@@ -112,6 +112,8 @@ makeCdbHash(int numsegs, int natts, Oid *hashfuncs)
 	 */
 	if (is_legacy_hash)
 		h->reducealg = ispowof2(numsegs) ? REDUCE_BITMASK : REDUCE_LAZYMOD;
+	else if (yezzey_key_ranges != NIL /* yezzey */) 
+		h->reducealg = REDUCE_YENEID, h->yezzey_key_ranges = yezzey_key_ranges;
 	else
 		h->reducealg = REDUCE_JUMP_HASH;
 
@@ -147,7 +149,7 @@ makeCdbHashForRelation(Relation rel)
 		hashfuncs[i] = cdb_hashproc_in_opfamily(opfamily, typeoid);
 	}
 
-	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs);
+	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs, yezzey_key_ranges);
 
 	pfree(hashfuncs);
 	return h;
@@ -260,7 +262,8 @@ cdbhashreduce(CdbHash *h)
 
 	Assert(h->reducealg == REDUCE_BITMASK ||
 		   h->reducealg == REDUCE_LAZYMOD ||
-		   h->reducealg == REDUCE_JUMP_HASH);
+		   h->reducealg == REDUCE_JUMP_HASH ||
+		   h->reducealg == REDUCE_YENEID);
 	Assert(h->natts > 0);
 
 	/*
@@ -278,6 +281,9 @@ cdbhashreduce(CdbHash *h)
 
 		case REDUCE_JUMP_HASH:
 			result = jump_consistent_hash(h->hash, h->numsegs);
+			break;
+		case REDUCE_YENEID:
+			result = 0; // array[h->hash % array.len]
 			break;
 	}
 
