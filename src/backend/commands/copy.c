@@ -7976,8 +7976,6 @@ GetTargetSeg(GpDistributionData *distData, TupleTableSlot *slot)
 	if (!cdbHash)
 		elog(ERROR, "missing cdbhash");
 
-	slot->tts_tableOid;
-
 	/*
 	 * At this point in the code, baseValues[x] is final for this
 	 * data row -- either the input data, a null or a default

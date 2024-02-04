@@ -1105,7 +1105,7 @@ cdbhash_const_list(List *plConsts, int iSegments, Oid *hashfuncs)
 
 	Assert(0 < list_length(plConsts));
 
-	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs, NIL);
+	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs, NULL);
 
 	cdbhashinit(pcdbhash);
 
@@ -1840,10 +1840,10 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 	/* Suppose caller already hold proper locks for relation. */
 	rel = relation_open(rte->relid, NoLock);
 	targetPolicy = rel->rd_cdbpolicy;
-	List *yezzey_key_ranges = NIL;
+	int2vector* yezzey_key_ranges = NULL;
 	if (rel->rd_node.spcNode == HEAPYTABLESPACE_OID) {
 		// !!!! fix this
-		yezzey_key_ranges = NIL;
+		yezzey_key_ranges = RelationGetYezzeyKey(rel);
 	}
 	hashExprs = getExprListFromTargetList(resultplan->plan.targetlist,
 										  targetPolicy->nattrs,

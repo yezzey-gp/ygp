@@ -75,7 +75,7 @@ static inline int32 jump_consistent_hash(uint64 key, int32 num_segments);
  * The hash value itself will be initialized for every tuple in cdbhashinit()
  */
 CdbHash *
-makeCdbHash(int numsegs, int natts, Oid *hashfuncs, List * yezzey_key_ranges)
+makeCdbHash(int numsegs, int natts, Oid *hashfuncs, int2vector* yezzey_key_ranges)
 {
 	CdbHash    *h;
 	int			i;
@@ -149,7 +149,7 @@ makeCdbHashForRelation(Relation rel)
 		hashfuncs[i] = cdb_hashproc_in_opfamily(opfamily, typeoid);
 	}
 
-	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs, yezzey_key_ranges);
+	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs, RelationGetYezzeyKey(rel));
 
 	pfree(hashfuncs);
 	return h;

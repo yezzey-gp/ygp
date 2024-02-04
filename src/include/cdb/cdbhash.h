@@ -50,7 +50,7 @@ typedef struct CdbHash
 /*
  * Create and initialize a CdbHash in the current memory context.
  */
-extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids, List *);
+extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids, int2vector *keys);
 extern CdbHash *makeCdbHashForRelation(Relation rel);
 extern void freeCdbHash(CdbHash *h);
 

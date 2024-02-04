@@ -15,8 +15,8 @@
  *-------------------------------------------------------------------------
  */
 
-#ifndef GP_DISTRIBUTION_POLICY_H
-#define GP_DISTRIBUTION_POLICY_H
+#ifndef GP_YEZZEY_DISTRIB_H
+#define GP_YEZZEY_DISTRIB_H
 
 #include "access/attnum.h"
 #include "access/tupdesc.h"
@@ -43,7 +43,7 @@ FOREIGN_KEY(reloid REFERENCES pg_class(oid));
  *		the format of gp_distribution_policy relation.
  * ----------------
  */
-typedef FormData_yezzey_distrib *Form_yezzey_distrib ;
+typedef FormData_yezzey_distrib *Form_yezzey_distrib;
 
 
-#endif			/* GP_DISTRIBUTION_POLICY_H */
+#endif			/* GP_YEZZEY_DISTRIB_H */

@@ -560,7 +560,7 @@ DirectDispatchUpdateContentIdsFromPlan(PlannerInfo *root, Plan *plan)
 
 void
 DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
-										GpPolicy *targetPolicy, Oid *hashfuncs, List *yezzey_key_ranges)
+										GpPolicy *targetPolicy, Oid *hashfuncs, int2vector* yezzey_key_ranges)
 {
 	DirectDispatchInfo dispatchInfo;
 	int			i;
