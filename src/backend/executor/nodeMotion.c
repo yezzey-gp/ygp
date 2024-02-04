@@ -819,7 +819,7 @@ ExecInitMotion(Motion *node, EState *estate, int eflags)
 		 */
 		motionstate->cdbhash = makeCdbHash(motionstate->numHashSegments,
 										   nkeys,
-										   node->hashFuncs);
+										   node->hashFuncs, NULL);
 	}
 
 	/*

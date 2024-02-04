@@ -102,6 +102,9 @@
 #include "cdb/cdbsreh.h"
 
 
+#include "catalog/yezzey_distrib.h"
+#include "catalog/yezzey_distrib_d.h"
+
 #define RELCACHE_INIT_FILEMAGIC		0x773266	/* version ID value */
 
 /*
@@ -4559,16 +4562,53 @@ RelationGetPartitioningKey(Relation relation)
  * RelationGetYezzeyKey -- get yezzey key ranges struct for distributed relation
  *
  */
-List*
+int2vector*
 RelationGetYezzeyKey(Relation relation)
 {
+	Relation yezzey_kr_rel;
+	ScanKeyData ykey;
+	SysScanDesc yscan;
+	HeapTuple ytup;
+	int2vector *retkeys;
+	Form_yezzey_distrib yForm;
+	TupleDesc	tupleDescriptor;
+
+	retkeys = NULL;
 
 	/*
 	 * Open and lock the yezzey key range catalog.
 	 */
-	// yezzey_kr_rel = table_open(GpPolicyRelationId, RowExclusiveLock);
+	yezzey_kr_rel = table_open(YezzeyDistribRelationId, AccessShareLock);
+	
+	tupleDescriptor = RelationGetDescr(yezzey_kr_rel);
 
-	return NIL;
+
+	/*
+	 * Setup a scan key to find chunks with matching va_valueid
+	 */
+	ScanKeyInit(&ykey,
+				(AttrNumber) Anum_yezzey_distrib_reloid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationGetRelid(relation)));
+
+	
+	yscan = systable_beginscan(yezzey_kr_rel, InvalidOid, false,
+								   SnapshotSelf, 1/*numkeys*/, &ykey);
+
+	if (HeapTupleIsValid(ytup = systable_getnext(yscan)))
+	{
+		bool isNull;
+		yForm = (Form_yezzey_distrib) GETSTRUCT(ytup);
+		retkeys = (int2vector *) DatumGetPointer(
+					heap_getattr(ytup,
+									Anum_yezzey_distrib_distkey, tupleDescriptor,
+									&isNull));
+
+	}
+	systable_endscan(yscan);
+	table_close(yezzey_kr_rel, AccessShareLock);
+
+	return retkeys;
 }                                       /* RelationGetYezzeyKey */
 
 

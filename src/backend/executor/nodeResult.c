@@ -305,7 +305,7 @@ ExecInitResult(Result *node, EState *estate, int eflags)
 
 		resstate->hashFilter = makeCdbHash(currentSlice->planNumSegments,
 										   node->numHashFilterCols,
-										   node->hashFilterFuncs);
+										   node->hashFilterFuncs, NULL);
 	}
 
 	if (!IsResManagerMemoryPolicyNone()

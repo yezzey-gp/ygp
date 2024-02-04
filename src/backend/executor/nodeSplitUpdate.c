@@ -267,7 +267,7 @@ ExecInitSplitUpdate(SplitUpdate *node, EState *estate, int eflags)
 	{
 		splitupdatestate->cdbhash = makeCdbHash(node->numHashSegments,
 												node->numHashAttrs,
-												node->hashFuncs, yezzey_key_ranges);
+												node->hashFuncs, NULL);
 	}
 
 	if (estate->es_instrument && (estate->es_instrument & INSTRUMENT_CDB))
