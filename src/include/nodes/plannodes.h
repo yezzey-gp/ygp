@@ -353,6 +353,8 @@ typedef struct Result
 	int			numHashFilterCols;
 	AttrNumber *hashFilterColIdx;
 	Oid		   *hashFilterFuncs;
+	int			numYezzeyKeyRanges;
+	int      *yezzey_key_ranges;
 } Result;
 
 /* ----------------
@@ -1539,6 +1541,8 @@ typedef struct SplitUpdate
 	AttrNumber *hashAttnos;
 	Oid		   *hashFuncs;			/* corresponding hash functions */
 	int			numHashSegments;	/* # of segs to use in hash computation */
+	int         numYezzeyKeyRanges;
+	int        *yezzey_key_ranges;
 } SplitUpdate;
 
 /*

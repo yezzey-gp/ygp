@@ -7741,8 +7741,10 @@ make_result(List *tlist,
 	node->resconstantqual = resconstantqual;
 
 	node->numHashFilterCols = 0;
+	node->numYezzeyKeyRanges = 0;
 	node->hashFilterColIdx = NULL;
 	node->hashFilterFuncs = NULL;
+	node->yezzey_key_ranges = NULL;
 
 	return node;
 }

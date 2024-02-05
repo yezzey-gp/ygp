@@ -41,7 +41,8 @@ typedef struct CdbHash
 								 * partitioning  */
 	CdbHashReduce reducealg;	/* the algorithm used for reducing to buckets		*/
 	bool		is_legacy_hash;
-	List        *yezzey_key_ranges;
+	int        *yezzey_key_ranges;
+	int         yezzey_key_ranges_sz;
 
 	int			natts;
 	FmgrInfo   *hashfuncs;
@@ -50,7 +51,7 @@ typedef struct CdbHash
 /*
  * Create and initialize a CdbHash in the current memory context.
  */
-extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids, int2vector *keys);
+extern CdbHash *makeCdbHash(int numsegs, int natts, Oid *typeoids, int *yezzey_key_ranges, int yezzey_key_ranges_sz);
 extern CdbHash *makeCdbHashForRelation(Relation rel);
 extern void freeCdbHash(CdbHash *h);
 

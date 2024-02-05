@@ -162,6 +162,9 @@ GetContentIdsFromPlanForSingleRelation(PlannerInfo *root, Plan *plan, int rangeT
 		// use yezzey(yeneid) hash for yezzey(yeneid) relations
 
 		
+		/*  we won't direct dispatch  */
+		if (rte->rtekind == RTE_RELATION)
+			relation_close(relation, NoLock);
 
 		return result;
 	}
@@ -560,7 +563,7 @@ DirectDispatchUpdateContentIdsFromPlan(PlannerInfo *root, Plan *plan)
 
 void
 DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
-										GpPolicy *targetPolicy, Oid *hashfuncs, int2vector* yezzey_key_ranges)
+										GpPolicy *targetPolicy, Oid *hashfuncs, int* yezzey_key_ranges, int yezzey_key_ranges_sz)
 {
 	DirectDispatchInfo dispatchInfo;
 	int			i;
@@ -616,7 +619,7 @@ DirectDispatchUpdateContentIdsForInsert(PlannerInfo *root, Plan *plan,
 		uint32		hashcode;
 		CdbHash    *h;
 
-		h = makeCdbHash(targetPolicy->numsegments, targetPolicy->nattrs, hashfuncs, yezzey_key_ranges);
+		h = makeCdbHash(targetPolicy->numsegments, targetPolicy->nattrs, hashfuncs, yezzey_key_ranges, yezzey_key_ranges_sz);
 
 		cdbhashinit(h);
 		for (i = 0; i < targetPolicy->nattrs; i++)
