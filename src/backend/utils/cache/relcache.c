@@ -4586,7 +4586,7 @@ RelationGetPartitioningKey(Relation relation)
  * RelationGetYezzeyKey -- get yezzey key ranges struct for distributed relation
  *
  */
-int2vector*
+int2vector *
 RelationGetYezzeyKey(Relation relation)
 {
 	Relation yezzey_kr_rel;
@@ -4607,29 +4607,30 @@ RelationGetYezzeyKey(Relation relation)
 	tupleDescriptor = RelationGetDescr(yezzey_kr_rel);
 
 
-	// /*
-	//  * Setup a scan key to find chunks with matching va_valueid
-	//  */
-	// ScanKeyInit(&ykey,
-	// 			(AttrNumber) Anum_yezzey_distrib_reloid,
-	// 			BTEqualStrategyNumber, F_OIDEQ,
-	// 			ObjectIdGetDatum(RelationGetRelid(relation)));
+	/*
+	 * Setup a scan key to find chunks with matching va_valueid
+	 */
+	ScanKeyInit(&ykey,
+				(AttrNumber) Anum_yezzey_distrib_reloid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationGetRelid(relation)));
 
 	
-	// yscan = systable_beginscan(yezzey_kr_rel, InvalidOid, false,
-	// 							   SnapshotSelf, 1/*numkeys*/, &ykey);
+	yscan = systable_beginscan(yezzey_kr_rel, InvalidOid, false,
+								   SnapshotSelf, 1/*numkeys*/, &ykey);
 
-	// if (HeapTupleIsValid(ytup = systable_getnext(yscan)))
-	// {
-	// 	bool isNull;
-	// 	yForm = (Form_yezzey_distrib) GETSTRUCT(ytup);
-	// 	retkeys = (int2vector *) DatumGetPointer(
-	// 				heap_getattr(ytup,
-	// 								Anum_yezzey_distrib_distkey, tupleDescriptor,
-	// 								&isNull));
+	if (HeapTupleIsValid(ytup = systable_getnext(yscan)))
+	{
+		bool isNull;
+		yForm = (Form_yezzey_distrib) GETSTRUCT(ytup);
+		retkeys = (int2vector *) DatumGetPointer(
+					heap_getattr(ytup,
+									Anum_yezzey_distrib_distkey, tupleDescriptor,
+									&isNull));
 
-	// }
-	// systable_endscan(yscan);
+	}
+
+	systable_endscan(yscan);
 	table_close(yezzey_kr_rel, AccessShareLock);
 
 	return retkeys;

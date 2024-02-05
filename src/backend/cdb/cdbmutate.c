@@ -1105,7 +1105,7 @@ cdbhash_const_list(List *plConsts, int iSegments, Oid *hashfuncs)
 
 	Assert(0 < list_length(plConsts));
 
-	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs, NULL);
+	pcdbhash = makeCdbHash(iSegments, list_length(plConsts), hashfuncs, NULL, 0);
 
 	cdbhashinit(pcdbhash);
 
@@ -1802,8 +1802,12 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 	int			numHashAttrs;
 	AttrNumber *hashAttrs;
 	Oid		   *hashFuncs;
+	int        *yezzeyKeyRanges;
 	int			i;
 	ListCell   *cell;
+	int2vector * yezzey_key_ranges;
+
+	yezzey_key_ranges = NULL;
 
 	if (!gp_enable_fast_sri)
 		return NULL;
@@ -1840,7 +1844,6 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 	/* Suppose caller already hold proper locks for relation. */
 	rel = relation_open(rte->relid, NoLock);
 	targetPolicy = rel->rd_cdbpolicy;
-	int2vector* yezzey_key_ranges = NULL;
 	if (rel->rd_node.spcNode == HEAPYTABLESPACE_OID) {
 		// !!!! fix this
 		yezzey_key_ranges = RelationGetYezzeyKey(rel);
@@ -1889,12 +1892,21 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 		for (i = 0; i < numHashAttrs; i++)
 			hashAttrs[i] = targetPolicy->attrs[i];
 
+		if (yezzey_key_ranges != NULL) {
+			/* copy the yezzey array */
+			yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));
+			for (i = 0; i < yezzey_key_ranges->dim1; i++)
+				yezzeyKeyRanges[i] = yezzey_key_ranges->values[i];
+		} else {
+			yezzeyKeyRanges = NULL;
+		}
+
 		if (subroot->config->gp_enable_direct_dispatch)
 		{
 			DirectDispatchUpdateContentIdsForInsert(subroot,
 													&resultplan->plan,
 													targetPolicy,
-													hashFuncs, yezzey_key_ranges);
+													hashFuncs, yezzeyKeyRanges, yezzey_key_ranges ? yezzey_key_ranges->dim1 : 0);
 
 			/*
 			 * we now either have a hash-code, or we've marked the plan
@@ -1905,6 +1917,8 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 		resultplan->numHashFilterCols = numHashAttrs;
 		resultplan->hashFilterColIdx = hashAttrs;
 		resultplan->hashFilterFuncs = hashFuncs;
+		resultplan->numYezzeyKeyRanges = yezzey_key_ranges ? yezzey_key_ranges->dim1 : 0;
+		resultplan->yezzey_key_ranges = yezzeyKeyRanges;
 	}
 	else
 		resultplan = NULL;

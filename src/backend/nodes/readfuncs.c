@@ -2525,6 +2525,8 @@ _readResult(void)
 	READ_INT_FIELD(numHashFilterCols);
 	READ_ATTRNUMBER_ARRAY(hashFilterColIdx, local_node->numHashFilterCols);
 	READ_OID_ARRAY(hashFilterFuncs, local_node->numHashFilterCols);
+	READ_INT_FIELD(numYezzeyKeyRanges);
+	READ_INT_ARRAY(yezzey_key_ranges, local_node->numYezzeyKeyRanges);
 
 	READ_DONE();
 }
