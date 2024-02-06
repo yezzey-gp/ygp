@@ -8092,7 +8092,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 		motion = make_hashed_motion(subplan,
 									hashExprs,
 									hashOpfamilies,
-									numHashSegments);
+									numHashSegments, path->path.locus.numykr, path->path.locus.ykr);
 	}
 	else if (CdbPathLocus_IsOuterQuery(path->path.locus))
 	{
@@ -8163,7 +8163,8 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 
 	/* Hashed redistribution to all QEs in gang above... */
 	else if (CdbPathLocus_IsHashed(path->path.locus) ||
-			 CdbPathLocus_IsHashedOJ(path->path.locus))
+			 CdbPathLocus_IsHashedOJ(path->path.locus) || 
+			 CdbPathLocus_IsYezzey(path->path.locus))
 	{
 		List	   *hashExprs;
 		List	   *hashOpfamilies;
@@ -8178,7 +8179,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
         motion = make_hashed_motion(subplan,
 									hashExprs,
 									hashOpfamilies,
-									numHashSegments);
+									numHashSegments, path->path.locus.numykr, path->path.locus.ykr);
     }
 	/* Hashed redistribution to all QEs in gang above... */
 	else if (CdbPathLocus_IsStrewn(path->path.locus))
@@ -8186,7 +8187,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 		motion = make_hashed_motion(subplan,
 									NIL,
 									NIL,
-									numHashSegments);
+									numHashSegments, 0, NULL);
 	}
 	else
 		elog(ERROR, "unexpected target locus type %d for Motion node", path->path.locus.locustype);

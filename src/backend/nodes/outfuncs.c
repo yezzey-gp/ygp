@@ -1370,6 +1370,8 @@ _outMotion(StringInfo str, const Motion *node)
 	WRITE_INT_FIELD(segidColIdx);
 
 	WRITE_INT_FIELD(numHashSegments);
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
 
 	/* senderSliceInfo is intentionally omitted. It's only used during planning */
 

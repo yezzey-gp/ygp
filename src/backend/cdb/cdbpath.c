@@ -74,7 +74,7 @@ static bool try_redistribute(PlannerInfo *root, CdbpathMfjRel *g,
 
 static SplitUpdatePath *make_splitupdate_path(PlannerInfo *root, Path *subpath, Index rti);
 
-static bool can_elide_explicit_motion(PlannerInfo *root, Index rti, Path *subpath, GpPolicy *policy);
+static bool can_elide_explicit_motion(PlannerInfo *root, Index rti, Path *subpath, GpPolicy *policy, int nykr, int *ykr);
 /*
  * cdbpath_cost_motion
  *    Fills in the cost estimate fields in a MotionPath node.
@@ -2265,7 +2265,7 @@ try_redistribute(PlannerInfo *root, CdbpathMfjRel *g, CdbpathMfjRel *o,
  * distributed correctly for insertion into target table.
  */
 Path *
-create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
+create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, int2vector *ykr, Path *subpath)
 {
 	GpPolicyType	policyType = policy->ptype;
 
@@ -2283,7 +2283,7 @@ create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
 		return cdbpath_create_motion_path(root, subpath, NIL, false, targetLocus);
 	}
 	else
-		return create_motion_path_for_insert(root, policy, subpath);
+		return create_motion_path_for_insert(root, policy, ykr, subpath);
 }
 
 /*
@@ -2291,7 +2291,7 @@ create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
  * distributed correctly for insertion into target table.
  */
 Path *
-create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy,
+create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy, int2vector *ykr,
 							  Path *subpath)
 {
 	GpPolicyType	policyType = policy->ptype;
@@ -2311,7 +2311,7 @@ create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy,
 			subpath->locus.numsegments = policy->numsegments;
 		}
 
-		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget);
+		targetLocus = cdbpathlocus_for_insert(root, policy, ykr, subpath->pathtarget);
 
 		if (policy->nattrs == 0 && CdbPathLocus_IsPartitioned(subpath->locus))
 		{
@@ -2416,7 +2416,7 @@ create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy,
  * instead.
  */
 Path *
-create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy,
+create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy, int2vector *ykr,
 							  Path *subpath)
 {
 	GpPolicyType	policyType = policy->ptype;
@@ -2424,7 +2424,14 @@ create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy,
 
 	if (policyType == POLICYTYPE_PARTITIONED)
 	{
-		if (can_elide_explicit_motion(root, rti, subpath, policy))
+		int * ykrarr = NULL;
+		if (ykr->dim1 > 0) {
+			ykrarr = palloc(ykr->dim1 * sizeof(int));
+			for (int i = 0; i < ykr->dim1; i ++ ) {
+				ykrarr[i] = ykr->values[i];
+			}
+		}
+		if (can_elide_explicit_motion(root, rti, subpath, policy, ykrarr, ykr->dim1))
 			return subpath;
 		else
 		{
@@ -2507,7 +2514,7 @@ create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy,
  * 'rti' is the UPDATE target relation.
  */
 Path *
-create_split_update_path(PlannerInfo *root, Index rti, GpPolicy *policy, Path *subpath)
+create_split_update_path(PlannerInfo *root, Index rti, GpPolicy *policy, int2vector *ykr, Path *subpath)
 {
 	GpPolicyType	policyType = policy->ptype;
 	CdbPathLocus	targetLocus;
@@ -2523,7 +2530,7 @@ create_split_update_path(PlannerInfo *root, Index rti, GpPolicy *policy, Path *s
 		 * e.g. because the input was eliminated by constraint
 		 * exclusion, we can skip it.
 		 */
-		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget);
+		targetLocus = cdbpathlocus_for_insert(root, policy, ykr, subpath->pathtarget);
 
 		subpath = (Path *) make_splitupdate_path(root, subpath, rti);
 		subpath = cdbpath_create_explicit_motion_path(root,
@@ -2664,7 +2671,7 @@ make_splitupdate_path(PlannerInfo *root, Path *subpath, Index rti)
 
 static bool
 can_elide_explicit_motion(PlannerInfo *root, Index rti, Path *subpath,
-						  GpPolicy *policy)
+						  GpPolicy *policy, int nykr, int * ykr)
 {
 	/*
 	 * If there are no Motions between scan of the target relation and here,
@@ -2675,7 +2682,7 @@ can_elide_explicit_motion(PlannerInfo *root, Index rti, Path *subpath,
 
 	if (!CdbPathLocus_IsStrewn(subpath->locus))
 	{
-		CdbPathLocus    resultrelation_locus = cdbpathlocus_from_policy(root, rti, policy);
+		CdbPathLocus    resultrelation_locus = cdbpathlocus_from_policy(root, rti, policy, nykr, ykr);
 		return cdbpathlocus_equal(subpath->locus, resultrelation_locus);
 	}
 

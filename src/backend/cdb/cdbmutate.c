@@ -101,7 +101,9 @@ Motion *
 make_hashed_motion(Plan *lefttree,
 				   List *hashExprs,
 				   List *hashOpfamilies,
-				   int numHashSegments)
+				   int numHashSegments,
+				   int numYezzeyKeyRanges,
+				   int *ykr)
 {
 	Motion	   *motion;
 	Oid		   *hashFuncs;
@@ -109,7 +111,7 @@ make_hashed_motion(Plan *lefttree,
 	ListCell   *opf_cell;
 	int			i;
 
-	Assert(numHashSegments > 0);
+	Assert(numHashSegments > 0 || ykr != NULL);
 	Assert(list_length(hashExprs) == list_length(hashOpfamilies));
 
 	/* Look up the right hash functions for the hash expressions */
@@ -130,6 +132,8 @@ make_hashed_motion(Plan *lefttree,
 	motion->hashExprs = hashExprs;
 	motion->hashFuncs = hashFuncs;
 	motion->numHashSegments = numHashSegments;
+	motion->numYezzeyKeyRanges = numYezzeyKeyRanges;
+	motion->yezzeyKeyRanges = ykr;
 
 	return motion;
 }

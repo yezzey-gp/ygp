@@ -4559,11 +4559,11 @@ RelationGetPartitioningKey(Relation relation)
 
 
 /*
- * RelationGetYezzeyKey -- get yezzey key ranges struct for distributed relation
+ * RelationGetYezzeyKeyByRelid -- get yezzey key ranges struct for distributed relation
  *
  */
 int2vector *
-RelationGetYezzeyKey(Relation relation)
+RelationGetYezzeyKeyByRelid(Oid reloid)
 {
 	Relation yezzey_kr_rel;
 	ScanKeyData ykey;
@@ -4589,7 +4589,7 @@ RelationGetYezzeyKey(Relation relation)
 	ScanKeyInit(&ykey,
 				(AttrNumber) Anum_yezzey_distrib_reloid,
 				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(relation)));
+				ObjectIdGetDatum(reloid));
 
 	
 	yscan = systable_beginscan(yezzey_kr_rel, InvalidOid, false,
@@ -4610,6 +4610,18 @@ RelationGetYezzeyKey(Relation relation)
 	table_close(yezzey_kr_rel, AccessShareLock);
 
 	return retkeys;
+}                                       /* RelationGetYezzeyKeyByRelid */
+
+
+
+/*
+ * RelationGetYezzeyKey -- get yezzey key ranges struct for distributed relation
+ *
+ */
+int2vector *
+RelationGetYezzeyKey(Relation relation)
+{
+	return RelationGetYezzeyKeyByRelid(RelationGetRelid(relation));
 }                                       /* RelationGetYezzeyKey */
 
 
