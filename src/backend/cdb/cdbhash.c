@@ -294,8 +294,9 @@ cdbhashreduce(CdbHash *h)
 		case REDUCE_JUMP_HASH:
 			result = jump_consistent_hash(h->hash, h->numsegs);
 			break;
+
 		case REDUCE_YENEID:
-			result = h->yezzey_key_ranges[h->hash & (h->yezzey_key_ranges_sz - 1)]; // array[h->hash % array.len]
+			result = h->yezzey_key_ranges[h->hash % h->yezzey_key_ranges_sz]; // array[h->hash % array.len]
 			break;
 	}
 

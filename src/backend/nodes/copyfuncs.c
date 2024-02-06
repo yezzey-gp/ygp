@@ -1621,6 +1621,8 @@ _copyMotion(const Motion *from)
 
 	COPY_SCALAR_FIELD(segidColIdx);
 	COPY_SCALAR_FIELD(numHashSegments);
+	COPY_SCALAR_FIELD(numYezzeyKeyRanges);
+	COPY_POINTER_FIELD(yezzeyKeyRanges, from->numYezzeyKeyRanges * sizeof(int));
 
 	if (from->senderSliceInfo)
 	{

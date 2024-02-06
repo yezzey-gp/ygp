@@ -172,6 +172,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
      * Yezzey: Get key ranges key info for distributed yezzey relation.
      */
     rel->yezzey_key_ranges = yezzeyKeyRanges;
+	rel->num_yezzey_key_ranges = yezzey_key_ranges ? yezzey_key_ranges->dim1 : 0;
 	rel->relam = relation->rd_rel->relam;
 
 	/*

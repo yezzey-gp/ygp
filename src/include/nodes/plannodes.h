@@ -1505,6 +1505,8 @@ typedef struct Motion
 	List		*hashExprs;			/* list of hash expressions */
 	Oid			*hashFuncs;			/* corresponding hash functions */
 	int         numHashSegments;	/* the module number of the hash function */
+	int         numYezzeyKeyRanges;	/* number of yezzey key ranges */
+	int         *yezzeyKeyRanges;   /* yezzey key ranges if any for this relation */
 
 	/* For Explicit */
 	AttrNumber segidColIdx;			/* index of the segid column in the target list */

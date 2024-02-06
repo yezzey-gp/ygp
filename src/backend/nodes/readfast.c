@@ -1060,6 +1060,9 @@ _readMotion(void)
 
 	READ_INT_FIELD(segidColIdx);
 	READ_INT_FIELD(numHashSegments);
+	READ_INT_FIELD(numYezzeyKeyRanges);
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
 
 	ReadCommonPlan(&local_node->plan);
 

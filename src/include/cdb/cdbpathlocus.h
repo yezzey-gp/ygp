@@ -152,6 +152,8 @@ typedef struct CdbPathLocus
 	/* list of key-ranges in case of CdbLocusType_Yezzey */
     List	   *distkey;		/* List of DistributionKeys */
     int			numsegments;
+    int         numykr;
+    int         *ykr;
 } CdbPathLocus;
 
 #define CdbPathLocus_NumSegments(locus)         \
@@ -166,7 +168,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_IsEqual(a, b)              \
             ((a).locustype == (b).locustype &&  \
              (a).numsegments == (b).numsegments && \
-             (a).distkey == (b).distkey)
+             (a).distkey == (b).distkey && \
+             (a).numykr == (b).numykr && \
+             (a).ykr == (b).ykr)
 
 #define CdbPathLocus_CommonSegments(a, b) \
             Min((a).numsegments, (b).numsegments)
@@ -192,7 +196,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_IsPartitioned(locus)       \
             (CdbPathLocus_IsHashed(locus) ||    \
              CdbPathLocus_IsHashedOJ(locus) ||  \
-             CdbPathLocus_IsStrewn(locus))
+             CdbPathLocus_IsStrewn(locus) || \
+             CdbPathLocus_IsYezzey(locus))
+
 
 #define CdbPathLocus_IsNull(locus)          \
             ((locus).locustype == CdbLocusType_Null)
@@ -223,6 +229,8 @@ typedef struct CdbPathLocus
         _locus->locustype = (_locustype);               \
         _locus->numsegments = (numsegments_);                        \
         _locus->distkey = NIL;                        \
+        _locus->numykr = 0;                           \
+        _locus->ykr = NULL;                           \
     } while (0)
 
 #define CdbPathLocus_MakeNull(plocus)                   \
@@ -256,12 +264,14 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_MakeStrewn(plocus, numsegments_)                 \
             CdbPathLocus_MakeSimple((plocus), CdbLocusType_Strewn, (numsegments_))
 
-#define CdbPathLocus_MakeYezzey(plocus, distkey_)       \
+#define CdbPathLocus_MakeYezzey(plocus, distkey_, numykr, ykr_)       \
     do {                                                \
         CdbPathLocus *_locus = (plocus);                \
         _locus->locustype = CdbLocusType_Yezzey;		\
         _locus->numsegments = -1;                       \
         _locus->distkey = (distkey_);					\
+        _locus->numykr = (numykr);					     \
+        _locus->ykr = (ykr_);					        \
         Assert(cdbpathlocus_is_valid(*_locus));         \
     } while (0)
 
@@ -276,10 +286,11 @@ extern bool cdbpathlocus_equal(CdbPathLocus a, CdbPathLocus b);
 
 extern CdbPathLocus cdbpathlocus_for_insert(struct PlannerInfo *root,
 											struct GpPolicy *policy,
+                                            int2vector *ykr,
 											struct PathTarget *pathtarget);
 
 CdbPathLocus
-cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy);
+cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy, int nykr, int *ykr);
 CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo   *root,
                           struct RelOptInfo    *rel);
