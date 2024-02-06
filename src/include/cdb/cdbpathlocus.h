@@ -251,6 +251,8 @@ typedef struct CdbPathLocus
         _locus->locustype = CdbLocusType_Hashed;		\
         _locus->numsegments = (numsegments_);           \
         _locus->distkey = (distkey_);					\
+        _locus->numykr = 0;	     			            \
+        _locus->ykr = NULL;					            \
         Assert(cdbpathlocus_is_valid(*_locus));         \
     } while (0)
 #define CdbPathLocus_MakeHashedOJ(plocus, distkey_, numsegments_)     \
@@ -259,6 +261,8 @@ typedef struct CdbPathLocus
         _locus->locustype = CdbLocusType_HashedOJ;		\
         _locus->numsegments = (numsegments_);           \
         _locus->distkey = (distkey_);					\
+        _locus->numykr = 0;	     			            \
+        _locus->ykr = NULL;					            \
         Assert(cdbpathlocus_is_valid(*_locus));         \
     } while (0)
 #define CdbPathLocus_MakeStrewn(plocus, numsegments_)                 \

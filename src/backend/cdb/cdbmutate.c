@@ -77,6 +77,8 @@ make_union_motion(Plan *lefttree)
 	motion->motionType = MOTIONTYPE_GATHER;
 	motion->hashExprs = NIL;
 	motion->hashFuncs = NULL;
+	motion->numYezzeyKeyRanges = 0;
+	motion->yezzeyKeyRanges = NULL;
 
 	return motion;
 }
@@ -93,6 +95,8 @@ make_sorted_union_motion(PlannerInfo *root, Plan *lefttree, int numSortCols,
 	motion->motionType = MOTIONTYPE_GATHER;
 	motion->hashExprs = NIL;
 	motion->hashFuncs = NULL;
+	motion->numYezzeyKeyRanges = 0;
+	motion->yezzeyKeyRanges = NULL;
 
 	return motion;
 }
@@ -148,6 +152,8 @@ make_broadcast_motion(Plan *lefttree)
 	motion->motionType = MOTIONTYPE_BROADCAST;
 	motion->hashExprs = NIL;
 	motion->hashFuncs = NULL;
+	motion->numYezzeyKeyRanges = 0;
+	motion->yezzeyKeyRanges = NULL;
 
 	return motion;
 }
@@ -167,6 +173,8 @@ make_explicit_motion(PlannerInfo *root, Plan *lefttree, AttrNumber segidColIdx)
 	motion->motionType = MOTIONTYPE_EXPLICIT;
 	motion->hashExprs = NIL;
 	motion->hashFuncs = NULL;
+	motion->numYezzeyKeyRanges = 0;
+	motion->yezzeyKeyRanges = NULL;
 	motion->segidColIdx = segidColIdx;
 
 	return (Plan *) motion;

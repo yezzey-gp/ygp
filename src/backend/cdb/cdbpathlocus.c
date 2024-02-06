@@ -226,7 +226,7 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy, int2vector * ykr,
 	bool		failed = false;
 	int         *ykr_ar;
 	ykr_ar = NULL;
-	if (ykr->dim1 > 0) {
+	if (ykr != NULL && ykr->dim1 > 0) {
 		ykr_ar = palloc(ykr->dim1 * sizeof(int));
 		for (int i = 0; i < ykr->dim1; ++ i) {
 			ykr_ar[i] = ykr->values[i];
