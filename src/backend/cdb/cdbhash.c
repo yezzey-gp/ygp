@@ -81,7 +81,7 @@ makeCdbHash(int numsegs, int natts, Oid *hashfuncs, int* yezzey_key_ranges, int 
 	int			i;
 	bool		is_legacy_hash = false;
 
-	Assert(numsegs > 0);		/* verify number of segments is legal. */
+	Assert(numsegs > 0 || yezzey_key_ranges != NULL);		/* verify number of segments is legal. */
 
 	/* Allocate a new CdbHash, with space for the datatype OIDs. */
 	h = palloc(sizeof(CdbHash));

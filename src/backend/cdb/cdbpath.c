@@ -2413,13 +2413,13 @@ create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy, in
 	if (policyType == POLICYTYPE_PARTITIONED)
 	{
 		int * ykrarr = NULL;
-		if (ykr->dim1 > 0) {
+		if (ykr != NULL && ykr->dim1 > 0) {
 			ykrarr = palloc(ykr->dim1 * sizeof(int));
 			for (int i = 0; i < ykr->dim1; i ++ ) {
 				ykrarr[i] = ykr->values[i];
 			}
 		}
-		if (can_elide_explicit_motion(root, rti, subpath, policy, ykrarr, ykr->dim1))
+		if (can_elide_explicit_motion(root, rti, subpath, policy, ykrarr, ykr ? ykr->dim1 : 0))
 			return subpath;
 		else
 		{

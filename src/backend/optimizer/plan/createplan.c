@@ -7241,6 +7241,9 @@ make_motion(PlannerInfo *root, Plan *lefttree,
 	node->collations = collations;
 	node->nullsFirst = nullsFirst;
 
+	node->yezzeyKeyRanges = NULL;
+	node->numYezzeyKeyRanges = 0;
+
 #ifdef USE_ASSERT_CHECKING
 	/*
 	 * If the child node was a Sort, then surely the order the caller gave us
