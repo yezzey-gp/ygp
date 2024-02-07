@@ -4773,6 +4773,100 @@ RelationGetIndexList(Relation relation)
 	return result;
 }
 
+List *
+RelationGetPrjList(Relation relation) {
+	Relation	indrel;
+	SysScanDesc indscan;
+	ScanKeyData skey;
+	HeapTuple	htup;
+	List	   *result;
+	List	   *oldlist;
+	char		replident = relation->rd_rel->relreplident;
+	Oid			pkeyIndex = InvalidOid;
+	Oid			candidateIndex = InvalidOid;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the list. */
+	if (relation->rd_prjvalid)
+		return list_copy(relation->rd_prjlist);
+
+	/*
+	 * We build the list we intend to return (in the caller's context) while
+	 * doing the scan.  After successfully completing the scan, we copy that
+	 * list into the relcache entry.  This avoids cache-context memory leakage
+	 * if we get some sort of error partway through.
+	 */
+	result = NIL;
+
+	/* Prepare to scan pg_index for entries having indrelid = this rel. */
+	ScanKeyInit(&skey,
+				Anum_pg_index_indrelid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationGetRelid(relation)));
+
+	indrel = table_open(IndexRelationId, AccessShareLock);
+	indscan = systable_beginscan(indrel, IndexIndrelidIndexId, true,
+								 NULL, 1, &skey);
+
+	while (HeapTupleIsValid(htup = systable_getnext(indscan)))
+	{
+		Form_pg_index index = (Form_pg_index) GETSTRUCT(htup);
+
+		/*
+		 * Ignore any indexes that are currently being dropped.  This will
+		 * prevent them from being searched, inserted into, or considered in
+		 * HOT-safety decisions.  It's unsafe to touch such an index at all
+		 * since its catalog entries could disappear at any instant.
+		 */
+		if (!index->indislive)
+			continue;
+
+		/* Add index's OID to result list in the proper order */
+		result = insert_ordered_oid(result, index->indexrelid);
+
+		/*
+		 * Invalid, non-unique, non-immediate or predicate indexes aren't
+		 * interesting for either oid indexes or replication identity indexes,
+		 * so don't check them.
+		 */
+		if (!index->indisvalid || !index->indisunique ||
+			!index->indimmediate ||
+			!heap_attisnull(htup, Anum_pg_index_indpred, NULL))
+			continue;
+
+		/* remember primary key index if any */
+		if (index->indisprimary)
+			pkeyIndex = index->indexrelid;
+
+		/* remember explicitly chosen replica index */
+		if (index->indisreplident)
+			candidateIndex = index->indexrelid;
+	}
+
+	systable_endscan(indscan);
+
+	table_close(indrel, AccessShareLock);
+
+	/* Now save a copy of the completed list in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
+	oldlist = relation->rd_indexlist;
+	relation->rd_indexlist = list_copy(result);
+	relation->rd_pkindex = pkeyIndex;
+	if (replident == REPLICA_IDENTITY_DEFAULT && OidIsValid(pkeyIndex))
+		relation->rd_replidindex = pkeyIndex;
+	else if (replident == REPLICA_IDENTITY_INDEX && OidIsValid(candidateIndex))
+		relation->rd_replidindex = candidateIndex;
+	else
+		relation->rd_replidindex = InvalidOid;
+	relation->rd_indexvalid = true;
+	MemoryContextSwitchTo(oldcxt);
+
+	/* Don't leak the old list, if there is one */
+	list_free(oldlist);
+
+	return result;
+}
+
 /*
  * RelationGetStatExtList
  *		get a list of OIDs of statistics objects on this relation
