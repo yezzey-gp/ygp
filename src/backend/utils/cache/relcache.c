@@ -1315,8 +1315,8 @@ retry:
      * initialize Greenplum Database partitioning info
      */
 	if ((
-		(relation->rd_rel->relkind == RELKIND_RELATION 
-	|| relation->rd_rel->relkind == RELKIND_PROJECTION) && !IsSystemRelation(relation)) ||
+		(relation->rd_rel->relkind == RELKIND_RELATION || 
+		relation->rd_rel->relkind == RELKIND_PROJECTION) && !IsSystemRelation(relation)) ||
 		relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE ||
 		relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE ||
 		relation->rd_rel->relkind == RELKIND_MATVIEW)
