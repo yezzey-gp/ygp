@@ -2541,6 +2541,7 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	FreeTriggerDesc(relation->trigdesc);
 	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
+	list_free(relation->rd_prjlist);
 	list_free(relation->rd_statlist);
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
@@ -4839,7 +4840,7 @@ RelationGetPrjList(Relation relation) {
 
 	/* Now save a copy of the completed list in the relcache entry. */
 	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
-	oldlist = relation->rd_indexlist;
+	oldlist = relation->rd_prjlist;
 	relation->rd_prjlist = list_copy(result);
 	relation->rd_prjvalid = true;
 	MemoryContextSwitchTo(oldcxt);
