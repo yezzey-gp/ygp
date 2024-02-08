@@ -3214,7 +3214,7 @@ _outCreateStmt(StringInfo str, const CreateStmt *node)
 static void
 _outCreateProjectionStmt(StringInfo str, const CreateProjectionStmt *node)
 {
-	WRITE_NODE_TYPE("CREATEPROJECTION");
+	WRITE_NODE_TYPE("CREATEPROJECTIONSTMT");
 
 	_outCreateProjectionStmtInfo(str, (const CreateProjectionStmt *) node);
 }

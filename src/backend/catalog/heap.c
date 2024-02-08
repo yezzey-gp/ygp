@@ -1860,6 +1860,7 @@ heap_create_with_catalog(const char *relname,
 		MemoryContext oldcontext;
 
 		Assert(relkind == RELKIND_RELATION ||
+			   relkind == RELKIND_PROJECTION ||
 			   relkind == RELKIND_PARTITIONED_TABLE ||
 			   relkind == RELKIND_MATVIEW ||
 			   relkind == RELKIND_FOREIGN_TABLE);

@@ -30,21 +30,11 @@ CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 {
 	Oid			prjrelid;		/* OID of the projection */
 	Oid			projectionrelid;		/* OID of the relation it projectiones */
-	int16		prjkeyatts;	   /* number of key columns in projection */
-	bool		prjisvalid;		/* is this projection valid for use by queries? */
-	bool		prjcheckxmin;	/* must we wait for xmin to be old? */
-	bool		prjisready;		/* is this projection ready for inserts? */
-	bool		prjislive;		/* is this projection alive at all? */
-
-	/* variable-length fields start here, but we allow direct access to indkey */
-	int2vector	prjkey;			/* column numbers of projectioned cols, or 0 */
 
 #ifdef CATALOG_VARLEN
-	pg_node_tree projectionprs;		/* expression trees for projection attributes that
-								 * are not simple column references; one for
-								 * each zero entry in indkey[] */
-	pg_node_tree prjpred;		/* expression tree for predicate, if a partial
-								 * projection; else NULL */
+	/* variable-length fields start here, but we allow direct access to indkey */
+	/* int2vector	prjkey;	*/		/* column numbers of projectioned cols, or 0 */
+	/* currently we store projection key in gp_distr_policy */
 #endif
 } FormData_pg_projection;
 

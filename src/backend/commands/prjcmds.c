@@ -24,11 +24,55 @@
 #include "access/table.h"
 #include "utils/rel.h"
 
+#include "utils/builtins.h"
+
 #include "catalog/oid_dispatch.h"
 #include "access/xact.h"
 
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp_query.h"
+
+static void UpdateProjectionRelation();
+
+
+static void
+UpdateProjectionRelation(Oid prjoid,
+					Oid heapoid)
+{
+	Datum		values[Natts_ygp_prj];
+	bool		nulls[Natts_ygp_prj];
+	Relation	ygp_prj;
+	HeapTuple	tuple;
+	int			i;
+
+
+	/*
+	 * open the system catalog index relation
+	 */
+	ygp_prj = table_open(ProjectionRelationId, RowExclusiveLock);
+
+	/*
+	 * Build a pg_index tuple
+	 */
+	MemSet(nulls, false, sizeof(nulls));
+
+	values[Anum_ygp_prj_prjrelid - 1] = ObjectIdGetDatum(prjoid);
+	values[Anum_ygp_prj_projectionrelid - 1] = ObjectIdGetDatum(heapoid);
+
+	tuple = heap_form_tuple(RelationGetDescr(ygp_prj), values, nulls);
+
+	/*
+	 * insert the tuple into the pg_index catalog
+	 */
+	CatalogTupleInsert(ygp_prj, tuple);
+
+	/*
+	 * close the relation and free the tuple
+	 */
+	table_close(ygp_prj, RowExclusiveLock);
+	heap_freetuple(tuple);
+}
+
 
 ObjectAddress
 DefineProjection(Oid relationId,
@@ -85,7 +129,7 @@ DefineProjection(Oid relationId,
 		RELPERSISTENCE_PERMANENT /* persistance */,
 		false /*shared*/, false /*mapped*/,
       	ONCOMMIT_NOOP, 
-		 NULL /* GP Policy */, 
+		policy /* GP Policy */, 
 		(Datum)0,
 		false /* use_user_acl */,
     	true,
@@ -100,6 +144,15 @@ DefineProjection(Oid relationId,
 	CommandCounterIncrement();
 
 
+	UpdateProjectionRelation(
+		prjOid,
+		relationId
+	);
+
+  	/* Make this changes visible */
+	CommandCounterIncrement();
+
+	
 	/* It is now safe to dispatch */
 	if (shouldDispatch)
 	{
@@ -119,17 +172,6 @@ DefineProjection(Oid relationId,
 	}
 
 	ObjectAddressSet(address, ProjectionRelationId, prjOid);
-	
-
-	/*
-	 * store index's pg_class entry
-	 */
-	// InsertPgClassTuple(pg_class, indexRelation,
-	// 				   RelationGetRelid(indexRelation),
-	// 				   (Datum) 0,
-	// 				   reloptions);
-
-	// UpdateIndexRelation
 
 	elog(LOG, "creating projection");
 

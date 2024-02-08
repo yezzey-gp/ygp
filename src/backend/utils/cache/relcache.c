@@ -3673,9 +3673,14 @@ RelationBuildLocalRelation(const char *relname,
 		relkind == RELKIND_MATVIEW)
 		RelationInitTableAccessMethod(rel);
 
+	/* GPDB */	
 	if (relkind == RELKIND_AOSEGMENTS ||
 		relkind == RELKIND_AOVISIMAP ||
 		relkind == RELKIND_AOBLOCKDIR)
+		RelationInitTableAccessMethod(rel);
+
+	/* YGP */	
+	if (relkind == RELKIND_PROJECTION)
 		RelationInitTableAccessMethod(rel);
 
 	/*

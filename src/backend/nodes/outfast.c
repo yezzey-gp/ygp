@@ -1844,7 +1844,6 @@ _outNode(StringInfo str, void *obj)
 			case T_RestrictInfo:
 				_outRestrictInfo(str, obj);
 				break;
-
 			case T_CreateProjectionStmt:
 				_outCreateProjectionStmt(str, obj);
 				break;
