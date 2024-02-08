@@ -2950,7 +2950,7 @@ transformDistributedBy(ParseState *pstate,
 			 * take care of marking them NOT NULL.
 			 */
 			if (!found && !cxt->isalter)
-				ereport(ERROR,
+				ereport(WARNING,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" named in DISTRIBUTED BY clause does not exist", colname),
 						 parser_errposition(pstate, dkelem->location)));
