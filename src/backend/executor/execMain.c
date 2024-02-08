@@ -2583,6 +2583,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 	for (i = 0; i < estate->es_num_result_relations; i++)
 	{
 		ExecCloseIndices(resultRelInfo);
+		ExecCloseProjection(resultRelInfo);
 		resultRelInfo++;
 	}
 

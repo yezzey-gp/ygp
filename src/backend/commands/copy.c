@@ -3677,6 +3677,14 @@ CopyMultiInsertBufferFlush(CopyMultiInsertInfo *miinfo,
 			list_free(recheckIndexes);
 		}
 
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(buffer->slots[i],
+								estate);
+		}
+
+
 		/*
 		 * There's no indexes, but see if we need to run AFTER ROW INSERT
 		 * triggers anyway.
@@ -4045,6 +4053,7 @@ CopyFrom(CopyState cstate)
 	CheckValidResultRel(resultRelInfo, CMD_INSERT);
 
 	ExecOpenIndices(resultRelInfo, false);
+	ExecOpenProjections(resultRelInfo);
 
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
@@ -4874,6 +4883,7 @@ CopyFrom(CopyState cstate)
 		table_dml_finish(target_resultRelInfo->ri_RelationDesc);
 
 	ExecCloseIndices(target_resultRelInfo);
+	ExecCloseProjection(target_resultRelInfo);
 
 	/* Close all the partitioned tables, leaf partitions, and their indices */
 	if (proute)

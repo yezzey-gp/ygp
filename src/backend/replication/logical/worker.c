@@ -631,12 +631,14 @@ apply_handle_insert(StringInfo s)
 	MemoryContextSwitchTo(oldctx);
 
 	ExecOpenIndices(estate->es_result_relation_info, false);
+	ExecOpenProjections(estate->es_result_relation_info);
 
 	/* Do the insert. */
 	ExecSimpleRelationInsert(estate, remoteslot);
 
 	/* Cleanup. */
 	ExecCloseIndices(estate->es_result_relation_info);
+	ExecCloseProjection(estate->es_result_relation_info);
 
 	finish_estate(estate);
 
@@ -754,6 +756,8 @@ apply_handle_update(StringInfo s)
 	fill_extraUpdatedCols(target_rte, rel->localrel);
 
 	ExecOpenIndices(estate->es_result_relation_info, false);
+	ExecOpenProjections(estate->es_result_relation_info);
+
 
 	/* Build the search tuple. */
 	oldctx = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
@@ -813,6 +817,7 @@ apply_handle_update(StringInfo s)
 	/* Cleanup. */
 	EvalPlanQualEnd(&epqstate);
 	ExecCloseIndices(estate->es_result_relation_info);
+	ExecCloseProjection(estate->es_result_relation_info);
 
 	finish_estate(estate);
 
@@ -868,6 +873,8 @@ apply_handle_delete(StringInfo s)
 	EvalPlanQualInit(&epqstate, estate, NULL, NIL, -1);
 
 	ExecOpenIndices(estate->es_result_relation_info, false);
+	ExecOpenProjections(estate->es_result_relation_info);
+
 
 	/* Find the tuple using the replica identity index. */
 	oldctx = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
@@ -909,6 +916,7 @@ apply_handle_delete(StringInfo s)
 	/* Cleanup. */
 	EvalPlanQualEnd(&epqstate);
 	ExecCloseIndices(estate->es_result_relation_info);
+	ExecCloseProjection(estate->es_result_relation_info);
 
 	finish_estate(estate);
 

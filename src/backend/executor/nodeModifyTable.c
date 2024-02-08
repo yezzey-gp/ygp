@@ -666,6 +666,13 @@ ExecInsert(ModifyTableState *mtstate,
 										   NULL,
 										   specToken);
 
+			/* insert rpj' tuples if needed */
+			if (resultRelInfo->ri_NumProjection > 0)
+			{
+				ExecInsertProjectionTuples(slot,
+									estate);
+			}
+
 			/* insert index entries for tuple */
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, true,
 												   &specConflict,
@@ -708,6 +715,13 @@ ExecInsert(ModifyTableState *mtstate,
 			if (resultRelInfo->ri_NumIndices > 0)
 				recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
 													   NIL);
+
+			/* insert rpj' tuples if needed */
+			if (resultRelInfo->ri_NumProjection > 0)
+			{
+				ExecInsertProjectionTuples(slot,
+									estate);
+			}
 		}
 	}
 	if (canSetTag)
@@ -1721,6 +1735,13 @@ lreplace:;
 		/* insert index entries for tuple if necessary */
 		if (resultRelInfo->ri_NumIndices > 0 && update_indexes)
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL, NIL);
+		
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(slot,
+								estate);
+		}
 	}
 	if (canSetTag)
 		(estate->es_processed)++;
@@ -2893,6 +2914,15 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			resultRelInfo->ri_IndexRelationDescs == NULL)
 			ExecOpenIndices(resultRelInfo,
 							node->onConflictAction != ONCONFLICT_NONE);
+
+		/*
+		 * If there are projections on the result relation, open them and save
+		 * descriptors in the result relation info, so that we can add new
+		 * index entries for the tuples we add/update. 
+		 */
+		if (resultRelInfo->ri_RelationDesc->rd_rel->relhasindex &&
+			resultRelInfo->ri_IndexRelationDescs == NULL)
+			ExecOpenProjections(resultRelInfo);
 
 		/*
 		 * If this is an UPDATE and a BEFORE UPDATE trigger is present, the

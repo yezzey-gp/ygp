@@ -1259,6 +1259,7 @@ ExecCleanupTupleRouting(ModifyTableState *mtstate,
 			table_dml_finish(resultRelInfo->ri_RelationDesc);
 
 		ExecCloseIndices(resultRelInfo);
+		ExecCloseProjection(resultRelInfo);
 		table_close(resultRelInfo->ri_RelationDesc, NoLock);
 	}
 }
