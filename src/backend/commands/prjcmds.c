@@ -24,6 +24,10 @@
 #include "access/table.h"
 #include "utils/rel.h"
 
+#include "catalog/oid_dispatch.h"
+#include "access/xact.h"
+
+#include "cdb/cdbvars.h"
 
 ObjectAddress
 DefineProjection(Oid relationId,
@@ -36,6 +40,7 @@ DefineProjection(Oid relationId,
 	Oid			namespaceId;
 	Relation rel;
 	Oid prjOid;
+	ObjectAddress address;
 
 	rel = table_open(relationId, ShareLock);
 	/*
@@ -85,7 +90,24 @@ DefineProjection(Oid relationId,
 		false /* valid_opts */
 	);
 
+
+  	/* Make this prj visible */
+	CommandCounterIncrement();
+
+
+  if (Gp_role != GP_ROLE_DISPATCH) {
+    /*  */
+
+  } else {
+    /* clear all pre-assigned oids */
+    GetAssignedOidsForDispatch();
+  }
+
 	table_close(rel, ShareLock);
+
+	ObjectAddressSet(address, ProjectionRelationId, prjOid);
 	
 	elog(LOG, "creating projection");
+
+	return address;
 }
