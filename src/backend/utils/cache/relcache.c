@@ -493,6 +493,7 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_VIEW:
 		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
+		case RELKIND_PROJECTION:
 			amoptsfn = NULL;
 			break;
 		case RELKIND_INDEX:
@@ -1275,6 +1276,11 @@ retry:
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
+			Assert(relation->rd_rel->relam != InvalidOid);
+			RelationInitTableAccessMethod(relation);
+			break;
+		/* YGP */
+		case RELKIND_PROJECTION:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
@@ -3794,6 +3800,12 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
+			table_relation_set_new_filenode(relation, &newrnode,
+											persistence,
+											&freezeXid, &minmulti);
+			break;
+
+		case RELKIND_PROJECTION:
 			table_relation_set_new_filenode(relation, &newrnode,
 											persistence,
 											&freezeXid, &minmulti);

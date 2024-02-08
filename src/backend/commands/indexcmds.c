@@ -3265,6 +3265,7 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		 * are processed.
 		 */
 		if (classtuple->relkind != RELKIND_RELATION &&
+		    classtuple->relkind != RELKIND_PROJECTION &&
 			classtuple->relkind != RELKIND_MATVIEW)
 			continue;
 

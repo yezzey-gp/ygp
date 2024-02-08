@@ -2045,6 +2045,7 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 	switch (resultRel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			CheckCmdReplicaIdentity(resultRel, operation);
 			break;
@@ -2222,6 +2223,7 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;

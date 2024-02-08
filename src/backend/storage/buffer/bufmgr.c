@@ -2972,6 +2972,7 @@ RelationGetNumberOfBlocksInFork(Relation relation, ForkNumber forkNum)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
+		case RELKIND_PROJECTION:
 			{
 				/*
 				 * Not every table AM uses BLCKSZ wide fixed size blocks.

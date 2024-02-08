@@ -1254,6 +1254,7 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_MATVIEW:
 		case RELKIND_TOASTVALUE:
 		case RELKIND_AOSEGMENTS:

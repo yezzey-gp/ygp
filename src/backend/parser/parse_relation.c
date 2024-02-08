@@ -1291,7 +1291,7 @@ addRangeTableEntry(ParseState *pstate,
 		if (!rel)
 			elog(ERROR, "open relation(%u) fail", relid);
 
-		if (rel->rd_rel->relkind != RELKIND_RELATION ||
+		if ((rel->rd_rel->relkind != RELKIND_RELATION || rel->rd_rel->relkind != RELKIND_PROJECTION) ||
 			GpPolicyIsReplicated(rel->rd_cdbpolicy) ||
 			RelationIsAppendOptimized(rel))
 			pstate->p_canOptSelectLockingClause = false;
@@ -2455,6 +2455,7 @@ isSimplyUpdatableRelation(Oid relid, bool noerror)
 		}
 
 		if (rel->rd_rel->relkind != RELKIND_RELATION &&
+		    rel->rd_rel->relkind != RELKIND_PROJECTION &&
 			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 		{
 			if (!noerror)

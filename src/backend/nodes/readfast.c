@@ -761,6 +761,7 @@ _readCreateStmt_common(CreateStmt *local_node)
 	 * during serialization/deserialization
 	 */
 	Assert(local_node->relKind == RELKIND_RELATION ||
+        	local_node->relKind == RELKIND_PROJECTION||
 		   local_node->relKind == RELKIND_PARTITIONED_TABLE ||
 		   local_node->relKind == RELKIND_INDEX ||
 		   local_node->relKind == RELKIND_SEQUENCE ||

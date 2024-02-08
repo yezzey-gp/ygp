@@ -1372,6 +1372,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		rte = rt_fetch(rtr->rtindex, pstate->p_rtable);
 		/* We only support this on plain relations and matviews */
 		if (rte->relkind != RELKIND_RELATION &&
+	    	rte->relkind != RELKIND_PROJECTION &&
 			rte->relkind != RELKIND_MATVIEW &&
 			rte->relkind != RELKIND_PARTITIONED_TABLE)
 			ereport(ERROR,

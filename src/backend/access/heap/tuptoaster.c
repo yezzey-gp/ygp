@@ -602,13 +602,14 @@ toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative)
 	 * We should only ever be called for tuples of plain relations ---
 	 * recursing on a toast rel is bad news.
 	 */
-	Assert(rel->rd_rel->relkind == RELKIND_RELATION);
+	Assert(rel->rd_rel->relkind == RELKIND_RELATION || rel->rd_rel->relkind == RELKIND_PROJECTION);
 
 	/*
 	 * We should only ever be called for tuples of plain relations or
 	 * materialized views --- recursing on a toast rel is bad news.
 	 */
 	Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
+	       rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		   rel->rd_rel->relkind == RELKIND_MATVIEW);
 
 	/*
@@ -724,6 +725,7 @@ toast_insert_or_update_generic(Relation rel, void *newtup, void *oldtup,
 	 * materialized views --- recursing on a toast rel is bad news.
 	 */
 	Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
+	       rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		   rel->rd_rel->relkind == RELKIND_MATVIEW);
 
 	/*

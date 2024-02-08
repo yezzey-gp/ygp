@@ -772,6 +772,7 @@ static void
 check_relation_relkind(Relation rel)
 {
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
+	    rel->rd_rel->relkind != RELKIND_PROJECTION &&
 		rel->rd_rel->relkind != RELKIND_MATVIEW &&
 		rel->rd_rel->relkind != RELKIND_TOASTVALUE)
 		ereport(ERROR,

@@ -3281,6 +3281,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 
 					relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
 					if (relkind == RELKIND_RELATION ||
+					    relkind == RELKIND_PROJECTION ||
 						relkind == RELKIND_MATVIEW ||
 						relkind == RELKIND_PARTITIONED_TABLE ||
 						IsAppendonlyMetadataRelkind(relkind))

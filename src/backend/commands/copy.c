@@ -2547,7 +2547,7 @@ BeginCopyTo(ParseState *pstate,
 		0
 	};
 
-	if (rel != NULL && rel->rd_rel->relkind != RELKIND_RELATION && rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+	if (rel != NULL && rel->rd_rel->relkind != RELKIND_RELATION && rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE && rel->rd_rel->relkind != RELKIND_PROJECTION)
 	{
 		if (rel->rd_rel->relkind == RELKIND_VIEW)
 			ereport(ERROR,
@@ -3881,6 +3881,7 @@ CopyFrom(CopyState cstate)
 	 * allowed on views, so we only hint about them in the view case.)
 	 */
 	if (cstate->rel->rd_rel->relkind != RELKIND_RELATION &&
+	    cstate->rel->rd_rel->relkind != RELKIND_PROJECTION &&
 		cstate->rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 		cstate->rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE &&
 		!(cstate->rel->trigdesc &&
