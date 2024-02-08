@@ -783,6 +783,28 @@ _readCreateStmt(void)
 	READ_DONE();
 }
 
+
+static void
+_readCreateProjection_common(CreateProjectionStmt *local_node)
+{
+	READ_NODE_FIELD(relation);
+	READ_STRING_FIELD(prjname);
+	READ_STRING_FIELD(accessMethod);
+	READ_STRING_FIELD(tableSpace);
+	READ_STRING_FIELD(prjcomment);
+	READ_NODE_FIELD(distributedBy);
+}
+
+
+static CreateProjectionStmt *
+_readCreateProjection(void) {
+	READ_LOCALS(CreateProjectionStmt);
+
+	_readCreateProjection_common(local_node);
+
+	READ_DONE();
+}
+
 static CreateRangeStmt *
 _readCreateRangeStmt(void)
 {
@@ -2124,6 +2146,9 @@ readNodeBinary(void)
 				break;
 			case T_CreateStmt:
 				return_value = _readCreateStmt();
+				break;
+			case T_CreateProjectionStmt:
+				return_value = _readCreateProjection();
 				break;
 			case T_CreateForeignTableStmt:
 				return_value = _readCreateForeignTableStmt();

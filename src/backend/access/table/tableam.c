@@ -62,6 +62,7 @@ table_slot_callbacks(Relation relation)
 		 * that case here.
 		 */
 		Assert(relation->rd_rel->relkind == RELKIND_VIEW ||
+				relation->rd_rel->relkind == RELKIND_PROJECTION ||
 			   relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
 		tts_cb = &TTSOpsVirtual;
 	}

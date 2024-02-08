@@ -29,7 +29,7 @@ extern void RemoveObjects(DropStmt *stmt);
 extern ObjectAddress DefineProjection(Oid relationId,
 								 CreateProjectionStmt *stmt,
 								 Oid prjRelationId,
-								 bool check_rights);
+								 bool check_rights, bool dispatch);
 
 /* commands/indexcmds.c */
 extern ObjectAddress DefineIndex(Oid relationId,

@@ -4031,7 +4031,7 @@ transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
 	MemoryContextDelete(cxt.tempCtx);
 
 	/* Mark statement as successfully transformed */
-	stmt->transformed = true;
+	// stmt->transformed = true;
 
 	return stmt;
 }

@@ -3193,11 +3193,30 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 }
 
 static void
+_outCreateProjectionStmtInfo(StringInfo str, const CreateProjectionStmt *node) {
+	WRITE_NODE_FIELD(relation);
+	WRITE_STRING_FIELD(prjname);
+	WRITE_STRING_FIELD(accessMethod);
+	WRITE_STRING_FIELD(tableSpace);
+	WRITE_STRING_FIELD(prjcomment);
+	WRITE_NODE_FIELD(distributedBy);
+}
+
+static void
 _outCreateStmt(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_TYPE("CREATESTMT");
 
 	_outCreateStmtInfo(str, (const CreateStmt *) node);
+}
+
+
+static void
+_outCreateProjectionStmt(StringInfo str, const CreateProjectionStmt *node)
+{
+	WRITE_NODE_TYPE("CREATEPROJECTION");
+
+	_outCreateProjectionStmtInfo(str, (const CreateProjectionStmt *) node);
 }
 
 static void

@@ -1017,7 +1017,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * the already-processed options from the QD.
 	 */
 
-	if ((relkind == RELKIND_RELATION || relkind == RELKIND_MATVIEW ||
+	if ((relkind == RELKIND_RELATION || relkind == RELKIND_PROJECTION || relkind == RELKIND_MATVIEW ||
 		 relkind == RELKIND_PARTITIONED_TABLE) &&
 		Gp_role != GP_ROLE_EXECUTE)
 	{

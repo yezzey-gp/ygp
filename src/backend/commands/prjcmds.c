@@ -28,12 +28,14 @@
 #include "access/xact.h"
 
 #include "cdb/cdbvars.h"
+#include "cdb/cdbdisp_query.h"
 
 ObjectAddress
 DefineProjection(Oid relationId,
 			CreateProjectionStmt *stmt,
 			Oid prjRelationId,
-			bool check_rights)
+			bool check_rights,
+			bool dispatch)
 {
 	GpPolicy   *policy;
 	TupleDesc	descriptor;
@@ -41,6 +43,9 @@ DefineProjection(Oid relationId,
 	Relation rel;
 	Oid prjOid;
 	ObjectAddress address;
+	bool		shouldDispatch = dispatch &&
+								 Gp_role == GP_ROLE_DISPATCH &&
+                                 IsNormalProcessingMode();
 
 	rel = table_open(relationId, ShareLock);
 	/*
@@ -95,19 +100,42 @@ DefineProjection(Oid relationId,
 	CommandCounterIncrement();
 
 
-  if (Gp_role != GP_ROLE_DISPATCH) {
-    /*  */
+	/* It is now safe to dispatch */
+	if (shouldDispatch)
+	{
+		/*
+		 * Dispatch the statement tree to all primary and mirror segdbs.
+		 * Doesn't wait for the QEs to finish execution.
+		 *
+		 * The OIDs are carried out-of-band.
+		 */
 
-  } else {
-    /* clear all pre-assigned oids */
-    GetAssignedOidsForDispatch();
-  }
-
-	table_close(rel, ShareLock);
+		CdbDispatchUtilityStatement((Node *) stmt,
+									DF_CANCEL_ON_ERROR |
+									DF_NEED_TWO_PHASE |
+									DF_WITH_SNAPSHOT,
+									GetAssignedOidsForDispatch(),
+									NULL);
+	}
 
 	ObjectAddressSet(address, ProjectionRelationId, prjOid);
 	
+
+	/*
+	 * store index's pg_class entry
+	 */
+	// InsertPgClassTuple(pg_class, indexRelation,
+	// 				   RelationGetRelid(indexRelation),
+	// 				   (Datum) 0,
+	// 				   reloptions);
+
+	// UpdateIndexRelation
+
 	elog(LOG, "creating projection");
+
+
+	table_close(rel, ShareLock);
+
 
 	return address;
 }

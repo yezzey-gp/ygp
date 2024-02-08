@@ -9960,7 +9960,6 @@ PrjStmt: CREATE PROJECTION projection_name ON relation_expr DistributedBy
 
 		n->prjname = $3;
 		n->relation = $5;
-		n->prjOid = InvalidOid;
 
 		n->distributedBy = (DistributedBy *) $6;
 

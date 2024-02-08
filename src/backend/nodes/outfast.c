@@ -1845,6 +1845,9 @@ _outNode(StringInfo str, void *obj)
 				_outRestrictInfo(str, obj);
 				break;
 
+			case T_CreateProjectionStmt:
+				_outCreateProjectionStmt(str, obj);
+				break;
 			default:
 				elog(ERROR, "could not serialize unrecognized node type: %d",
 						 (int) nodeTag(obj));

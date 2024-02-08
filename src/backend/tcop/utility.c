@@ -1871,7 +1871,8 @@ ProcessUtilitySlow(ParseState *pstate,
 						reloid,
 						prjstmt,
 						InvalidOid/* no pre-defined oid */,
-						true /* do check rights */
+						true /* do check rights */,
+						true /* should dispatch on segs*/
 					);
 				}
 
