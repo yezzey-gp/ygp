@@ -2920,8 +2920,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		 * descriptors in the result relation info, so that we can add new
 		 * index entries for the tuples we add/update. 
 		 */
-		if (resultRelInfo->ri_RelationDesc->rd_rel->relhasindex &&
-			resultRelInfo->ri_IndexRelationDescs == NULL)
+		if (resultRelInfo->ri_PrjRelationDescs == NULL)
 			ExecOpenProjections(resultRelInfo);
 
 		/*

@@ -36,7 +36,7 @@ CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 	/* int2vector	prjkey;	*/		/* column numbers of projectioned cols, or 0 */
 	/* currently we store projection key in gp_distr_policy */
 #endif
-} FormData_pg_projection;
+} FormData_ypg_projection;
 
 
 /* */
@@ -49,6 +49,6 @@ FOREIGN_KEY(prjrelid REFERENCES pg_class(oid));
  *		the format of ygp_prj relation.
  * ----------------
  */
-typedef FormData_pg_projection *Form_pg_projection;
+typedef FormData_ypg_projection *Form_ypg_projection;
 
 #endif							/* PG_PROJECTION_H */

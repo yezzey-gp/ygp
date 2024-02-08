@@ -97,6 +97,7 @@
 #include "catalog/gp_distribution_policy.h"         /* GpPolicy */
 #include "catalog/heap.h"
 #include "catalog/index.h"
+#include "catalog/ygp_prj.h"
 #include "cdb/cdbtm.h"
 #include "cdb/cdbvars.h"        /* Gp_role */
 #include "cdb/cdbsreh.h"
@@ -4794,15 +4795,12 @@ RelationGetIndexList(Relation relation)
 
 List *
 RelationGetPrjList(Relation relation) {
-	Relation	indrel;
-	SysScanDesc indscan;
+	Relation	prjrel;
+	SysScanDesc prjscan;
 	ScanKeyData skey;
 	HeapTuple	htup;
 	List	   *result;
 	List	   *oldlist;
-	char		replident = relation->rd_rel->relreplident;
-	Oid			pkeyIndex = InvalidOid;
-	Oid			candidateIndex = InvalidOid;
 	MemoryContext oldcxt;
 
 	/* Quick exit if we already computed the list. */
@@ -4817,67 +4815,33 @@ RelationGetPrjList(Relation relation) {
 	 */
 	result = NIL;
 
-	/* Prepare to scan pg_index for entries having indrelid = this rel. */
+	/* Prepare to scan ygp_prj for entries having projectionrelid = this rel. */
 	ScanKeyInit(&skey,
-				Anum_pg_index_indrelid,
+				Anum_ygp_prj_projectionrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(relation)));
 
-	indrel = table_open(IndexRelationId, AccessShareLock);
-	indscan = systable_beginscan(indrel, IndexIndrelidIndexId, true,
+	prjrel = table_open(ProjectionRelationId, AccessShareLock);
+	prjscan = systable_beginscan(prjrel, InvalidOid, true,
 								 NULL, 1, &skey);
 
-	while (HeapTupleIsValid(htup = systable_getnext(indscan)))
+	while (HeapTupleIsValid(htup = systable_getnext(prjscan)))
 	{
-		Form_pg_index index = (Form_pg_index) GETSTRUCT(htup);
-
-		/*
-		 * Ignore any indexes that are currently being dropped.  This will
-		 * prevent them from being searched, inserted into, or considered in
-		 * HOT-safety decisions.  It's unsafe to touch such an index at all
-		 * since its catalog entries could disappear at any instant.
-		 */
-		if (!index->indislive)
-			continue;
+		Form_ypg_projection prj = (Form_ypg_projection) GETSTRUCT(htup);
 
 		/* Add index's OID to result list in the proper order */
-		result = insert_ordered_oid(result, index->indexrelid);
-
-		/*
-		 * Invalid, non-unique, non-immediate or predicate indexes aren't
-		 * interesting for either oid indexes or replication identity indexes,
-		 * so don't check them.
-		 */
-		if (!index->indisvalid || !index->indisunique ||
-			!index->indimmediate ||
-			!heap_attisnull(htup, Anum_pg_index_indpred, NULL))
-			continue;
-
-		/* remember primary key index if any */
-		if (index->indisprimary)
-			pkeyIndex = index->indexrelid;
-
-		/* remember explicitly chosen replica index */
-		if (index->indisreplident)
-			candidateIndex = index->indexrelid;
+		result = insert_ordered_oid(result, prj->prjrelid);
 	}
 
-	systable_endscan(indscan);
+	systable_endscan(prjscan);
 
-	table_close(indrel, AccessShareLock);
+	table_close(prjrel, AccessShareLock);
 
 	/* Now save a copy of the completed list in the relcache entry. */
 	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
 	oldlist = relation->rd_indexlist;
-	relation->rd_indexlist = list_copy(result);
-	relation->rd_pkindex = pkeyIndex;
-	if (replident == REPLICA_IDENTITY_DEFAULT && OidIsValid(pkeyIndex))
-		relation->rd_replidindex = pkeyIndex;
-	else if (replident == REPLICA_IDENTITY_INDEX && OidIsValid(candidateIndex))
-		relation->rd_replidindex = candidateIndex;
-	else
-		relation->rd_replidindex = InvalidOid;
-	relation->rd_indexvalid = true;
+	relation->rd_prjlist = list_copy(result);
+	relation->rd_prjvalid = true;
 	MemoryContextSwitchTo(oldcxt);
 
 	/* Don't leak the old list, if there is one */
@@ -6109,6 +6073,8 @@ load_relcache_init_file(bool shared)
 			rel->rd_refcnt = 0;
 		rel->rd_indexvalid = false;
 		rel->rd_indexlist = NIL;
+		rel->rd_prjvalid = false;
+		rel->rd_prjlist = NIL;
 		rel->rd_pkindex = InvalidOid;
 		rel->rd_replidindex = InvalidOid;
 		rel->rd_indexattr = NULL;
