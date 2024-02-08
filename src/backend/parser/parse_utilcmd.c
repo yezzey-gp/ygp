@@ -3977,6 +3977,64 @@ transformIndexStmt(Oid relid, IndexStmt *stmt, const char *queryString)
 	return stmt;
 }
 
+CreateProjectionStmt *
+transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
+									 const char *queryString) {
+	ParseState *pstate;
+	bool bQuiet;
+	DistributedBy*likeDistributedBy;
+	CreateStmtContext cxt;
+
+	likeDistributedBy = NULL;
+
+	bQuiet = false;
+
+	cxt.tempCtx =
+		AllocSetContextCreate(CurrentMemoryContext,
+							  "CreateStmt analyze context",
+							  ALLOCSET_DEFAULT_MINSIZE,
+							  ALLOCSET_DEFAULT_INITSIZE,
+							  ALLOCSET_DEFAULT_MAXSIZE);
+
+	cxt.relation = stmt->relation;
+	cxt.rel = NULL;
+	cxt.inhRelations = NULL;
+	cxt.isalter = false;
+	cxt.columns = NIL;
+	cxt.ckconstraints = NIL;
+	cxt.fkconstraints = NIL;
+	cxt.ixconstraints = NIL;
+	cxt.inh_indexes = NIL;
+	cxt.likeclauses = NIL;
+	cxt.extstats = NIL;
+	cxt.attr_encodings = NULL;
+	cxt.blist = NIL;
+	cxt.alist = NIL;
+	cxt.pkey = NULL;
+	cxt.ispartitioned = false;
+	cxt.partbound = NULL;
+	cxt.ofType = false;
+
+	/* Set up pstate */
+	pstate = make_parsestate(NULL);
+	pstate->p_sourcetext = queryString;
+	/*
+	 * Transform DISTRIBUTED BY (or construct a default one, if not given
+	 * explicitly).
+	 */
+	
+	stmt->distributedBy = transformDistributedBy(pstate, &cxt,
+													stmt->distributedBy,
+													likeDistributedBy, bQuiet);
+	free_parsestate(pstate);
+
+	MemoryContextDelete(cxt.tempCtx);
+
+	/* Mark statement as successfully transformed */
+	stmt->transformed = true;
+
+	return stmt;
+}
 
 /*
  * transformRuleStmt -

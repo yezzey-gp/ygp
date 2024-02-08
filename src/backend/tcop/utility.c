@@ -1851,6 +1851,31 @@ ProcessUtilitySlow(ParseState *pstate,
 					EventTriggerAlterTableEnd();
 				}
 				break;
+			
+			case T_CreateProjectionStmt:
+				{
+					Oid			reloid;
+					CreateProjectionStmt  *prjstmt = (CreateProjectionStmt *) parsetree;
+
+					reloid =
+							RangeVarGetRelidExtended(prjstmt->relation, ShareLock,
+												 0,
+												 RangeVarCallbackOwnsRelation,
+												 NULL);
+
+
+					/* Run parse analysis ... */
+					prjstmt = transformPrjStmt(reloid, prjstmt, queryString);
+
+					address = DefineProjection(
+						reloid,
+						prjstmt,
+						InvalidOid/* no pre-defined oid */,
+						true /* do check rights */
+					);
+				}
+
+				break;
 
 			case T_CreateExtensionStmt:
 				address = CreateExtension(pstate, (CreateExtensionStmt *) parsetree);
@@ -2785,6 +2810,10 @@ CreateCommandTag(Node *parsetree)
 			tag = "CREATE EXTENSION";
 			break;
 
+		case T_CreateProjectionStmt:
+			tag = "CREATE PROJECTION";
+			break;
+
 		case T_AlterExtensionStmt:
 			tag = "ALTER EXTENSION";
 			break;
@@ -3604,6 +3633,7 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateStmt:
+		case T_CreateProjectionStmt:
 		case T_CreateForeignTableStmt:
 			lev = LOGSTMT_DDL;
 			break;

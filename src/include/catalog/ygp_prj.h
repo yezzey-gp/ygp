@@ -49,7 +49,7 @@ CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 } FormData_pg_projection;
 
 
-/* GPDB added foreign key definitions for gpcheckcat. */
+/* */
 FOREIGN_KEY(projectionrelid REFERENCES pg_class(oid));
 FOREIGN_KEY(prjrelid REFERENCES pg_class(oid));
 /*   alter table ygp_prj add vector_fk indclass on pg_opclass(oid); */
@@ -60,17 +60,5 @@ FOREIGN_KEY(prjrelid REFERENCES pg_class(oid));
  * ----------------
  */
 typedef FormData_pg_projection *Form_pg_projection;
-
-#ifdef EXPOSE_TO_CLIENT_CODE
-
-/*
- * projection AMs that support ordered scans must support these two indoption
- * bits.  Otherwise, the content of the per-column indoption fields is
- * open for future definition.
- */
-#define INDOPTION_DESC			0x0001	/* values are in reverse order */
-#define INDOPTION_NULLS_FIRST	0x0002	/* NULLs are first instead of last */
-
-#endif							/* EXPOSE_TO_CLIENT_CODE */
 
 #endif							/* PG_PROJECTION_H */

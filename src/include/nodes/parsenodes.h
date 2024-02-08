@@ -3303,6 +3303,41 @@ typedef struct IndexStmt
 										 * executing */
 } IndexStmt;
 
+
+/* ----------------------
+ *		Create Projection Statement
+
+ * ----------------------
+ */
+typedef struct ProjectionStmt
+{
+	NodeTag		type;
+	char	   *prjname;		/* name of new index, or NULL for default */
+	RangeVar   *relation;		/* relation to build index on */
+	Oid			relationOid;
+	char	   *accessMethod;	/* name of access method (eg. btree) */
+	char	   *tableSpace;		/* tablespace, or NULL for default */
+	List	   *indexParams;	/* columns to index: a list of IndexElem */
+
+	List	   *options;		/* WITH clause options: a list of DefElem */
+	Node	   *whereClause;	/* qualification (partial-index predicate) */
+	List	   *excludeOpNames; /* exclusion operator names, or NIL if none */
+	char	   *prjcomment;		/* comment to apply to index, or NULL */
+	Oid			prjOid;		/* OID of an existing index, if any */
+	Oid			oldNode;		/* relfilenode of existing storage, if any */
+	bool		isconstraint;	/* is it for a pkey/unique constraint? */
+	bool		deferrable;		/* is the constraint DEFERRABLE? */
+	bool		initdeferred;	/* is the constraint INITIALLY DEFERRED? */
+	bool		transformed;	/* true when transformIndexStmt is finished */
+	bool		concurrent;		/* should this be a concurrent index build? */
+	bool		if_not_exists;	/* just do nothing if index already exists? */
+	bool		reset_default_tblspc;	/* reset default_tablespace prior to
+										 * executing */
+
+	DistributedBy *distributedBy;   /* what columns we distribute the data by */
+} CreateProjectionStmt;
+
+
 /* ----------------------
  *		Create Statistics Statement
  * ----------------------

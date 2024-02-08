@@ -1339,6 +1339,7 @@ AddNewRelationTuple(Relation pg_class_desc,
 	switch (relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_MATVIEW:
 		case RELKIND_INDEX:
 		case RELKIND_TOASTVALUE:

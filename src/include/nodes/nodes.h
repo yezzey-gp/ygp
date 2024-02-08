@@ -488,6 +488,10 @@ typedef enum NodeTag
 	T_CreateForeignTableStmt,
 	T_ImportForeignSchemaStmt,
 	T_CreateExtensionStmt,
+
+	/* ygp addition */
+	T_CreateProjectionStmt,
+
 	T_AlterExtensionStmt,
 	T_AlterExtensionContentsStmt,
 	T_CreateEventTrigStmt,

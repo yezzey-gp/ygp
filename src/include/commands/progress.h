@@ -85,6 +85,7 @@
 /* 3, 4 and 5 reserved for "waitfor" metrics */
 #define PROGRESS_CREATEIDX_COMMAND				0
 #define PROGRESS_CREATEIDX_INDEX_OID			6
+#define PROGRESS_CREATEPRJ_OID		        	7
 #define PROGRESS_CREATEIDX_ACCESS_METHOD_OID	8
 #define PROGRESS_CREATEIDX_PHASE				9	/* AM-agnostic phase # */
 #define PROGRESS_CREATEIDX_SUBPHASE				10	/* phase # filled by AM */
