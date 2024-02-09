@@ -1685,7 +1685,7 @@ typedef enum SetOperation
 typedef struct DistributedBy
 {
 	NodeTag		type;
-	GpPolicyType ptype;
+	int ptype;
 	int			numsegments;
 	List	   *keyCols;	/* valid when ptype is POLICYTYPE_PARTITIONED */
 } DistributedBy;

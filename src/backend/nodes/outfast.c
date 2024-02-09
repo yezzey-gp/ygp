@@ -213,6 +213,18 @@
 		} \
 	}
 
+
+/* Write an INT2 	array  */
+#define WRITE_INT2_ARRAY(fldname, count) \
+	if ( (count) > 0 ) \
+	{ \
+		int i; \
+		for(i = 0; i < (count); i++) \
+		{ \
+			appendBinaryStringInfo(str, (const char *)&node->fldname[i], sizeof(short)); \
+		} \
+	}
+
 static void _outNode(StringInfo str, void *obj);
 
 #define outDatum(str, value, typlen, typbyval) _outDatum(str, value, typlen, typbyval)

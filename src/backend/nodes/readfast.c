@@ -1060,6 +1060,9 @@ _readMotion(void)
 
 	READ_INT_FIELD(segidColIdx);
 	READ_INT_FIELD(numHashSegments);
+	READ_INT_FIELD(numYezzeyKeyRanges);
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
 
 	ReadCommonPlan(&local_node->plan);
 
@@ -1079,9 +1082,11 @@ _readSplitUpdate(void)
 	READ_NODE_FIELD(deleteColIdx);
 
 	READ_INT_FIELD(numHashSegments);
+	READ_INT_FIELD(numYezzeyKeyRanges);
 	READ_INT_FIELD(numHashAttrs);
 	READ_ATTRNUMBER_ARRAY(hashAttnos, local_node->numHashAttrs);
 	READ_OID_ARRAY(hashFuncs, local_node->numHashAttrs);
+	READ_INT_ARRAY(yezzey_key_ranges, local_node->numYezzeyKeyRanges);
 
 	ReadCommonPlan(&local_node->plan);
 

@@ -151,6 +151,19 @@ static void outChar(StringInfo str, char c);
 			appendStringInfo(str, " %u", node->fldname[i]); \
 	} while(0)
 
+
+/* Write an INT2 	array  */
+#define WRITE_INT2_ARRAY(fldname, count) \
+	if ( (count) > 0 ) \
+	{ \
+		int i; \
+		for(i = 0; i < (count); i++) \
+		{ \
+			appendBinaryStringInfo(str, (const char *)&node->fldname[i], sizeof(short)); \
+		} \
+	}
+
+
 #define WRITE_INT_ARRAY(fldname, len) \
 	do { \
 		appendStringInfoString(str, " :" CppAsString(fldname) " "); \
@@ -546,6 +559,9 @@ _outResult(StringInfo str, const Result *node)
 	WRITE_INT_FIELD(numHashFilterCols);
 	WRITE_ATTRNUMBER_ARRAY(hashFilterColIdx, node->numHashFilterCols);
 	WRITE_OID_ARRAY(hashFilterFuncs, node->numHashFilterCols);
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzey_key_ranges, node->numYezzeyKeyRanges);
 }
 
 static void
@@ -1354,6 +1370,8 @@ _outMotion(StringInfo str, const Motion *node)
 	WRITE_INT_FIELD(segidColIdx);
 
 	WRITE_INT_FIELD(numHashSegments);
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
 
 	/* senderSliceInfo is intentionally omitted. It's only used during planning */
 
@@ -1373,9 +1391,11 @@ _outSplitUpdate(StringInfo str, const SplitUpdate *node)
 	WRITE_NODE_FIELD(deleteColIdx);
 
 	WRITE_INT_FIELD(numHashSegments);
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
 	WRITE_INT_FIELD(numHashAttrs);
 	WRITE_ATTRNUMBER_ARRAY(hashAttnos, node->numHashAttrs);
 	WRITE_OID_ARRAY(hashFuncs, node->numHashAttrs);
+	WRITE_INT_ARRAY(yezzey_key_ranges, node->numYezzeyKeyRanges);
 
 	_outPlanInfo(str, (Plan *) node);
 }

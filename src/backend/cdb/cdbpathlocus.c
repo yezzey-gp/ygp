@@ -33,6 +33,9 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbpathlocus.h"	/* me */
 
+#include "catalog/pg_tablespace.h" /* yezzey */
+
+
 static List *cdb_build_distribution_keys(PlannerInfo *root,
 										 Index rti,
 										 GpPolicy *policy);
@@ -74,9 +77,20 @@ cdbpathlocus_equal(CdbPathLocus a, CdbPathLocus b)
 		list_length(a.distkey) != list_length(b.distkey))
 		return false;
 
-	if ((CdbPathLocus_IsHashed(a) || CdbPathLocus_IsHashedOJ(a)) &&
-		(CdbPathLocus_IsHashed(b) || CdbPathLocus_IsHashedOJ(b)))
+	if (CdbPathLocus_IsYezzey(a) && !CdbPathLocus_IsYezzey(b)) {
+		return false;
+	}
+
+	if (!CdbPathLocus_IsYezzey(a) && CdbPathLocus_IsYezzey(b)) {
+		return false;
+	}
+
+	if ((CdbPathLocus_IsHashed(a) || CdbPathLocus_IsHashedOJ(a) || CdbPathLocus_IsYezzey(a)) &&
+		(CdbPathLocus_IsHashed(b) || CdbPathLocus_IsHashedOJ(b) || CdbPathLocus_IsYezzey(b)))
 	{
+		if (CdbPathLocus_IsYezzey(a) && CdbPathLocus_IsYezzey(b)) {
+			// ! check arrays
+		}
 		forboth(acell, a.distkey, bcell, b.distkey)
 		{
 			DistributionKey *adistkey = (DistributionKey *) lfirst(acell);
@@ -199,7 +213,7 @@ cdb_build_distribution_keys(PlannerInfo *root, Index rti, GpPolicy *policy)
  * is always partitioned type.
  */
 CdbPathLocus
-cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
+cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy, int2vector * ykr,
 						PathTarget *pathtarget)
 {
 	CdbPathLocus targetLocus;
@@ -210,6 +224,14 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
 	List	   *distkeys = NIL;
 	Index		maxRef = 0;
 	bool		failed = false;
+	int         *ykr_ar;
+	ykr_ar = NULL;
+	if (ykr != NULL && ykr->dim1 > 0) {
+		ykr_ar = palloc(ykr->dim1 * sizeof(int));
+		for (int i = 0; i < ykr->dim1; ++ i) {
+			ykr_ar[i] = ykr->values[i];
+		}
+	}
 
 	for (int i = 0; i < list_length(pathtarget->exprs); i++)
 		maxRef = Max(maxRef, pathtarget->sortgrouprefs[i]);
@@ -280,8 +302,10 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
 		distkeys = lappend(distkeys, cdistkey);
 	}
 
-	if (failed)
-	{
+	if (ykr != NULL) {
+		int numykr = ykr->dim1;
+		CdbPathLocus_MakeYezzey(&targetLocus, distkeys, numykr, ykr_ar);
+	} else if (failed) {
 		CdbPathLocus_MakeNull(&targetLocus);
 	}
 	else if (distkeys)
@@ -301,7 +325,7 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
  * Returns a locus describing the distribution of a policy
  */
 CdbPathLocus
-cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy)
+cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy, int numykr, int *ykr)
 {
 	CdbPathLocus result;
 
@@ -320,7 +344,9 @@ cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy)
 															   rti,
 															   policy);
 
-			if (distkeys)
+			if (ykr != NULL) {
+				CdbPathLocus_MakeYezzey(&result, distkeys, numykr, ykr);
+			} else if (distkeys)
 				CdbPathLocus_MakeHashed(&result, distkeys, policy->numsegments);
 			else
 			{
@@ -356,7 +382,7 @@ CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo *root,
 						  struct RelOptInfo *rel)
 {
-	return cdbpathlocus_from_policy(root, rel->relid, rel->cdbpolicy);
+	return cdbpathlocus_from_policy(root, rel->relid, rel->cdbpolicy, rel->num_yezzey_key_ranges, rel->yezzey_key_ranges);
 }								/* cdbpathlocus_from_baserel */
 
 
@@ -543,37 +569,35 @@ cdbpathlocus_get_distkey_exprs(CdbPathLocus locus,
 	ListCell   *distkeycell;
 
 	Assert(cdbpathlocus_is_valid(locus));
+	Assert(CdbPathLocus_IsHashed(locus) || CdbPathLocus_IsHashedOJ(locus) || CdbPathLocus_IsYezzey(locus));
 
 	*exprs_p = NIL;
 	*opfamilies_p = NIL;
 
-	if (CdbPathLocus_IsHashed(locus) || CdbPathLocus_IsHashedOJ(locus))
+	foreach(distkeycell, locus.distkey)
 	{
-		foreach(distkeycell, locus.distkey)
+		DistributionKey *distkey = (DistributionKey *) lfirst(distkeycell);
+		ListCell   *ec_cell;
+		Expr	   *item = NULL;
+
+		foreach(ec_cell, distkey->dk_eclasses)
 		{
-			DistributionKey *distkey = (DistributionKey *) lfirst(distkeycell);
-			ListCell   *ec_cell;
-			Expr	   *item = NULL;
+			EquivalenceClass *dk_eclass = (EquivalenceClass *) lfirst(ec_cell);
 
-			foreach(ec_cell, distkey->dk_eclasses)
-			{
-				EquivalenceClass *dk_eclass = (EquivalenceClass *) lfirst(ec_cell);
+			item = cdbpullup_findEclassInTargetList(dk_eclass, targetlist,
+													distkey->dk_opfamily);
 
-				item = cdbpullup_findEclassInTargetList(dk_eclass, targetlist,
-														distkey->dk_opfamily);
-
-				if (item)
-					break;
-			}
-			if (!item)
-				return;
-
-			result_exprs = lappend(result_exprs, item);
-			result_opfamilies = lappend_oid(result_opfamilies, distkey->dk_opfamily);
+			if (item)
+				break;
 		}
-		*exprs_p = result_exprs;
-		*opfamilies_p = result_opfamilies;
+		if (!item)
+			return;
+
+		result_exprs = lappend(result_exprs, item);
+		result_opfamilies = lappend_oid(result_opfamilies, distkey->dk_opfamily);
 	}
+	*exprs_p = result_exprs;
+	*opfamilies_p = result_opfamilies;
 }								/* cdbpathlocus_get_distkey_exprs */
 
 
@@ -1119,7 +1143,7 @@ cdbpathlocus_is_valid(CdbPathLocus locus)
 	if (!CdbLocusType_IsValid(locus.locustype))
 		goto bad;
 
-	if (!CdbPathLocus_IsHashed(locus) && !CdbPathLocus_IsHashedOJ(locus) && locus.distkey != NIL)
+	if (!CdbPathLocus_IsHashed(locus) && !CdbPathLocus_IsHashedOJ(locus) && !CdbPathLocus_IsYezzey(locus) && locus.distkey != NIL)
 		goto bad;
 
 	if (CdbPathLocus_IsHashed(locus) || CdbPathLocus_IsHashedOJ(locus))
@@ -1144,6 +1168,7 @@ cdbpathlocus_is_valid(CdbPathLocus locus)
 	if (!CdbPathLocus_IsGeneral(locus) &&
 		!CdbPathLocus_IsEntry(locus) &&
 		!CdbPathLocus_IsOuterQuery(locus) &&
+		!CdbPathLocus_IsYezzey(locus) &&
 		locus.numsegments == -1)
 		goto bad;
 

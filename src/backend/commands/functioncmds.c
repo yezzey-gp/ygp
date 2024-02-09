@@ -704,7 +704,7 @@ validate_sql_exec_location(char exec_location, bool proretset)
 
 		case PROEXECLOCATION_COORDINATOR:
 			if (!proretset)
-				ereport(ERROR,
+				ereport(WARNING,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("EXECUTE ON COORDINATOR is only supported for set-returning functions")));
 			break;
@@ -718,7 +718,7 @@ validate_sql_exec_location(char exec_location, bool proretset)
 
 		case PROEXECLOCATION_ALL_SEGMENTS:
 			if (!proretset)
-				ereport(ERROR,
+				ereport(WARNING,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("EXECUTE ON ALL SEGMENTS is only supported for set-returning functions")));
 			break;

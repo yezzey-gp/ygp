@@ -294,6 +294,7 @@ _copyResult(const Result *from)
 	{
 		COPY_POINTER_FIELD(hashFilterColIdx, from->numHashFilterCols * sizeof(AttrNumber));
 		COPY_POINTER_FIELD(hashFilterFuncs, from->numHashFilterCols * sizeof(Oid));
+		COPY_POINTER_FIELD(yezzey_key_ranges, from->numYezzeyKeyRanges * sizeof(int));
 	}
 
 	return newnode;
@@ -1621,6 +1622,8 @@ _copyMotion(const Motion *from)
 
 	COPY_SCALAR_FIELD(segidColIdx);
 	COPY_SCALAR_FIELD(numHashSegments);
+	COPY_SCALAR_FIELD(numYezzeyKeyRanges);
+	COPY_POINTER_FIELD(yezzeyKeyRanges, from->numYezzeyKeyRanges * sizeof(int));
 
 	if (from->senderSliceInfo)
 	{
@@ -1649,9 +1652,11 @@ _copySplitUpdate(const SplitUpdate *from)
 	COPY_NODE_FIELD(deleteColIdx);
 
 	COPY_SCALAR_FIELD(numHashSegments);
+	COPY_SCALAR_FIELD(numYezzeyKeyRanges);
 	COPY_SCALAR_FIELD(numHashAttrs);
 	COPY_POINTER_FIELD(hashAttnos, from->numHashAttrs * sizeof(AttrNumber));
 	COPY_POINTER_FIELD(hashFuncs, from->numHashAttrs * sizeof(Oid));
+	COPY_POINTER_FIELD(yezzey_key_ranges, from->numYezzeyKeyRanges * sizeof(int));
 
 	return newnode;
 }

@@ -332,7 +332,7 @@ cdbllize_get_final_locus(PlannerInfo *root, PathTarget *target)
 			if (intoPolicy->ptype == POLICYTYPE_PARTITIONED &&
 				intoPolicy->nattrs > 0)
 			{
-				return cdbpathlocus_for_insert(root, intoPolicy, target);
+				return cdbpathlocus_for_insert(root, intoPolicy, NULL, target);
 			}
 			else if (intoPolicy->ptype == POLICYTYPE_REPLICATED)
 			{
@@ -388,6 +388,8 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 {
 	Query	   *query = root->parse;
 	GpPolicy   *targetPolicy = NULL;
+	int2vector *yezzey_key_ranges;
+	yezzey_key_ranges = NULL;
 
 	/*
 	 * NOTE: This code makes the assumption that if we are working on a
@@ -401,6 +403,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 		Assert(rte->rtekind == RTE_RELATION);
 
 		targetPolicy = GpPolicyFetch(rte->relid);
+		yezzey_key_ranges = RelationGetYezzeyKeyByRelid(rte->relid);
 	}
 
 	if (query->commandType == CMD_SELECT && query->parentStmtType == PARENTSTMTTYPE_CTAS)
@@ -526,7 +529,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target list will correspond to the attributes of
 			 * the target relation in order.
 			 */
-			best_path = create_motion_path_for_ctas(root, targetPolicy,
+			best_path = create_motion_path_for_ctas(root, targetPolicy, yezzey_key_ranges,
 													best_path);
 		}
 
@@ -570,7 +573,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target list will correspond to the attributes of
 			 * the target relation in order.
 			 */
-			best_path = create_motion_path_for_insert(root, targetPolicy,
+			best_path = create_motion_path_for_insert(root, targetPolicy, yezzey_key_ranges,
 													  best_path);
 		}
 
@@ -1066,6 +1069,8 @@ fix_subplan_motion(PlannerInfo *root, Plan *subplan, Flow *outer_query_flow)
 			MOTIONTYPE_GATHER : MOTIONTYPE_BROADCAST;
 		motion->hashExprs = NIL;
 		motion->hashFuncs = NULL;
+		motion->yezzeyKeyRanges = NULL;
+		motion->numYezzeyKeyRanges = 0;
 		motion->plan.lefttree->flow = subFlow;
 		motion->plan.initPlan = initPlans;
 		motion->senderSliceInfo = sendSlice;

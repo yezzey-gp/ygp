@@ -45,6 +45,8 @@ extern void RelationClose(Relation relation);
  * Routines to compute/retrieve additional cached information
  */
 struct GpPolicy *RelationGetPartitioningKey(Relation relation);
+extern int2vector* RelationGetYezzeyKey(Relation relation);
+extern int2vector* RelationGetYezzeyKeyByRelid(Oid reloid);
 extern List *RelationGetFKeyList(Relation relation);
 extern List *RelationGetIndexList(Relation relation);
 extern List *RelationGetStatExtList(Relation relation);

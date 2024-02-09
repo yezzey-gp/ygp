@@ -915,6 +915,9 @@ typedef struct RelOptInfo
 	 */
 	List	   *upperrestrictinfo;		/* RestrictInfo structures (if base
 										 * rel) */
+
+    int        num_yezzey_key_ranges;
+	int       *yezzey_key_ranges;
 } RelOptInfo;
 
 /*

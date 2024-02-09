@@ -26,7 +26,7 @@ extern Motion *make_sorted_union_motion(PlannerInfo *root, Plan *lefttree, int n
 extern Motion *make_hashed_motion(Plan *lefttree,
 								  List *hashExpr,
 								  List *hashOpfamilies,
-								  int numHashSegments);
+								  int numHashSegments, int numYkr, int *ykr);
 
 extern Motion *make_broadcast_motion(Plan *lefttree);
 

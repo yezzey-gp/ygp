@@ -5390,11 +5390,13 @@ adjust_modifytable_subpaths(PlannerInfo *root, CmdType operation,
 		RangeTblEntry *rte = rt_fetch(rti, root->parse->rtable);
 		GpPolicy   *targetPolicy;
 		GpPolicyType targetPolicyType;
+		int2vector *yezzey_key_ranges;
 
 		Assert(rte->rtekind == RTE_RELATION);
 
 		targetPolicy = GpPolicyFetch(rte->relid);
 		targetPolicyType = targetPolicy->ptype;
+		yezzey_key_ranges = RelationGetYezzeyKeyByRelid(rte->relid);
 
 		numsegments = Max(targetPolicy->numsegments, numsegments);
 
@@ -5417,11 +5419,11 @@ adjust_modifytable_subpaths(PlannerInfo *root, CmdType operation,
 
 		if (operation == CMD_INSERT)
 		{
-			subpath = create_motion_path_for_insert(root, targetPolicy, subpath);
+			subpath = create_motion_path_for_insert(root, targetPolicy, yezzey_key_ranges, subpath);
 		}
 		else if (operation == CMD_DELETE)
 		{
-			subpath = create_motion_path_for_upddel(root, rti, targetPolicy, subpath);
+			subpath = create_motion_path_for_upddel(root, rti, targetPolicy, yezzey_key_ranges, subpath);
 		}
 		else if (operation == CMD_UPDATE)
 		{
@@ -5430,9 +5432,9 @@ adjust_modifytable_subpaths(PlannerInfo *root, CmdType operation,
 			is_split_update = (bool) lfirst_int(lci);
 
 			if (is_split_update)
-				subpath = create_split_update_path(root, rti, targetPolicy, subpath);
+				subpath = create_split_update_path(root, rti, targetPolicy, yezzey_key_ranges, subpath);
 			else
-				subpath = create_motion_path_for_upddel(root, rti, targetPolicy, subpath);
+				subpath = create_motion_path_for_upddel(root, rti, targetPolicy, yezzey_key_ranges, subpath);
 
 			lci = lnext(lci);
 		}
