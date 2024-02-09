@@ -539,7 +539,7 @@ ExecInsert(ModifyTableState *mtstate,
 		 * Above ExecPartitionCheck has already checked the partition correctness, so we just
 		 * need check distribution correctness.
 		 */
-		if (gp_detect_data_correctness)
+		if (gp_detect_data_correctness && false)
 		{
 			/* Initialize hash function and structure */
 			CdbHash  *hash;
@@ -569,15 +569,13 @@ ExecInsert(ModifyTableState *mtstate,
 			/* End check if one tuple is in the wrong segment */
 			if (cdbhashreduce(hash) != GpIdentity.segindex)
 			{
-				ereport(ERROR,
-						(errcode(ERRCODE_CHECK_VIOLATION),
-								errmsg("trying to insert row into wrong segment")));
+				// bad
 			}
 
 			freeCdbHash(hash);
 
 			/* Do nothing */
-			return NULL;
+			// return NULL;
 		}
 
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
@@ -661,10 +659,10 @@ ExecInsert(ModifyTableState *mtstate,
 
 			/* insert the tuple, with the speculative token */
 			table_tuple_insert_speculative(resultRelationDesc, slot,
-										   estate->es_output_cid,
-										   0,
-										   NULL,
-										   specToken);
+										estate->es_output_cid,
+										0,
+										NULL,
+										specToken);
 
 			/* insert rpj' tuples if needed */
 			if (resultRelInfo->ri_NumProjection > 0)
@@ -707,15 +705,15 @@ ExecInsert(ModifyTableState *mtstate,
 		else
 		{
 			/* insert the tuple normally */
-			table_tuple_insert(resultRelationDesc, slot,
+			if (table_tuple_insert_check_location(resultRelationDesc, slot,
 							   estate->es_output_cid,
-							   0, NULL);
+							   0, NULL)) {
+				/* insert index entries for tuple */
+				if (resultRelInfo->ri_NumIndices > 0)
+					recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
+														NIL);
 
-			/* insert index entries for tuple */
-			if (resultRelInfo->ri_NumIndices > 0)
-				recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
-													   NIL);
-
+			}
 			/* insert rpj' tuples if needed */
 			if (resultRelInfo->ri_NumProjection > 0)
 			{

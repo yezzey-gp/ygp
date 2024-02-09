@@ -1865,8 +1865,11 @@ ProcessUtilitySlow(ParseState *pstate,
 
 
 					/* Run parse analysis ... */
-					prjstmt = transformPrjStmt(reloid, prjstmt, queryString);
 
+					if (Gp_role == GP_ROLE_DISPATCH) {
+						prjstmt = transformPrjStmt(reloid, prjstmt, queryString);
+					}
+					
 					address = DefineProjection(
 						reloid,
 						prjstmt,

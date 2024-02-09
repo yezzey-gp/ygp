@@ -268,6 +268,12 @@ simple_table_tuple_insert(Relation rel, TupleTableSlot *slot)
 	table_tuple_insert(rel, slot, GetCurrentCommandId(true), 0, NULL);
 }
 
+void
+simple_table_tuple_insert_check_location(Relation rel, TupleTableSlot *slot)
+{
+	table_tuple_insert_check_location(rel, slot, GetCurrentCommandId(true), 0, NULL);
+}
+
 /*
  * simple_table_tuple_delete - delete a tuple
  *

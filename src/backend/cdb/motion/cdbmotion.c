@@ -357,7 +357,7 @@ void
 CheckAndSendRecordCache(MotionLayerState *mlStates,
 						ChunkTransportState *transportStates,
 						int16 motNodeID,
-						int16 targetRoute)
+						int16 targetRoute, Bitmapset *broadcastsegs)
 {
 	MotionNodeEntry *pMNEntry;
 	TupleChunkListData tcList;
@@ -414,7 +414,7 @@ CheckAndSendRecordCache(MotionLayerState *mlStates,
 #endif
 
 	/* do the send. */
-	if (!SendTupleChunkToAMS(mlStates, transportStates, motNodeID, targetRoute, tcList.p_first))
+	if (!SendTupleChunkToAMS(mlStates, transportStates, motNodeID, targetRoute, tcList.p_first, broadcastsegs))
 	{
 		pMNEntry->stopped = true;
 	}
@@ -438,7 +438,7 @@ SendTuple(MotionLayerState *mlStates,
 		  ChunkTransportState *transportStates,
 		  int16 motNodeID,
 		  TupleTableSlot *slot,
-		  int16 targetRoute)
+		  int16 targetRoute, Bitmapset *broadcastsegs)
 {
 	MotionNodeEntry *pMNEntry;
 	TupleChunkListData tcList;
@@ -502,7 +502,7 @@ SendTuple(MotionLayerState *mlStates,
 #endif
 
 	/* do the send. */
-	if (!SendTupleChunkToAMS(mlStates, transportStates, motNodeID, targetRoute, tcList.p_first))
+	if (!SendTupleChunkToAMS(mlStates, transportStates, motNodeID, targetRoute, tcList.p_first, broadcastsegs))
 	{
 		pMNEntry->stopped = true;
 		rc = STOP_SENDING;

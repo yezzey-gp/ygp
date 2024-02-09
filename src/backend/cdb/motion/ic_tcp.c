@@ -2769,7 +2769,7 @@ SendEosTCP(ChunkTransportState *transportStates,
 	 * we want to add our tcItem onto each of the outgoing buffers -- this is
 	 * guaranteed to leave things in a state where a flush is *required*.
 	 */
-	doBroadcast(transportStates, pEntry, tcItem, NULL);
+	doBroadcast(transportStates, pEntry, tcItem, NULL, NULL);
 
 	/* now flush all of the buffers. */
 	for (i = 0; i < pEntry->numConns; i++)

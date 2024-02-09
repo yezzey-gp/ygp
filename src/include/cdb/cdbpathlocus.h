@@ -57,6 +57,7 @@ typedef enum CdbLocusType
 								 * not be redistributed */
     CdbLocusType_Replicated,    /* replicated over all qExecs of an N-gang */
     CdbLocusType_Hashed,        /* hash partitioned over all qExecs of N-gang */
+    CdbLocusType_MiltiHashed,     /* broadcast to multiple hash partitioned over all qExecs of N-gang */
     CdbLocusType_HashedOJ,      /* result of hash partitioned outer join, NULLs can be anywhere */
     CdbLocusType_Strewn,        /* partitioned on no known function */
     CdbLocusType_End            /* = last valid CdbLocusType + 1 */

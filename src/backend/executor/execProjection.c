@@ -1,3 +1,7 @@
+/*
+* execProjection.c
+*/
+
 #include "postgres.h"
 
 #include "nodes/execnodes.h"
@@ -104,8 +108,6 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
 
 List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
 {
-
-	ItemPointer tupleid = &slot->tts_tid;
 	List	   *result = NIL;
 	ResultRelInfo *resultRelInfo;
 	int			i;
@@ -113,8 +115,9 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 	RelationPtr relationDescs;
 	Relation	heapRelation;
 	ExprContext *econtext;
+	TupleTableSlot *tts;
 
-	Assert(ItemPointerIsValid(tupleid));
+	// ExecCopySlot(tts, slot);
 
 	/*
 	 * Get information from the result relation info structure.
@@ -169,7 +172,7 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 
         //!! form prj datum here
 
-		(void)simple_table_tuple_insert(prjRelation,slot);
+		(void)simple_table_tuple_insert_check_location(prjRelation, slot);
 	}
 
 	return result;

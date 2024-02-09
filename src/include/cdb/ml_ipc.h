@@ -19,6 +19,7 @@
 #include "cdb/cdbmotion.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbgang.h"
+#include "nodes/bitmapset.h"
 
 struct SliceTable;                          /* #include "nodes/execnodes.h" */
 struct EState;                              /* #include "nodes/execnodes.h" */
@@ -140,7 +141,7 @@ extern bool SendTupleChunkToAMS(MotionLayerState *mlStates,
 								ChunkTransportState *transportStates, 
 								int16 motNodeID, 
 								int16 targetRoute, 
-								TupleChunkListItem tcItem);
+								TupleChunkListItem tcItem, Bitmapset *broadcastsegs);
 
 /* The SendEosToAMS() function is used to send an "End Of Stream" message to
  * all connected receivers (generally this is a broadcast)
@@ -271,7 +272,7 @@ extern void putTransportDirectBuffer(ChunkTransportState *transportStates,
  *	 pEntry - ChunkTransportState context that contains everything we need to send.
  *	 tcItem - TupleChunk to send.
  */
-#define doBroadcast(transportStates, pEntry, tcItem, inactiveCountPtr) \
+#define doBroadcast(transportStates, pEntry, tcItem, inactiveCountPtr, broadcastsegs) \
 	do { \
 		MotionConn *conn; \
 		int			*p_inactive = inactiveCountPtr; \
@@ -282,6 +283,8 @@ extern void putTransportDirectBuffer(ChunkTransportState *transportStates,
 		{ \
 			if (index >= pEntry->numConns) \
 				index = 0; \
+			if (broadcastsegs != NULL  && bms_is_member(index, broadcastsegs)) \
+				continue; \
 			conn = pEntry->conns + index; \
 			/* only send to still interested receivers. */ \
 			if (conn->stillActive) \
