@@ -85,6 +85,8 @@ static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
 static List *get_relation_statistics(RelOptInfo *rel, Relation relation);
 static void set_relation_partition_info(PlannerInfo *root, RelOptInfo *rel,
 										Relation relation);
+static void set_relation_projection_info(PlannerInfo *root, RelOptInfo *rel,
+										Relation relation);
 static PartitionScheme find_partition_scheme(PlannerInfo *root, Relation rel);
 static void set_baserel_partition_key_exprs(Relation relation,
 											RelOptInfo *rel);
@@ -2559,6 +2561,12 @@ set_relation_partition_info(PlannerInfo *root, RelOptInfo *rel,
 	rel->nparts = partdesc->nparts;
 	set_baserel_partition_key_exprs(relation, rel);
 	rel->partition_qual = RelationGetPartitionQual(relation);
+}
+
+static void 
+set_relation_projection_info(PlannerInfo *root, RelOptInfo *rel,
+										Relation relation) {
+	rel->nprjs = list_length(RelationGetPrjList(relation));
 }
 
 /*

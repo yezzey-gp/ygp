@@ -332,7 +332,7 @@ cdbllize_get_final_locus(PlannerInfo *root, PathTarget *target)
 			if (intoPolicy->ptype == POLICYTYPE_PARTITIONED &&
 				intoPolicy->nattrs > 0)
 			{
-				return cdbpathlocus_for_insert(root, intoPolicy, target);
+				return cdbpathlocus_for_insert(root, intoPolicy, target, root->simple_rel_array[query->resultRelation]);
 			}
 			else if (intoPolicy->ptype == POLICYTYPE_REPLICATED)
 			{
@@ -527,7 +527,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target relation in order.
 			 */
 			best_path = create_motion_path_for_ctas(root, targetPolicy,
-													best_path);
+													best_path, rt_fetch(query->resultRelation, query->rtable)->relhasprj);
 		}
 
 		topslice->numsegments = targetPolicy->numsegments;
@@ -571,7 +571,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target relation in order.
 			 */
 			best_path = create_motion_path_for_insert(root, targetPolicy,
-													  best_path);
+													  best_path, root->simple_rel_array[query->resultRelation]->nprjs);
 		}
 
 		topslice->numsegments = targetPolicy->numsegments;

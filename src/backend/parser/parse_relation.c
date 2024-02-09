@@ -1323,6 +1323,7 @@ addRangeTableEntry(ParseState *pstate,
 	rte->relid = RelationGetRelid(rel);
 	rte->relkind = rel->rd_rel->relkind;
 	rte->rellockmode = lockmode;
+	rte->relhasprj = list_length(RelationGetPrjList(rel)) > 0;
 
 	/*
 	 * Build the list of effective column names using user-supplied aliases
@@ -1401,6 +1402,7 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	rte->rtekind = RTE_RELATION;
 	rte->alias = alias;
 	rte->relid = RelationGetRelid(rel);
+	rte->relhasprj = list_length(RelationGetPrjList(rel)) > 0;
 	rte->relkind = rel->rd_rel->relkind;
 	rte->rellockmode = lockmode;
 

@@ -1195,6 +1195,8 @@ typedef struct RangeTblEntry
 	 */
 	bool		forceDistRandom;
 
+	bool relhasprj;
+
 	/*
 	 * Fields valid in all RTEs:
 	 */
