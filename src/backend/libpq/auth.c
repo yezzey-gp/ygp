@@ -69,7 +69,7 @@ int     getpeereid(int, uid_t *__restrict__, gid_t *__restrict__);
  */
 static void sendAuthRequest(Port *port, AuthRequest areq, char *extradata,
 				int extralen);
-static void auth_failed(Port *port, int status, char *logdetail);
+static void auth_failed(Port *port, UserAuth method, int status, char *logdetail);
 static char *recv_password_packet(Port *port);
 
 
@@ -79,7 +79,7 @@ static char *recv_password_packet(Port *port);
  */
 
 static int	CheckPasswordAuth(Port *port, char **logdetail);
-static int	CheckPWChallengeAuth(Port *port, char **logdetail);
+static int	CheckPWChallengeAuth(Port *port, UserAuth method, char **logdetail);
 static int	CheckMD5Auth(Port *port, char *shadow_pass, char **logdetail);
 static int	CheckSCRAMAuth(Port *port, char *shadow_pass, char **logdetail);
 
@@ -259,7 +259,7 @@ ClientAuthentication_hook_type ClientAuthentication_hook = NULL;
  * particular, if logdetail isn't NULL, we send that string to the log.
  */
 static void
-auth_failed(Port *port, int status, char *logdetail)
+auth_failed(Port *port, UserAuth method, int status, char *logdetail)
 {
 	const char *errstr;
 	char	   *cdetail;
@@ -286,7 +286,7 @@ auth_failed(Port *port, int status, char *logdetail)
 	}
 	else
 	{
-	  switch (port->hba->auth_method)
+	  switch (method)
 	  {
 		case uaReject:
 		case uaImplicitReject:
@@ -339,7 +339,7 @@ auth_failed(Port *port, int status, char *logdetail)
      * Avoid leak user infomations when failed to connect database using LDAP,
      * and we need hide failed details return by LDAP.
      * */
-    if (port->hba->auth_method == uaLDAP)
+    if (method == uaLDAP)
     {
         pfree(cdetail);
         cdetail = NULL;
@@ -861,7 +861,7 @@ ClientAuthentication(Port *port)
 
 		case uaMD5:
 		case uaSCRAM:
-			status = CheckPWChallengeAuth(port, &logdetail);
+			status = CheckPWChallengeAuth(port, method, &logdetail);
 			break;
 
 		case uaPassword:
@@ -914,7 +914,7 @@ ClientAuthentication(Port *port)
 	if (status == STATUS_OK)
 		sendAuthRequest(port, AUTH_REQ_OK, NULL, 0);
 	else
-		auth_failed(port, status, logdetail);
+		auth_failed(port, method, status, logdetail);
 
 	/* Done with authentication, so we should turn off immediate interrupts */
 	ImmediateInterruptOK = false;
@@ -1080,7 +1080,7 @@ CheckPasswordAuth(Port *port, char **logdetail)
  * MD5 and SCRAM authentication.
  */
 static int
-CheckPWChallengeAuth(Port *port, char **logdetail)
+CheckPWChallengeAuth(Port *port, UserAuth method, char **logdetail)
 {
 	int			auth_result;
 	char	   *shadow_pass;
@@ -1089,9 +1089,7 @@ CheckPWChallengeAuth(Port *port, char **logdetail)
 	Oid useroid;
 	Oid service_auth_roleoid;
 
-	Assert(port->hba->auth_method == uaSCRAM ||
-		   port->hba->auth_method == uaMD5);
-
+	Assert(method == uaSCRAM || method == uaMD5);
 
 	
 	if (port->service_auth_role) {
@@ -1141,7 +1139,7 @@ CheckPWChallengeAuth(Port *port, char **logdetail)
 	 * If MD5 authentication is not allowed, always use SCRAM.  If the user
 	 * had an MD5 password, CheckSCRAMAuth() will fail.
 	 */
-	if (port->hba->auth_method == uaMD5 && (pwtype == PASSWORD_TYPE_MD5 || pwtype == PASSWORD_TYPE_PLAINTEXT))
+	if (method == uaMD5 && (pwtype == PASSWORD_TYPE_MD5 || pwtype == PASSWORD_TYPE_PLAINTEXT))
 	{
 		auth_result = CheckMD5Auth(port, shadow_pass, logdetail);
 	}
