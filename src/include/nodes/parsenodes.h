@@ -1502,6 +1502,7 @@ typedef enum AlterTableType
 	AT_SetDistributedBy,		/* SET DISTRIBUTED BY */
 	AT_ExpandTable,          /* EXPAND DISTRIBUTED */
 	AT_ExpandPartitionTablePrepare,	/* EXPAND PARTITION PREPARE */
+	AT_ShrinkTable,					/* SHRINK DISTRIBUTED */
 
 	/* CDB: Partitioned Tables */
 	AT_PartAdd,					/* Add */
