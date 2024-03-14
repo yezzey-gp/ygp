@@ -788,6 +788,7 @@ DefineIndex(Oid relationId,
 	{
 		case RELKIND_RELATION:
 		case RELKIND_MATVIEW:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
