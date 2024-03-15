@@ -9965,6 +9965,7 @@ PrjStmt: CREATE PROJECTION projection_name ON relation_expr DistributedBy
 
 		$$ = (Node *)n;
 	}
+	;
 
 /*****************************************************************************
  *
