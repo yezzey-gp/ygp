@@ -93,6 +93,7 @@ typedef struct
 	List	   *inhRelations;	/* relations to inherit from */
 	bool		isforeign;		/* true if CREATE/ALTER FOREIGN TABLE */
 	bool		isalter;		/* true if altering existing table */
+	bool        isprojection;   /* true if create statement is projection */
 	List	   *columns;		/* ColumnDef items */
 	List	   *ckconstraints;	/* CHECK constraints */
 	List	   *fkconstraints;	/* FOREIGN KEY constraints */
@@ -2914,6 +2915,42 @@ transformDistributedBy(ParseState *pstate,
 				}
 			}
 
+			if (cxt->isprojection) {
+
+				RangeVar   *rte = (RangeVar *) cxt->relation;
+				Relation	rel;
+				int			count;
+
+				Assert(IsA(rte, RangeVar));
+				rel = heap_openrv(rte, AccessShareLock);
+				/* check user requested relation to prjection from valid relkind */
+				if (rel->rd_rel->relkind != RELKIND_RELATION)
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+								errmsg("projectioned relation \"%s\" is not a table",
+									rte->relname)));
+				for (count = 0; count < rel->rd_att->natts; count++)
+				{
+					Form_pg_attribute relattr = TupleDescAttr(rel->rd_att, count);
+					char	   *inhname = NameStr(relattr->attname);
+
+					if (relattr->attisdropped)
+						continue;
+					if (strcmp(colname, inhname) == 0)
+					{
+						found = true;
+
+						break;
+					}
+				}
+				heap_close(rel, NoLock);
+				if (found)
+					elog(DEBUG1, "DISTRIBUTED BY clause refers to columns of inherited table");
+
+				if (found)
+					break;
+			}
+
 			if (!found)
 			{
 				foreach(columns, cxt->columns)
@@ -2950,7 +2987,7 @@ transformDistributedBy(ParseState *pstate,
 			 * take care of marking them NOT NULL.
 			 */
 			if (!found && !cxt->isalter)
-				ereport(WARNING,
+				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" named in DISTRIBUTED BY clause does not exist", colname),
 						 parser_errposition(pstate, dkelem->location)));
@@ -4014,6 +4051,7 @@ transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
 	cxt.ispartitioned = false;
 	cxt.partbound = NULL;
 	cxt.ofType = false;
+	cxt.isprojection = true;
 
 	/* Set up pstate */
 	pstate = make_parsestate(NULL);
@@ -5018,7 +5056,6 @@ transformCreateSchemaStmt(CreateSchemaStmt *stmt)
 			case T_GrantStmt:
 				cxt.grants = lappend(cxt.grants, element);
 				break;
-
 			default:
 				elog(ERROR, "unrecognized node type: %d",
 					 (int) nodeTag(element));
