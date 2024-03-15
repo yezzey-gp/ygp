@@ -2602,7 +2602,7 @@ ExecModifyTable(PlanState *pstate)
 
 				relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
 				if (relkind == RELKIND_RELATION || relkind == RELKIND_MATVIEW ||
-					relkind == RELKIND_PARTITIONED_TABLE ||
+					relkind == RELKIND_PARTITIONED_TABLE || relkind == RELKIND_PROJECTION ||
 					IsAppendonlyMetadataRelkind(relkind))
 				{
 					datum = ExecGetJunkAttribute(slot,
