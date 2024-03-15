@@ -562,6 +562,7 @@ typedef enum NodeTag
 	T_TypeName,
 	T_ColumnDef,
 	T_IndexElem,
+	T_ProjectionElem,
 	T_Constraint,
 	T_DefElem,
 	T_RangeTblEntry,

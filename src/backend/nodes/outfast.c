@@ -1553,6 +1553,9 @@ _outNode(StringInfo str, void *obj)
 			case T_IndexElem:
 				_outIndexElem(str, obj);
 				break;
+			case T_ProjectionElem:
+				_outProjectionElem(str, obj);
+				break;
 			case T_Query:
 				_outQuery(str, obj);
 				break;

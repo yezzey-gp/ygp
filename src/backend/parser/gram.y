@@ -238,6 +238,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 	WindowDef			*windef;
 	JoinExpr			*jexpr;
 	IndexElem			*ielem;
+	ProjectionElem		*pelem;
 	Alias				*alias;
 	RangeVar			*range;
 	IntoClause			*into;
@@ -458,6 +459,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 				TriggerTransitions TriggerReferencing
 				publication_name_list
 				vacuum_relation_list opt_vacuum_relation_list
+				projection_params opt_prj_params prj_params
 
 %type <list>	group_by_list
 %type <node>	group_by_item empty_grouping_set rollup_clause cube_clause
@@ -556,6 +558,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 %type <list>	func_alias_clause
 %type <sortby>	sortby
 %type <ielem>	index_elem
+%type <pelem>   prj_elem
 %type <node>	table_ref
 %type <jexpr>	joined_table
 %type <range>	relation_expr
@@ -9954,14 +9957,46 @@ defacl_privilege_target:
  * willing to make TABLESPACE a fully reserved word.
  *****************************************************************************/
 
-PrjStmt: CREATE PROJECTION projection_name ON relation_expr DistributedBy 
+
+
+projection_params:	prj_elem							{ $$ = list_make1($1); }
+			| projection_params ',' prj_elem			{ $$ = lappend($1, $3); }
+		;
+
+/*
+ * Index attributes can be either simple column references, or arbitrary
+ * expressions in parens.  For backwards-compatibility reasons, we allow
+ * an expression that's just a function call to be written without parens.
+ */
+prj_elem:	ColId opt_collate opt_class
+				{
+					$$ = makeNode(ProjectionElem);
+					$$->name = $1;
+					$$->expr = NULL;
+					$$->prjcolname = NULL;
+					$$->collation = $2;
+					$$->opclass = $3;
+				}
+		;
+
+
+prj_params: '(' projection_params ')' 
+	;
+
+opt_prj_params:
+	prj_params { $$ = $1; } 
+	| /*EMPTY*/
+		{ $$ = NULL; }
+	;
+
+PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params DistributedBy 
 	{
 		CreateProjectionStmt *n = makeNode(CreateProjectionStmt);
 
 		n->prjname = $3;
 		n->relation = $5;
 
-		n->distributedBy = (DistributedBy *) $6;
+		n->distributedBy = (DistributedBy *) $7;
 
 		$$ = (Node *)n;
 	}

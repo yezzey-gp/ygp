@@ -772,6 +772,23 @@ typedef struct IndexElem
 } IndexElem;
 
 /*
+ * ProjectionElem - projection parameters (used in CREATE PROJECTION)
+ *
+ * For a plain index attribute, 'name' is the name of the table column to
+ * index, and 'expr' is NULL.  For an index expression, 'name' is NULL and
+ * 'expr' is the expression tree.
+ */
+typedef struct ProjectionElem
+{
+	NodeTag		type;
+	char	   *name;			/* name of attribute to index, or NULL */
+	Node	   *expr;			/* expression to index, or NULL */
+	char	   *prjcolname;	    /* name for index column; NULL = default */
+	List	   *collation;		/* name of collation; NIL = default */
+	List	   *opclass;		/* name of desired opclass; NIL = default */
+} ProjectionElem;
+
+/*
  * column reference encoding clause for storage
  */
 typedef struct ColumnReferenceStorageDirective

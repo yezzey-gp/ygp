@@ -4152,6 +4152,15 @@ raw_expression_tree_walker(Node *node,
 				/* collation and opclass names are deemed uninteresting */
 			}
 			break;
+		case T_ProjectionElem:
+			{
+				ProjectionElem  *prjelem = (ProjectionElem *) node;
+
+				if (walker(prjelem->expr, context))
+					return true;
+				/* collation and opclass names are deemed uninteresting */
+			}
+			break;
 		case T_GroupingSet:
 			return walker(((GroupingSet *) node)->content, context);
 		case T_LockingClause:

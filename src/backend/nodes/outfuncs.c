@@ -4288,6 +4288,18 @@ _outIndexElem(StringInfo str, const IndexElem *node)
 }
 
 static void
+_outProjectionElem(StringInfo str, const ProjectionElem *node)
+{
+	WRITE_NODE_TYPE("PROJECTIONELEM");
+
+	WRITE_STRING_FIELD(name);
+	WRITE_NODE_FIELD(expr);
+	WRITE_STRING_FIELD(prjcolname);
+	WRITE_NODE_FIELD(collation);
+	WRITE_NODE_FIELD(opclass);
+}
+
+static void
 _outVariableSetStmt(StringInfo str, const VariableSetStmt *node)
 {
 	WRITE_NODE_TYPE("VARIABLESETSTMT");
@@ -6319,6 +6331,9 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_IndexElem:
 				_outIndexElem(str, obj);
+				break;
+			case T_ProjectionElem:
+				_outProjectionElem(str, obj);
 				break;
 			case T_Query:
 				_outQuery(str, obj);
