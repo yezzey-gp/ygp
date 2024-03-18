@@ -344,6 +344,10 @@ typedef struct ProjectionInfo
 	NodeTag		type;
 	/* instructions to evaluate projection */
 	ExprState	pi_state;
+
+	int			ii_NumPrjAttrs;	/* total number of columns in index */
+	
+	AttrNumber	ii_PrjAttrNumbers[INDEX_MAX_KEYS];
 	/* expression context in which to evaluate expression */
 	ExprContext *pi_exprContext;
 } ProjectionInfo;

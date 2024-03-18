@@ -106,6 +106,85 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
 }
 
 
+/* ----------------
+ *		FormIndexDatum
+ *			Construct values[] and isnull[] arrays for a new index tuple.
+ *
+ *	indexInfo		Info about the index
+ *	slot			Heap tuple for which we must prepare an index entry
+ *	estate			executor state for evaluating any index expressions
+ *	values			Array of index Datums (output area)
+ *	isnull			Array of is-null indicators (output area)
+ *
+ * When there are no index expressions, estate may be NULL.  Otherwise it
+ * must be supplied, *and* the ecxt_scantuple slot of its per-tuple expr
+ * context must point to the heap tuple passed in.
+ *
+ * Notice we don't actually call index_form_tuple() here; we just prepare
+ * its input arrays values[] and isnull[].  This is because the index AM
+ * may wish to alter the data before storage.
+ * ----------------
+ */
+void
+FormProjectionDatum(struct ProjectionInfo *prjInfo,
+			   TupleTableSlot *slot,
+			   struct EState *estate,
+			   Datum *values,
+			   bool *isnull)
+{
+	// ListCell   *indexpr_item;
+	int			i;
+
+	// if (prjInfo->ii_Expressions != NIL &&
+	// 	prjInfo->ii_ExpressionsState == NIL)
+	// {
+	// 	/* First time through, set up expression evaluation state */
+	// 	prjInfo->ii_ExpressionsState =
+	// 		ExecPrepareExprList(prjInfo->ii_Expressions, estate);
+	// 	/* Check caller has set up context correctly */
+	// 	Assert(GetPerTupleExprContext(estate)->ecxt_scantuple == slot);
+	// }
+	// indexpr_item = list_head(prjInfo->ii_ExpressionsState);
+
+	for (i = 0; i < prjInfo->ii_NumPrjAttrs; i++)
+	{
+		int			keycol = prjInfo->ii_PrjAttrNumbers[i];
+		Datum		iDatum;
+		bool		isNull;
+
+		if (keycol < 0)
+			iDatum = slot_getsysattr(slot, keycol, &isNull);
+		else if (keycol != 0)
+		{
+			/*
+			 * Plain index column; get the value we need directly from the
+			 * heap tuple.
+			 */
+			iDatum = slot_getattr(slot, keycol, &isNull);
+		}
+		else
+		{
+			// /*
+			//  * Index expression --- need to evaluate it.
+			//  */
+			// if (indexpr_item == NULL)
+			// 	elog(ERROR, "wrong number of index expressions");
+			// iDatum = ExecEvalExprSwitchContext((ExprState *) lfirst(indexpr_item),
+			// 								   GetPerTupleExprContext(estate),
+			// 								   &isNull);
+			// indexpr_item = lnext(indexpr_item);
+		}
+		values[i] = iDatum;
+		isnull[i] = isNull;
+	}
+
+	// if (indexpr_item != NULL)
+		// elog(ERROR, "wrong number of index expressions");
+}
+
+
+
+
 List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
 {
 	List	   *result = NIL;
