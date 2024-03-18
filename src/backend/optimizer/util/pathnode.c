@@ -5417,7 +5417,7 @@ adjust_modifytable_subpaths(PlannerInfo *root, CmdType operation,
 
 		if (operation == CMD_INSERT)
 		{
-			subpath = create_motion_path_for_insert(root, targetPolicy, subpath);
+			subpath = create_motion_path_for_insert(root, targetPolicy, subpath, rte->relhasprj);
 		}
 		else if (operation == CMD_DELETE)
 		{

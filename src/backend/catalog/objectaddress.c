@@ -3757,6 +3757,10 @@ getRelationDescription(StringInfo buffer, Oid relid)
 			appendStringInfo(buffer, _("table %s"),
 							 relname);
 			break;
+		case RELKIND_PROJECTION:
+			appendStringInfo(buffer, _("projection %s"),
+							 relname);
+			break;
 		case RELKIND_INDEX:
 		case RELKIND_PARTITIONED_INDEX:
 			appendStringInfo(buffer, _("index %s"),
@@ -4252,6 +4256,9 @@ getRelationTypeDescription(StringInfo buffer, Oid relid, int32 objectSubId)
 		case RELKIND_RELATION:
 		case RELKIND_PARTITIONED_TABLE:
 			appendStringInfoString(buffer, "table");
+			break;
+		case RELKIND_PROJECTION:
+			appendStringInfoString(buffer, "projection");
 			break;
 		case RELKIND_INDEX:
 		case RELKIND_PARTITIONED_INDEX:
@@ -5437,6 +5444,7 @@ get_relkind_objtype(char relkind)
 	{
 		case RELKIND_RELATION:
 		case RELKIND_PARTITIONED_TABLE:
+		case RELKIND_PROJECTION:
 			return OBJECT_TABLE;
 		case RELKIND_INDEX:
 		case RELKIND_PARTITIONED_INDEX:

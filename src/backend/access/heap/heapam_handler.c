@@ -649,6 +649,7 @@ heapam_relation_set_new_filenode(Relation rel,
 	if (persistence == RELPERSISTENCE_UNLOGGED)
 	{
 		Assert(rel->rd_rel->relkind == RELKIND_RELATION ||
+		       rel->rd_rel->relkind == RELKIND_PROJECTION ||
 			   rel->rd_rel->relkind == RELKIND_MATVIEW ||
 			   rel->rd_rel->relkind == RELKIND_TOASTVALUE ||
 			   rel->rd_rel->relkind == RELKIND_AOSEGMENTS ||

@@ -3122,7 +3122,7 @@ get_rels_with_domain(Oid domainOid, LOCKMODE lockmode)
 			 * a suitable expression index, this should also check expression
 			 * index columns.
 			 */
-			if (rel->rd_rel->relkind != RELKIND_RELATION &&
+			if (rel->rd_rel->relkind != RELKIND_RELATION &&rel->rd_rel->relkind != RELKIND_PROJECTION &&
 				rel->rd_rel->relkind != RELKIND_MATVIEW)
 			{
 				relation_close(rel, lockmode);

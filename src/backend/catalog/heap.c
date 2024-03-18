@@ -501,6 +501,13 @@ heap_create(const char *relname,
 												relpersistence,
 												relfrozenxid, relminmxid);
 				break;
+			/* YGP */
+			case RELKIND_PROJECTION:
+				Assert(rel->rd_tableam);
+				table_relation_set_new_filenode(rel, &rel->rd_node,
+												relpersistence,
+												relfrozenxid, relminmxid);
+				break;
 		}
 
 		/*
@@ -1339,6 +1346,7 @@ AddNewRelationTuple(Relation pg_class_desc,
 	switch (relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_MATVIEW:
 		case RELKIND_INDEX:
 		case RELKIND_TOASTVALUE:
@@ -1575,6 +1583,7 @@ heap_create_with_catalog(const char *relname,
 		switch (relkind)
 		{
 			case RELKIND_RELATION:
+			case RELKIND_PROJECTION:
 			case RELKIND_VIEW:
 			case RELKIND_MATVIEW:
 			case RELKIND_FOREIGN_TABLE:
@@ -1818,6 +1827,7 @@ heap_create_with_catalog(const char *relname,
 		 * main table depends on it.
 		 */
 		if (relkind == RELKIND_RELATION ||
+		    relkind == RELKIND_PROJECTION ||
 			relkind == RELKIND_MATVIEW ||
 			relkind == RELKIND_PARTITIONED_TABLE)
 		{
@@ -1859,6 +1869,7 @@ heap_create_with_catalog(const char *relname,
 		MemoryContext oldcontext;
 
 		Assert(relkind == RELKIND_RELATION ||
+			   relkind == RELKIND_PROJECTION ||
 			   relkind == RELKIND_PARTITIONED_TABLE ||
 			   relkind == RELKIND_MATVIEW ||
 			   relkind == RELKIND_FOREIGN_TABLE);
@@ -1890,6 +1901,9 @@ heap_create_with_catalog(const char *relname,
 				break;
 			case RELKIND_MATVIEW:
 				subtyp = "MATVIEW";
+				break;
+			case RELKIND_PROJECTION:
+				subtyp = "PROJECTION";
 				break;
 			default:
 				doIt = false;
@@ -2476,6 +2490,7 @@ heap_drop_with_catalog(Oid relid)
 	 * Remove distribution policy, if any.
  	 */
 	if (rel->rd_rel->relkind == RELKIND_RELATION ||
+	    rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		rel->rd_rel->relkind == RELKIND_MATVIEW ||
 		rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE ||
 		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
@@ -2487,6 +2502,7 @@ heap_drop_with_catalog(Oid relid)
 	 * Attribute encoding
 	 */
 	if (rel->rd_rel->relkind == RELKIND_RELATION ||
+	    rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		rel->rd_rel->relkind == RELKIND_MATVIEW ||
 		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 	{
@@ -2669,7 +2685,7 @@ SetAttrMissing(Oid relid, char *attname, char *value)
 	tablerel = table_open(relid, AccessExclusiveLock);
 
 	/* Don't do anything unless it's a plain table */
-	if (tablerel->rd_rel->relkind != RELKIND_RELATION)
+	if (tablerel->rd_rel->relkind != RELKIND_RELATION || tablerel->rd_rel->relkind != RELKIND_PROJECTION)
 	{
 		table_close(tablerel, AccessExclusiveLock);
 		return;

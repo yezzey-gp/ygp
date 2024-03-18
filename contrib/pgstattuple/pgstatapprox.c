@@ -283,6 +283,7 @@ pgstattuple_approx_internal(Oid relid, FunctionCallInfo fcinfo)
 	 * unscanned pages.
 	 */
 	if (!(rel->rd_rel->relkind == RELKIND_RELATION ||
+		  rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		  rel->rd_rel->relkind == RELKIND_AOSEGMENTS ||
 		  rel->rd_rel->relkind == RELKIND_AOBLOCKDIR ||
 		  rel->rd_rel->relkind == RELKIND_AOVISIMAP ||

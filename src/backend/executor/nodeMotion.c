@@ -1150,9 +1150,12 @@ doSendTuple(Motion *motion, MotionState *node, TupleTableSlot *outerTupleSlot)
 	int16		targetRoute;
 	SendReturnCode sendRC;
 	ExprContext *econtext = node->ps.ps_ExprContext;
+	Bitmapset *broadcastsegs;
 
 	/* We got a tuple from the child-plan. */
 	node->numTuplesFromChild++;
+
+	broadcastsegs = NULL;
 
 	if (motion->motionType == MOTIONTYPE_GATHER ||
 		motion->motionType == MOTIONTYPE_GATHER_SINGLE)
@@ -1217,14 +1220,14 @@ doSendTuple(Motion *motion, MotionState *node, TupleTableSlot *outerTupleSlot)
 	CheckAndSendRecordCache(node->ps.state->motionlayer_context,
 							node->ps.state->interconnect_context,
 							motion->motionID,
-							targetRoute);
+							targetRoute, broadcastsegs);
 
 	/* send the tuple out. */
 	sendRC = SendTuple(node->ps.state->motionlayer_context,
 					   node->ps.state->interconnect_context,
 					   motion->motionID,
 					   outerTupleSlot,
-					   targetRoute);
+					   targetRoute, broadcastsegs);
 
 	Assert(sendRC == SEND_COMPLETE || sendRC == STOP_SENDING);
 	if (sendRC == SEND_COMPLETE)

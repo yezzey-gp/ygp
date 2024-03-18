@@ -925,6 +925,8 @@ objectsInSchemaToOids(ObjectType objtype, List *nspnames)
 				objects = list_concat(objects, objs);
 				objs = getRelationsInNamespace(namespaceId, RELKIND_PARTITIONED_TABLE);
 				objects = list_concat(objects, objs);
+				objs = getRelationsInNamespace(namespaceId, RELKIND_PROJECTION);
+				objects = list_concat(objects, objs);
 				break;
 			case OBJECT_SEQUENCE:
 				objs = getRelationsInNamespace(namespaceId, RELKIND_SEQUENCE);
@@ -2258,6 +2260,7 @@ ExecGrant_Relation(InternalGrant *istmt)
 			if (!bTemp
 				&& ((pg_class_tuple->relkind == RELKIND_INDEX) ||
 					(pg_class_tuple->relkind == RELKIND_RELATION) ||
+					(pg_class_tuple->relkind == RELKIND_PROJECTION) ||
 					(pg_class_tuple->relkind == RELKIND_SEQUENCE) ||
 					(pg_class_tuple->relkind == RELKIND_VIEW)))
 				MetaTrackUpdObject(RelationRelationId,
@@ -6598,6 +6601,7 @@ CopyRelationAcls(Oid srcId, Oid destId)
 	pg_class_tuple = (Form_pg_class) GETSTRUCT(destTuple);
 
 	if (pg_class_tuple->relkind != RELKIND_RELATION &&
+	    pg_class_tuple->relkind != RELKIND_PROJECTION &&
 		pg_class_tuple->relkind != RELKIND_PARTITIONED_TABLE &&
 		pg_class_tuple->relkind != RELKIND_FOREIGN_TABLE)
 		elog(ERROR, "unexpected relkind %c",  pg_class_tuple->relkind);

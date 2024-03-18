@@ -1188,6 +1188,7 @@ get_all_vacuum_rels(int options)
 		 */
 		if ((options & VACOPT_AO_AUX_ONLY) == 0 &&
 			classForm->relkind != RELKIND_RELATION &&
+			classForm->relkind != RELKIND_PROJECTION &&
 			classForm->relkind != RELKIND_MATVIEW &&
 			classForm->relkind != RELKIND_PARTITIONED_TABLE)
 			continue;
@@ -1866,6 +1867,7 @@ vac_update_datfrozenxid(void)
 		 * should have InvalidTransactionId in relfrozenxid anyway).
 		 */
 		if (classForm->relkind != RELKIND_RELATION &&
+	        classForm->relkind != RELKIND_PROJECTION &&
 			classForm->relkind != RELKIND_MATVIEW &&
 			classForm->relkind != RELKIND_TOASTVALUE &&
 			classForm->relkind != RELKIND_AOSEGMENTS &&
@@ -2303,6 +2305,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	 * Check that it's of a vacuumable relkind.
 	 */
 	if (onerel->rd_rel->relkind != RELKIND_RELATION &&
+	    onerel->rd_rel->relkind != RELKIND_PROJECTION &&
 		onerel->rd_rel->relkind != RELKIND_MATVIEW &&
 		onerel->rd_rel->relkind != RELKIND_TOASTVALUE &&
 		onerel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE &&
@@ -2446,6 +2449,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	 * relation.
 	 */
 	if ((onerel->rd_rel->relkind != RELKIND_RELATION &&
+	     onerel->rd_rel->relkind != RELKIND_PROJECTION &&
 		 onerel->rd_rel->relkind != RELKIND_MATVIEW &&
 		 onerel->rd_rel->relkind != RELKIND_TOASTVALUE &&
 		 onerel->rd_rel->relkind != RELKIND_AOSEGMENTS &&

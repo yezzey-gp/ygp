@@ -93,6 +93,7 @@ typedef struct
 	List	   *inhRelations;	/* relations to inherit from */
 	bool		isforeign;		/* true if CREATE/ALTER FOREIGN TABLE */
 	bool		isalter;		/* true if altering existing table */
+	bool        isprojection;   /* true if create statement is projection */
 	List	   *columns;		/* ColumnDef items */
 	List	   *ckconstraints;	/* CHECK constraints */
 	List	   *fkconstraints;	/* FOREIGN KEY constraints */
@@ -2914,6 +2915,42 @@ transformDistributedBy(ParseState *pstate,
 				}
 			}
 
+			if (cxt->isprojection) {
+
+				RangeVar   *rte = (RangeVar *) cxt->relation;
+				Relation	rel;
+				int			count;
+
+				Assert(IsA(rte, RangeVar));
+				rel = heap_openrv(rte, AccessShareLock);
+				/* check user requested relation to prjection from valid relkind */
+				if (rel->rd_rel->relkind != RELKIND_RELATION)
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+								errmsg("projectioned relation \"%s\" is not a table",
+									rte->relname)));
+				for (count = 0; count < rel->rd_att->natts; count++)
+				{
+					Form_pg_attribute relattr = TupleDescAttr(rel->rd_att, count);
+					char	   *inhname = NameStr(relattr->attname);
+
+					if (relattr->attisdropped)
+						continue;
+					if (strcmp(colname, inhname) == 0)
+					{
+						found = true;
+
+						break;
+					}
+				}
+				heap_close(rel, NoLock);
+				if (found)
+					elog(DEBUG1, "DISTRIBUTED BY clause refers to columns of inherited table");
+
+				if (found)
+					break;
+			}
+
 			if (!found)
 			{
 				foreach(columns, cxt->columns)
@@ -3977,6 +4014,65 @@ transformIndexStmt(Oid relid, IndexStmt *stmt, const char *queryString)
 	return stmt;
 }
 
+CreateProjectionStmt *
+transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
+									 const char *queryString) {
+	ParseState *pstate;
+	bool bQuiet;
+	DistributedBy*likeDistributedBy;
+	CreateStmtContext cxt;
+
+	likeDistributedBy = NULL;
+
+	bQuiet = false;
+
+	cxt.tempCtx =
+		AllocSetContextCreate(CurrentMemoryContext,
+							  "CreateStmt analyze context",
+							  ALLOCSET_DEFAULT_MINSIZE,
+							  ALLOCSET_DEFAULT_INITSIZE,
+							  ALLOCSET_DEFAULT_MAXSIZE);
+
+	cxt.relation = stmt->relation;
+	cxt.rel = NULL;
+	cxt.inhRelations = NULL;
+	cxt.isalter = false;
+	cxt.columns = NIL;
+	cxt.ckconstraints = NIL;
+	cxt.fkconstraints = NIL;
+	cxt.ixconstraints = NIL;
+	cxt.inh_indexes = NIL;
+	cxt.likeclauses = NIL;
+	cxt.extstats = NIL;
+	cxt.attr_encodings = NULL;
+	cxt.blist = NIL;
+	cxt.alist = NIL;
+	cxt.pkey = NULL;
+	cxt.ispartitioned = false;
+	cxt.partbound = NULL;
+	cxt.ofType = false;
+	cxt.isprojection = true;
+
+	/* Set up pstate */
+	pstate = make_parsestate(NULL);
+	pstate->p_sourcetext = queryString;
+	/*
+	 * Transform DISTRIBUTED BY (or construct a default one, if not given
+	 * explicitly).
+	 */
+	
+	stmt->distributedBy = transformDistributedBy(pstate, &cxt,
+													stmt->distributedBy,
+													likeDistributedBy, bQuiet);
+	free_parsestate(pstate);
+
+	MemoryContextDelete(cxt.tempCtx);
+
+	/* Mark statement as successfully transformed */
+	// stmt->transformed = true;
+
+	return stmt;
+}
 
 /*
  * transformRuleStmt -
@@ -4960,7 +5056,6 @@ transformCreateSchemaStmt(CreateSchemaStmt *stmt)
 			case T_GrantStmt:
 				cxt.grants = lappend(cxt.grants, element);
 				break;
-
 			default:
 				elog(ERROR, "unrecognized node type: %d",
 					 (int) nodeTag(element));

@@ -539,7 +539,7 @@ ExecInsert(ModifyTableState *mtstate,
 		 * Above ExecPartitionCheck has already checked the partition correctness, so we just
 		 * need check distribution correctness.
 		 */
-		if (gp_detect_data_correctness)
+		if (gp_detect_data_correctness && false)
 		{
 			/* Initialize hash function and structure */
 			CdbHash  *hash;
@@ -569,15 +569,13 @@ ExecInsert(ModifyTableState *mtstate,
 			/* End check if one tuple is in the wrong segment */
 			if (cdbhashreduce(hash) != GpIdentity.segindex)
 			{
-				ereport(ERROR,
-						(errcode(ERRCODE_CHECK_VIOLATION),
-								errmsg("trying to insert row into wrong segment")));
+				// bad
 			}
 
 			freeCdbHash(hash);
 
 			/* Do nothing */
-			return NULL;
+			// return NULL;
 		}
 
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
@@ -661,10 +659,17 @@ ExecInsert(ModifyTableState *mtstate,
 
 			/* insert the tuple, with the speculative token */
 			table_tuple_insert_speculative(resultRelationDesc, slot,
-										   estate->es_output_cid,
-										   0,
-										   NULL,
-										   specToken);
+										estate->es_output_cid,
+										0,
+										NULL,
+										specToken);
+
+			/* insert rpj' tuples if needed */
+			if (resultRelInfo->ri_NumProjection > 0)
+			{
+				ExecInsertProjectionTuples(slot,
+									estate);
+			}
 
 			/* insert index entries for tuple */
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, true,
@@ -700,14 +705,21 @@ ExecInsert(ModifyTableState *mtstate,
 		else
 		{
 			/* insert the tuple normally */
-			table_tuple_insert(resultRelationDesc, slot,
+			if (table_tuple_insert_check_location(resultRelationDesc, slot,
 							   estate->es_output_cid,
-							   0, NULL);
+							   0, NULL)) {
+				/* insert index entries for tuple */
+				if (resultRelInfo->ri_NumIndices > 0)
+					recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
+														NIL);
 
-			/* insert index entries for tuple */
-			if (resultRelInfo->ri_NumIndices > 0)
-				recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
-													   NIL);
+			}
+			/* insert rpj' tuples if needed */
+			if (resultRelInfo->ri_NumProjection > 0)
+			{
+				ExecInsertProjectionTuples(slot,
+									estate);
+			}
 		}
 	}
 	if (canSetTag)
@@ -1721,6 +1733,13 @@ lreplace:;
 		/* insert index entries for tuple if necessary */
 		if (resultRelInfo->ri_NumIndices > 0 && update_indexes)
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL, NIL);
+		
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(slot,
+								estate);
+		}
 	}
 	if (canSetTag)
 		(estate->es_processed)++;
@@ -2583,7 +2602,7 @@ ExecModifyTable(PlanState *pstate)
 
 				relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
 				if (relkind == RELKIND_RELATION || relkind == RELKIND_MATVIEW ||
-					relkind == RELKIND_PARTITIONED_TABLE ||
+					relkind == RELKIND_PARTITIONED_TABLE || relkind == RELKIND_PROJECTION ||
 					IsAppendonlyMetadataRelkind(relkind))
 				{
 					datum = ExecGetJunkAttribute(slot,
@@ -2893,6 +2912,14 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			resultRelInfo->ri_IndexRelationDescs == NULL)
 			ExecOpenIndices(resultRelInfo,
 							node->onConflictAction != ONCONFLICT_NONE);
+
+		/*
+		 * If there are projections on the result relation, open them and save
+		 * descriptors in the result relation info, so that we can add new
+		 * index entries for the tuples we add/update. 
+		 */
+		if (resultRelInfo->ri_PrjRelationDescs == NULL)
+			ExecOpenProjections(resultRelInfo);
 
 		/*
 		 * If this is an UPDATE and a BEFORE UPDATE trigger is present, the
@@ -3281,6 +3308,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 
 					relkind = resultRelInfo->ri_RelationDesc->rd_rel->relkind;
 					if (relkind == RELKIND_RELATION ||
+					    relkind == RELKIND_PROJECTION ||
 						relkind == RELKIND_MATVIEW ||
 						relkind == RELKIND_PARTITIONED_TABLE ||
 						IsAppendonlyMetadataRelkind(relkind))

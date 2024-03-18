@@ -25,6 +25,12 @@ struct HTAB;  /* utils/hsearch.h */
 /* commands/dropcmds.c */
 extern void RemoveObjects(DropStmt *stmt);
 
+/* commands/prjcmds.c */
+extern ObjectAddress DefineProjection(Oid relationId,
+								 CreateProjectionStmt *stmt,
+								 Oid prjRelationId,
+								 bool check_rights, bool dispatch);
+
 /* commands/indexcmds.c */
 extern ObjectAddress DefineIndex(Oid relationId,
 								 IndexStmt *stmt,

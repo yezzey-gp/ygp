@@ -133,6 +133,10 @@ static const event_trigger_support_data event_trigger_support[] = {
 	{"EXTERNAL TABLE", true},
 	{"PROTOCOL", true},
 
+	/* PROJECTION */
+
+	{"PROJECTION", true},
+
 	{NULL, false}
 };
 

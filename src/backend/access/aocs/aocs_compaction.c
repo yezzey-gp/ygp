@@ -202,6 +202,15 @@ AOCSMoveTuple(TupleTableSlot *slot,
 		ResetPerTupleExprContext(estate);
 	}
 
+	/* insert prj' tuples if needed */
+	if (resultRelInfo->ri_NumProjection > 0)
+	{
+		ExecInsertProjectionTuples(slot,
+							  estate);
+		ResetPerTupleExprContext(estate);
+	}
+
+
 	elogif(Debug_appendonly_print_compaction, DEBUG5,
 		   "Compaction: Moved tuple (%d," INT64_FORMAT ") -> (%d," INT64_FORMAT ")",
 		   AOTupleIdGet_segmentFileNum(oldAoTupleId), AOTupleIdGet_rowNum(oldAoTupleId),
@@ -271,6 +280,7 @@ AOCSSegmentFileFullCompaction(Relation aorel,
 	resultRelInfo->ri_RelationDesc = aorel;
 	resultRelInfo->ri_TrigDesc = NULL;	/* we don't fire triggers */
 	ExecOpenIndices(resultRelInfo, false);
+	ExecOpenProjections(resultRelInfo);
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
 	estate->es_result_relation_info = resultRelInfo;
@@ -346,6 +356,7 @@ AOCSSegmentFileFullCompaction(Relation aorel,
 	AppendOnlyVisimap_Finish(&visiMap, NoLock);
 
 	ExecCloseIndices(resultRelInfo);
+	ExecCloseProjection(resultRelInfo);
 	FreeExecutorState(estate);
 
 	ExecDropSingleTupleTableSlot(slot);

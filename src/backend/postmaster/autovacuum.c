@@ -2197,6 +2197,7 @@ do_autovacuum(void)
 		bool		wraparound;
 
 		if (classForm->relkind != RELKIND_RELATION &&
+		    classForm->relkind != RELKIND_PROJECTION &&
 			classForm->relkind != RELKIND_MATVIEW &&
 			classForm->relkind != RELKIND_AOSEGMENTS &&
 			classForm->relkind != RELKIND_AOBLOCKDIR &&
@@ -2396,6 +2397,7 @@ do_autovacuum(void)
 		 * AO aux files without dropping AO relaton itself, so do not attempt to.
 		 */
 		if (!((classForm->relkind == RELKIND_RELATION ||
+	     	classForm->relkind == RELKIND_PROJECTION ||
 			classForm->relkind == RELKIND_MATVIEW) &&
 			  classForm->relpersistence == RELPERSISTENCE_TEMP))
 		{
@@ -2896,6 +2898,7 @@ extract_autovac_opts(HeapTuple tup, TupleDesc pg_class_desc)
 	AutoVacOpts *av;
 
 	Assert(((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_RELATION ||
+	       ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_PROJECTION ||
 		   ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_MATVIEW ||
 		   ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_TOASTVALUE ||
 		   ((Form_pg_class) GETSTRUCT(tup))->relkind == RELKIND_AOSEGMENTS ||

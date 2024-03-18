@@ -120,6 +120,7 @@ CreateStatistics(CreateStatsStmt *stmt)
 
 		/* Restrict to allowed relation types */
 		if (rel->rd_rel->relkind != RELKIND_RELATION &&
+		    rel->rd_rel->relkind != RELKIND_PROJECTION &&
 			rel->rd_rel->relkind != RELKIND_MATVIEW &&
 			rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)

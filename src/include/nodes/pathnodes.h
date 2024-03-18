@@ -896,6 +896,9 @@ typedef struct RelOptInfo
 	Relids		top_parent_relids;	/* Relids of topmost parents (if "other"
 									 * rel) */
 
+	/* used for projection relations */
+	int nprjs;
+
 	/* used for partitioned relations */
 	PartitionScheme part_scheme;	/* Partitioning scheme. */
 	int			nparts;			/* number of partitions */

@@ -8156,7 +8156,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 	}
 
 	/* Send all of the tuples to all of the QEs in gang above... */
-	else if (CdbPathLocus_IsReplicated(path->path.locus))
+	else if (CdbPathLocus_IsReplicated(path->path.locus) || CdbPathLocus_IsMultiHash(path->path.locus))
 		motion = make_broadcast_motion(subplan);
 
 	/* Hashed redistribution to all QEs in gang above... */

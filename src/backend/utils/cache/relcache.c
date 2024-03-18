@@ -97,6 +97,7 @@
 #include "catalog/gp_distribution_policy.h"         /* GpPolicy */
 #include "catalog/heap.h"
 #include "catalog/index.h"
+#include "catalog/ygp_prj.h"
 #include "cdb/cdbtm.h"
 #include "cdb/cdbvars.h"        /* Gp_role */
 #include "cdb/cdbsreh.h"
@@ -493,6 +494,7 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_VIEW:
 		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
+		case RELKIND_PROJECTION:
 			amoptsfn = NULL;
 			break;
 		case RELKIND_INDEX:
@@ -1278,6 +1280,11 @@ retry:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
+		/* YGP */
+		case RELKIND_PROJECTION:
+			Assert(relation->rd_rel->relam != InvalidOid);
+			RelationInitTableAccessMethod(relation);
+			break;
 		case RELKIND_PARTITIONED_TABLE:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			break;
@@ -1308,7 +1315,9 @@ retry:
     /*
      * initialize Greenplum Database partitioning info
      */
-	if ((relation->rd_rel->relkind == RELKIND_RELATION && !IsSystemRelation(relation)) ||
+	if ((
+		(relation->rd_rel->relkind == RELKIND_RELATION || 
+		relation->rd_rel->relkind == RELKIND_PROJECTION) && !IsSystemRelation(relation)) ||
 		relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE ||
 		relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE ||
 		relation->rd_rel->relkind == RELKIND_MATVIEW)
@@ -2532,6 +2541,7 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	FreeTriggerDesc(relation->trigdesc);
 	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
+	list_free(relation->rd_prjlist);
 	list_free(relation->rd_statlist);
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
@@ -3673,9 +3683,14 @@ RelationBuildLocalRelation(const char *relname,
 		relkind == RELKIND_MATVIEW)
 		RelationInitTableAccessMethod(rel);
 
+	/* GPDB */	
 	if (relkind == RELKIND_AOSEGMENTS ||
 		relkind == RELKIND_AOVISIMAP ||
 		relkind == RELKIND_AOBLOCKDIR)
+		RelationInitTableAccessMethod(rel);
+
+	/* YGP */	
+	if (relkind == RELKIND_PROJECTION)
 		RelationInitTableAccessMethod(rel);
 
 	/*
@@ -3789,6 +3804,12 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
+			table_relation_set_new_filenode(relation, &newrnode,
+											persistence,
+											&freezeXid, &minmulti);
+			break;
+
+		case RELKIND_PROJECTION:
 			table_relation_set_new_filenode(relation, &newrnode,
 											persistence,
 											&freezeXid, &minmulti);
@@ -4765,6 +4786,63 @@ RelationGetIndexList(Relation relation)
 	else
 		relation->rd_replidindex = InvalidOid;
 	relation->rd_indexvalid = true;
+	MemoryContextSwitchTo(oldcxt);
+
+	/* Don't leak the old list, if there is one */
+	list_free(oldlist);
+
+	return result;
+}
+
+List *
+RelationGetPrjList(Relation relation) {
+	Relation	prjrel;
+	SysScanDesc prjscan;
+	ScanKeyData skey;
+	HeapTuple	htup;
+	List	   *result;
+	List	   *oldlist;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the list. */
+	if (relation->rd_prjvalid)
+		return list_copy(relation->rd_prjlist);
+
+	/*
+	 * We build the list we intend to return (in the caller's context) while
+	 * doing the scan.  After successfully completing the scan, we copy that
+	 * list into the relcache entry.  This avoids cache-context memory leakage
+	 * if we get some sort of error partway through.
+	 */
+	result = NIL;
+
+	/* Prepare to scan ygp_prj for entries having projectionrelid = this rel. */
+	ScanKeyInit(&skey,
+				Anum_ygp_prj_projectionrelid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationGetRelid(relation)));
+
+	prjrel = table_open(ProjectionRelationId, AccessShareLock);
+	prjscan = systable_beginscan(prjrel, InvalidOid, true,
+								 NULL, 1, &skey);
+
+	while (HeapTupleIsValid(htup = systable_getnext(prjscan)))
+	{
+		Form_ypg_projection prj = (Form_ypg_projection) GETSTRUCT(htup);
+
+		/* Add index's OID to result list in the proper order */
+		result = insert_ordered_oid(result, prj->prjrelid);
+	}
+
+	systable_endscan(prjscan);
+
+	table_close(prjrel, AccessShareLock);
+
+	/* Now save a copy of the completed list in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
+	oldlist = relation->rd_prjlist;
+	relation->rd_prjlist = list_copy(result);
+	relation->rd_prjvalid = true;
 	MemoryContextSwitchTo(oldcxt);
 
 	/* Don't leak the old list, if there is one */
@@ -5996,6 +6074,8 @@ load_relcache_init_file(bool shared)
 			rel->rd_refcnt = 0;
 		rel->rd_indexvalid = false;
 		rel->rd_indexlist = NIL;
+		rel->rd_prjvalid = false;
+		rel->rd_prjlist = NIL;
 		rel->rd_pkindex = InvalidOid;
 		rel->rd_replidindex = InvalidOid;
 		rel->rd_indexattr = NULL;

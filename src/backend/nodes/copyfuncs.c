@@ -3435,6 +3435,20 @@ _copyIndexElem(const IndexElem *from)
 	return newnode;
 }
 
+static ProjectionElem *
+_copyProjectionElem(const ProjectionElem *from)
+{
+	ProjectionElem  *newnode = makeNode(ProjectionElem);
+
+	COPY_STRING_FIELD(name);
+	COPY_NODE_FIELD(expr);
+	COPY_STRING_FIELD(prjcolname);
+	COPY_NODE_FIELD(collation);
+	COPY_NODE_FIELD(opclass);
+
+	return newnode;
+}
+
 static ColumnDef *
 _copyColumnDef(const ColumnDef *from)
 {
@@ -6730,6 +6744,9 @@ copyObjectImpl(const void *from)
 			break;
 		case T_IndexElem:
 			retval = _copyIndexElem(from);
+			break;
+		case T_ProjectionElem:
+			retval = _copyProjectionElem(from);
 			break;
 		case T_ColumnDef:
 			retval = _copyColumnDef(from);

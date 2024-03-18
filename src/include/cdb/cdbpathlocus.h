@@ -57,6 +57,7 @@ typedef enum CdbLocusType
 								 * not be redistributed */
     CdbLocusType_Replicated,    /* replicated over all qExecs of an N-gang */
     CdbLocusType_Hashed,        /* hash partitioned over all qExecs of N-gang */
+    CdbLocusType_MultiHashed,     /* broadcast to multiple hash partitioned over all qExecs of N-gang */
     CdbLocusType_HashedOJ,      /* result of hash partitioned outer join, NULLs can be anywhere */
     CdbLocusType_Strewn,        /* partitioned on no known function */
     CdbLocusType_End            /* = last valid CdbLocusType + 1 */
@@ -213,6 +214,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_IsOuterQuery(locus)        \
             ((locus).locustype == CdbLocusType_OuterQuery)
 
+#define CdbPathLocus_IsMultiHash(locus)        \
+            ((locus).locustype == CdbLocusType_MultiHashed)
+
 #define CdbPathLocus_MakeSimple(plocus, _locustype, numsegments_) \
     do {                                                \
         CdbPathLocus *_locus = (plocus);                \
@@ -255,6 +259,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_MakeOuterQuery(plocus)                 \
 	CdbPathLocus_MakeSimple((plocus), CdbLocusType_OuterQuery, -1)
 
+#define CdbPathLocus_MakeMultiHashed(plocus)                  \
+        CdbPathLocus_MakeSimple((plocus), CdbLocusType_MultiHashed, -1)
+
 /************************************************************************/
 
 extern bool cdbpathlocus_equal(CdbPathLocus a, CdbPathLocus b);
@@ -263,10 +270,10 @@ extern bool cdbpathlocus_equal(CdbPathLocus a, CdbPathLocus b);
 
 extern CdbPathLocus cdbpathlocus_for_insert(struct PlannerInfo *root,
 											struct GpPolicy *policy,
-											struct PathTarget *pathtarget);
+											struct PathTarget *pathtarget, bool relhasprj);
 
 CdbPathLocus
-cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy);
+cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy, bool relhasprj);
 CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo   *root,
                           struct RelOptInfo    *rel);

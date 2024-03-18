@@ -23,7 +23,8 @@
 #include "utils/guc.h"
 #include "utils/rel.h"
 #include "utils/snapshot.h"
-
+#include "cdb/cdbhash.h"
+#include "cdb/cdbvars.h"
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
 
@@ -1365,6 +1366,53 @@ table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 								  bistate);
 }
 
+
+static inline bool
+table_tuple_insert_check_location(Relation rel, TupleTableSlot *slot, CommandId cid,
+				   int options, struct BulkInsertStateData *bistate)
+{
+	CdbHash  *hash;
+	GpPolicy *policy = rel->rd_cdbpolicy;
+	bool doins = true;
+
+	/* Skip randomly and replicated distributed relation */
+	if (!GpPolicyIsHashPartitioned(policy))
+		return NULL;
+
+	hash = makeCdbHashForRelation(rel);
+
+	cdbhashinit(hash);
+
+	/* Add every attribute in the distribution policy to the hash */
+	for (int i = 0; i < policy->nattrs; i++)
+	{
+		int			attnum = policy->attrs[i];
+		bool		isNull;
+		Datum		attr;
+
+		attr = slot_getattr(slot, attnum, &isNull);
+
+		cdbhash(hash, i + 1, attr, isNull);
+	}
+
+	/* End check if one tuple is in the wrong segment */
+	if (cdbhashreduce(hash) != GpIdentity.segindex)
+	{
+		// bad
+		doins = false;
+	}
+
+	freeCdbHash(hash);
+
+	if (doins) {
+		table_tuple_insert(rel, slot, cid, options,
+									bistate);
+	}
+
+	return doins;
+}
+
+
 /*
  * Perform a "speculative insertion". These can be backed out afterwards
  * without aborting the whole transaction.  Other sessions can wait for the
@@ -2042,6 +2090,7 @@ table_scan_sample_next_tuple(TableScanDesc scan,
  */
 
 extern void simple_table_tuple_insert(Relation rel, TupleTableSlot *slot);
+extern void simple_table_tuple_insert_check_location(Relation rel, TupleTableSlot *slot);
 extern void simple_table_tuple_delete(Relation rel, ItemPointer tid,
 									  Snapshot snapshot);
 extern void simple_table_tuple_update(Relation rel, ItemPointer otid,

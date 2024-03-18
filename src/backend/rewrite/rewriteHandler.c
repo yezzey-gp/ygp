@@ -1563,6 +1563,7 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 	Var 		*varSegid = NULL;
 
 	if (target_relation->rd_rel->relkind == RELKIND_RELATION ||
+	    target_relation->rd_rel->relkind == RELKIND_PROJECTION ||
 		target_relation->rd_rel->relkind == RELKIND_MATVIEW ||
 		target_relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE ||
 		IsAppendonlyMetadataRelkind(target_relation->rd_rel->relkind))
@@ -2238,6 +2239,7 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		/* Only normal relations can have RLS policies */
 		if (rte->rtekind != RTE_RELATION ||
 			(rte->relkind != RELKIND_RELATION &&
+			rte->relkind != RELKIND_PROJECTION &&
 			 rte->relkind != RELKIND_PARTITIONED_TABLE))
 			continue;
 
@@ -2705,6 +2707,7 @@ view_query_is_auto_updatable(Query *viewquery, bool check_cols)
 	if (base_rte->rtekind != RTE_RELATION ||
 		(base_rte->relkind != RELKIND_RELATION &&
 		 base_rte->relkind != RELKIND_FOREIGN_TABLE &&
+		 base_rte->relkind != RELKIND_PROJECTION &&
 		 base_rte->relkind != RELKIND_VIEW &&
 		 base_rte->relkind != RELKIND_PARTITIONED_TABLE))
 		return gettext_noop("Views that do not select from a single table or view are not automatically updatable.");
@@ -2883,6 +2886,7 @@ relation_is_updatable(Oid reloid,
 	/* If the relation is a table, it is always updatable */
 	/* GPDB: except if it's an external table, which we checked above */
 	if (rel->rd_rel->relkind == RELKIND_RELATION ||
+		rel->rd_rel->relkind == RELKIND_PROJECTION ||
 		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 	{
 		relation_close(rel, AccessShareLock);

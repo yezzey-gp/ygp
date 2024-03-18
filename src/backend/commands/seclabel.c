@@ -107,6 +107,7 @@ ExecSecLabelStmt(SecLabelStmt *stmt)
 			 * are the only relkinds for which pg_dump will dump labels).
 			 */
 			if (relation->rd_rel->relkind != RELKIND_RELATION &&
+			    relation->rd_rel->relkind != RELKIND_PROJECTION &&
 				relation->rd_rel->relkind != RELKIND_VIEW &&
 				relation->rd_rel->relkind != RELKIND_MATVIEW &&
 				relation->rd_rel->relkind != RELKIND_COMPOSITE_TYPE &&

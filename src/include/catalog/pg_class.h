@@ -161,6 +161,7 @@ typedef FormData_pg_class *Form_pg_class;
 #ifdef EXPOSE_TO_CLIENT_CODE
 
 #define		  RELKIND_RELATION		  'r'	/* ordinary table */
+#define		  RELKIND_PROJECTION	  'j'	/* table projection */
 #define		  RELKIND_INDEX			  'i'	/* secondary index */
 #define		  RELKIND_SEQUENCE		  'S'	/* sequence object */
 #define		  RELKIND_TOASTVALUE	  't'	/* for out-of-line values */
@@ -198,6 +199,7 @@ typedef FormData_pg_class *Form_pg_class;
  */
 #define RELKIND_HAS_STORAGE(relkind) \
 	((relkind) == RELKIND_RELATION || \
+	 (relkind) == RELKIND_PROJECTION || \
 	 (relkind) == RELKIND_INDEX || \
 	 (relkind) == RELKIND_SEQUENCE || \
 	 (relkind) == RELKIND_TOASTVALUE || \

@@ -310,6 +310,15 @@ AppendOnlyMoveTuple(TupleTableSlot *slot,
 		ResetPerTupleExprContext(estate);
 	}
 
+
+	/* insert rpj' tuples if needed */
+	if (resultRelInfo->ri_NumProjection > 0)
+	{
+		ExecInsertProjectionTuples(slot,
+							  estate);
+		ResetPerTupleExprContext(estate);
+	}
+
 	appendonly_free_memtuple(tuple);
 
 	if (Debug_appendonly_print_compaction)
@@ -445,6 +454,7 @@ AppendOnlySegmentFileFullCompaction(Relation aorel,
 	resultRelInfo->ri_RelationDesc = aorel;
 	resultRelInfo->ri_TrigDesc = NULL;	/* we don't fire triggers */
 	ExecOpenIndices(resultRelInfo, false);
+	ExecOpenProjections(resultRelInfo);
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
 	estate->es_result_relation_info = resultRelInfo;
@@ -516,6 +526,7 @@ AppendOnlySegmentFileFullCompaction(Relation aorel,
 	AppendOnlyVisimap_Finish(&visiMap, NoLock);
 
 	ExecCloseIndices(resultRelInfo);
+	ExecCloseProjection(resultRelInfo);
 	FreeExecutorState(estate);
 
 	ExecDropSingleTupleTableSlot(slot);

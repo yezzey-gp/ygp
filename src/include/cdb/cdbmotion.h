@@ -64,7 +64,7 @@ extern void RemoveMotionLayer(MotionLayerState *ml_states);
 extern void CheckAndSendRecordCache(MotionLayerState *mlStates,
 									ChunkTransportState *transportStates,
 									int16 motNodeID,
-									int16 targetRoute);
+									int16 targetRoute, Bitmapset*brd);
 
 /* non-blocking operation that may perform only part (or none) of the
  * send before returning.  The TupleSendContext is used to help keep track
@@ -93,7 +93,7 @@ extern SendReturnCode SendTuple(MotionLayerState *mlStates,
 								ChunkTransportState *transportStates,
 								int16 motNodeID,
 		  						TupleTableSlot *slot,
-								int16 targetRoute);
+								int16 targetRoute, Bitmapset *broadcastsegs);
 
 
 /* Send or broadcast an END_OF_STREAM token to the corresponding motion-node

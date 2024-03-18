@@ -643,6 +643,14 @@ extern void check_exclusion_constraint(Relation heap, Relation index,
 									   EState *estate, bool newIndex);
 
 /*
+ * prototypes from functions in execProjection.c
+ */
+extern void ExecOpenProjections(ResultRelInfo *resultRelInfo);
+extern void ExecCloseProjection(ResultRelInfo *resultRelInfo);
+
+extern List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate);
+
+/*
  * prototypes from functions in execReplication.c
  */
 extern bool RelationFindReplTupleByIndex(Relation rel, Oid idxoid,

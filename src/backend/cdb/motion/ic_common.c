@@ -281,7 +281,8 @@ SendTupleChunkToAMS(MotionLayerState *mlStates,
 					ChunkTransportState *transportStates,
 					int16 motNodeID,
 					int16 targetRoute,
-					TupleChunkListItem tcItem)
+					TupleChunkListItem tcItem,
+					Bitmapset *broadcastsegs)
 {
 	int			i,
 				recount = 0;
@@ -317,7 +318,7 @@ SendTupleChunkToAMS(MotionLayerState *mlStates,
 
 		if (targetRoute == BROADCAST_SEGIDX)
 		{
-			doBroadcast(transportStates, pEntry, currItem, &recount);
+			doBroadcast(transportStates, pEntry, currItem, &recount, broadcastsegs);
 		}
 		else
 		{

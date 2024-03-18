@@ -2448,7 +2448,6 @@ get_rel_relkind(Oid relid)
 	else
 		return '\0';
 }
-
 /*
  * get_rel_relispartition
  *

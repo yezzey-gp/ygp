@@ -413,7 +413,8 @@ rel_is_range_part_nondefault(Oid relid)
 	/* check if the relation is a partition */
 	classForm = (Form_pg_class) GETSTRUCT(tuple);
 	if ((classForm->relkind == RELKIND_RELATION ||
-		classForm->relkind == RELKIND_PARTITIONED_TABLE) &&
+		classForm->relkind == RELKIND_PARTITIONED_TABLE
+		|| classForm->relkind == RELKIND_PROJECTION) &&
 		classForm->relispartition)
 	{
 		PartitionBoundSpec *boundspec = NULL;

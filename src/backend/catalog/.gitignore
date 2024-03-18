@@ -5,5 +5,6 @@
 /schemapg.h
 /pg_*_d.h
 /gp_*_d.h
+/ygp_*_d.h
 /bki-stamp
 /system_views_gp.sql

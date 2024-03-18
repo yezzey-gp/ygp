@@ -346,6 +346,7 @@ analyze_rel_internal(Oid relid, RangeVar *relation,
 	 * Check that it's of an analyzable relkind, and set up appropriately.
 	 */
 	if (onerel->rd_rel->relkind == RELKIND_RELATION ||
+		onerel->rd_rel->relkind == RELKIND_PROJECTION ||
 		onerel->rd_rel->relkind == RELKIND_MATVIEW)
 	{
 		/* Regular table, so we'll use the regular row acquisition function */
@@ -880,7 +881,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 				{
 					analyze_hll_non_part_table = true;
 				}
-				if (onerel->rd_rel->relkind == RELKIND_RELATION && (onerel->rd_rel->relispartition || analyze_hll_non_part_table))
+				if ((onerel->rd_rel->relkind == RELKIND_RELATION || onerel->rd_rel->relkind == RELKIND_PROJECTION) && (onerel->rd_rel->relispartition || analyze_hll_non_part_table))
 				{
 					MemoryContext old_context;
 					Datum *hll_values;
@@ -1814,6 +1815,7 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 
 		/* Check table type (MATVIEW can't happen, but might as well allow) */
 		if (childrel->rd_rel->relkind == RELKIND_RELATION ||
+		    childrel->rd_rel->relkind == RELKIND_PROJECTION ||
 			childrel->rd_rel->relkind == RELKIND_MATVIEW)
 		{
 			/* Regular table, so use the regular row acquisition function */
@@ -4151,7 +4153,7 @@ merge_leaf_stats(VacAttrStatsP stats,
 		Oid			pkrelid = lfirst_oid(lc);
 
 		/* skip intermediate partitions, we're only interested in leaves */
-		if (get_rel_relkind(pkrelid) != RELKIND_RELATION)
+		if (get_rel_relkind(pkrelid) != RELKIND_RELATION && get_rel_relkind(pkrelid) != RELKIND_PROJECTION)
 			continue;
 
 		oid_list = lappend_oid(oid_list, pkrelid);
