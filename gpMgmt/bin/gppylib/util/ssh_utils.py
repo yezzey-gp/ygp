@@ -8,6 +8,7 @@ import cmd
 import os
 import sys
 import socket
+import time
 import threading
 from gppylib.commands.base import WorkerPool, REMOTE
 from gppylib.commands.unix import Hostname, Echo
@@ -16,6 +17,7 @@ from gpssh_modules import gppxssh_wrapper
 sys.path.insert(1, sys.path[0] + '/lib')
 from pexpect import pxssh
 
+RETRY_EXPONENT = 3
 
 class HostNameError(Exception):
     def __init__(self, msg, lineno=0):
@@ -167,7 +169,7 @@ class Session(cmd.Cmd):
         self.peerStringFormatRaw = "[%%%ds]" % cnt
         return self.peerStringFormatRaw
 
-    def login(self, hostList=None, userName=None, delaybeforesend=0.05, sync_multiplier=1.0, sync_retries=3):
+    def login(self, hostList=None, userName=None, delaybeforesend=0.05, sync_multiplier=1.0, sync_retries=3, all_hosts=None):
         """This is the normal entry point used to add host names to the object and log in to each of them"""
         if self.verbose: print '\n[Reset ...]'
         if not (self.hostList or hostList):
@@ -194,8 +196,11 @@ class Session(cmd.Cmd):
 
         def connect_host(hostname):
             retry_login = True
+            num_retries = sync_retries
+            retry_attempt = 0
+            success = False
 
-            while True:
+            while (not success) and retry_attempt <= num_retries:
                 # create a new PxsshWrapper object for each retry to avoid using the
                 # same object which can cause unexpected behaviours
                 p = gppxssh_wrapper.PxsshWrapper(delaybeforesend=delaybeforesend,
@@ -210,6 +215,7 @@ class Session(cmd.Cmd):
                     p.x_peer = hostname
                     p.x_pid = p.pid
                     good_list.append(p)
+                    success = True
                     if self.verbose:
                         with print_lock:
                             print '[INFO] login %s' % hostname
@@ -230,8 +236,10 @@ class Session(cmd.Cmd):
                             print e
                         else:
                             print 'hint: use gpssh-exkeys to setup public-key authentication between hosts'
+                            print e
 
-                break
+                    time.sleep(min(120, RETRY_EXPONENT ** retry_attempt))
+                    retry_attempt += 1
 
         thread_list = []
         for host in hostList:
@@ -241,6 +249,9 @@ class Session(cmd.Cmd):
 
         for t in thread_list:
             t.join()
+
+        if all_hosts and len(good_list) != len(hostList):
+            raise RuntimeError("Not all hosts reached.")
 
         # Restore terminal type
         if origTERM:
