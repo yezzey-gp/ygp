@@ -126,7 +126,7 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
  * ----------------
  */
 void
-FormProjectionDatum(struct ProjectionInfo *prjInfo,
+FormProjectionDatum(struct PrjInfo *prjInfo,
 			   TupleTableSlot *slot,
 			   struct EState *estate,
 			   Datum *values,
@@ -165,10 +165,10 @@ FormProjectionDatum(struct ProjectionInfo *prjInfo,
 		else
 		{
 			// /*
-			//  * Index expression --- need to evaluate it.
+			//  * Projection expression --- need to evaluate it.
 			//  */
 			// if (indexpr_item == NULL)
-			// 	elog(ERROR, "wrong number of index expressions");
+			// 	elog(ERROR, "wrong number of projection expressions");
 			// iDatum = ExecEvalExprSwitchContext((ExprState *) lfirst(indexpr_item),
 			// 								   GetPerTupleExprContext(estate),
 			// 								   &isNull);
@@ -224,28 +224,38 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 	for (i = 0; i < numProjections; i++)
 	{
 
-
-        // Datum		values[INDEX_MAX_KEYS];
-        // bool		isnull[INDEX_MAX_KEYS];
+		HeapTuple tuple;
+        Datum		values[INDEX_MAX_KEYS];
+        bool		isnull[INDEX_MAX_KEYS];
         
 		Relation	prjRelation = relationDescs[i];
+		TupleDesc tupDesc;
+		TupleTableSlot slot;
 		IndexInfo  *indexInfo;
 		bool		applyNoDupErr;
 		bool		satisfiesConstraint;
 
 		if (prjRelation == NULL)
 			continue;
+
+		tupDesc = RelationGetDescr(prjRelation);
+		slot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);
         
 		// /*
-		//  * FormIndexDatum fills in its values and isnull parameters with the
-		//  * appropriate values for the column(s) of the index.
+		//  * FormProjectionDatum fills in its values and isnull parameters with the
+		//  * appropriate values for the column(s) of the projection.
 		//  */
-		// FormIndexDatum(indexInfo,
-		// 			   slot,
-		// 			   estate,
-		// 			   values,
-		// 			   isnull);
+		FormProjectionDatum(indexInfo,
+					   slot,
+					   estate,
+					   values,
+					   isnull);
 
+
+
+		tuple = heap_form_tuple(funcctx->tuple_desc, values, isnull);
+
+		ExecStoreHeapTuple(tuple, , true /* do pfree tuple */);
 
         // !! reduce tuple, does it satify local prj?
 
