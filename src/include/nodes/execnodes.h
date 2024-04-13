@@ -194,9 +194,17 @@ typedef struct IndexInfo
 
 typedef struct PrjInfo {
 	NodeTag		type;
-	int			ii_NumPrjAttrs;	/* total number of columns in projection */
+	int			pji_NumPrjAttrs;	/* total number of columns in projection */;
 
-	AttrNumber	*ii_PrjAttrNumbers /* List of column attrib number */;
+	AttrNumber	*pji_PrjAttrNumbers /* List of column attrib number */;
+
+	List	   *pji_Predicate; /* list of Expr */
+
+	ExprState  *pji_PredicateState;
+
+	Oid			pji_Am;
+	void	   *pji_AmCache;
+	MemoryContext pji_Context;
 } PrjInfo;
 
 /* ----------------

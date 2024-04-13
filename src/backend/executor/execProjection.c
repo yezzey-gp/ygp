@@ -241,10 +241,10 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 		tupDesc = RelationGetDescr(prjRelation);
 		slot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);
         
-		// /*
-		//  * FormProjectionDatum fills in its values and isnull parameters with the
-		//  * appropriate values for the column(s) of the projection.
-		//  */
+		/*
+		 * FormProjectionDatum fills in its values and isnull parameters with the
+		 * appropriate values for the column(s) of the projection.
+		 */
 		FormProjectionDatum(indexInfo,
 					   slot,
 					   estate,
@@ -255,11 +255,9 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 
 		tuple = heap_form_tuple(funcctx->tuple_desc, values, isnull);
 
-		ExecStoreHeapTuple(tuple, , true /* do pfree tuple */);
+		ExecStoreHeapTuple(tuple, slot, true /* do pfree tuple */);
 
         // !! reduce tuple, does it satify local prj?
-
-        //!! form prj datum here
 
 		(void)simple_table_tuple_insert_check_location(prjRelation, slot);
 	}

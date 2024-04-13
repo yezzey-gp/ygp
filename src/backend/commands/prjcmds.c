@@ -359,7 +359,9 @@ DefineProjection(Oid relationId,
 	 */
 	/* todo: get schem a from query */
 	// descriptor = BuildDescForRelation(schema);
-	descriptor = RelationGetDescr(rel);
+	//descriptor = RelationGetDescr(rel);
+
+	descriptor = ConstructPrjTupleDescriptor(rel, );
 
 	policy = getPolicyForDistributedBy(stmt->distributedBy, descriptor);
 
