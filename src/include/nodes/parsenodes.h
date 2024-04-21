@@ -3336,6 +3336,8 @@ typedef struct ProjectionStmt
 	char	   *accessMethod;	/* name of access method (eg. btree) */
 	char	   *tableSpace;		/* tablespace, or NULL for default */
 	char	   *prjcomment;		/* comment to apply to index, or NULL */
+
+	List	   *prjParams;	/* columns to insert into projection: a list of ProjectionElem */
 	
 	DistributedBy *distributedBy;   /* what columns we distribute the data by */
 } CreateProjectionStmt;

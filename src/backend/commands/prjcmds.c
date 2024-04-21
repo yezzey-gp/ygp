@@ -338,6 +338,10 @@ DefineProjection(Oid relationId,
 	Relation rel;
 	Oid prjOid;
 	ObjectAddress address;
+	HeapTuple	tuple;
+	Form_pg_am	accessMethodForm;
+	PrjInfo *newInfo;
+	char * accessMethodName;
 	bool		shouldDispatch = dispatch &&
 								 Gp_role == GP_ROLE_DISPATCH &&
                                  IsNormalProcessingMode();
@@ -361,7 +365,54 @@ DefineProjection(Oid relationId,
 	// descriptor = BuildDescForRelation(schema);
 	//descriptor = RelationGetDescr(rel);
 
-	descriptor = ConstructPrjTupleDescriptor(rel, );
+	int numberOfAttributes;
+
+	numberOfAttributes = list_length(stmt->prjParams);
+
+	/*
+	 * look up the access method, verify it can handle the requested features
+	 */
+	accessMethodName = stmt->accessMethod;
+	tuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
+	if (!HeapTupleIsValid(tuple))
+	{
+		/* invalid access method */ 
+		elog(ERROR, "invalid access method %s", accessMethodName);
+	}
+	accessMethodForm = (Form_pg_am) GETSTRUCT(tuple);
+	accessMethodId = accessMethodForm->oid;
+
+	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, stmt->prjParams);
+
+		/*
+	 * Extract the list of column names and the column numbers for the new
+	 * index information.  All this information will be used for the index
+	 * creation.
+	 */
+    ListCell *cell;
+	List *projectionColNames,
+	Oid *collationObjectId,
+	Oid *classObjectId;
+
+
+	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
+	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
+	int ind;
+
+	ind = 0;
+
+	foreach(cell, stmt->prjParams) {
+		ProjectionElem    *pelem = (ProjectionElem *) lfirst(cell);
+		prjColNames = lappend(prjColNames, pelem->name);
+
+		collationObjectId[ind] = get_collation_oid(pelem->collation, false /*missing not ok*/);
+		classObjectId[ind] = 
+
+		++ind;
+	}
+
+
+	descriptor = ConstructPrjTupleDescriptor(rel, newInfo, prjColNames);
 
 	policy = getPolicyForDistributedBy(stmt->distributedBy, descriptor);
 
@@ -426,8 +477,7 @@ DefineProjection(Oid relationId,
 
 	ObjectAddressSet(address, ProjectionRelationId, prjOid);
 
-	elog(LOG, "creating projection");
-
+	elog(LOG, "created projection %s", stmt->prjname);
 
 	table_close(rel, ShareLock);
 

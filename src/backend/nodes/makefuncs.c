@@ -787,11 +787,11 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 
 
 /*
- * makePrjInfoInfo
+ * makePrjInfo
  *	  create an PrjInfo node
  */
-IndexInfo *
-PrjInfo(int numattrs, Oid amoid,
+PrjInfo *
+makePrjInfo(int numattrs, Oid amoid,
 			  List *predicates)
 {
 	PrjInfo  *n = makeNode(PrjInfo);

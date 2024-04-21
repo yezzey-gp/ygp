@@ -9996,6 +9996,8 @@ PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params Distr
 		n->prjname = $3;
 		n->relation = $5;
 
+		n->prjParams = $6;
+
 		n->distributedBy = (DistributedBy *) $7;
 
 		$$ = (Node *)n;
