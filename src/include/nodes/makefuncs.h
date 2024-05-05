@@ -103,6 +103,8 @@ extern DefElem *makeDefElemExtended(char *nameSpace, char *name, Node *arg,
 
 extern GroupingSet *makeGroupingSet(GroupingSetKind kind, List *content, int location);
 
+extern PrjInfo *makePrjInfo(int numattrs, Oid amoid, List *predicates);
+
 extern VacuumRelation *makeVacuumRelation(RangeVar *relation, Oid oid, List *va_cols);
 
 #endif							/* MAKEFUNC_H */

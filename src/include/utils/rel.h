@@ -22,6 +22,7 @@
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
 #include "catalog/pg_publication.h"
+#include "catalog/ygp_prj.h"
 #include "fmgr.h"
 #include "nodes/bitmapset.h"
 #include "rewrite/prs2lock.h"
@@ -167,7 +168,7 @@ typedef struct RelationData
 	struct HeapTupleData *rd_indextuple;	/* all of pg_index tuple */
 
 	/* These are non-NULL only for an projection relation: */
-	Form_ypg_projection rd_prj;		/* ygp_prj tuple describing this projection */
+	Form_ygp_projection rd_prj;		/* ygp_prj tuple describing this projection */
 	/* use "struct" here to avoid needing to include htup.h: */
 	struct HeapTupleData *rd_prjtuple;	/* all of ygp_prj tuple */
 

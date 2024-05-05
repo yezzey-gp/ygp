@@ -12,6 +12,9 @@
 
 #include "access/table.h"
 #include "utils/relcache.h"
+#include "utils/syscache.h"
+
+#include "catalog/ygp_prj.h"
 
 /* ----------------------------------------------------------------
  *						index_build support
@@ -30,22 +33,6 @@
  */
 
 
-/*
-
-	NodeTag		type;
-	int			pji_NumPrjAttrs;	/* total number of columns in projection */;
-
-	AttrNumber	*pji_PrjAttrNumbers /* List of column attrib number */;
-
-	List	   *pji_Predicate; /* list of Expr */
-
-	ExprState  *pji_PredicateState;
-
-	Oid			pji_Am;
-	void	   *pji_AmCache;
-	MemoryContext pji_Context;
-*/
-
 PrjInfo *
 BuildPrjInfo(Relation projection)
 {
@@ -54,13 +41,21 @@ BuildPrjInfo(Relation projection)
 	int			i;
 	int			numAtts;
 
-	/* check the number of keys, and copy attr numbers into the IndexInfo */
-	numAtts = indexStruct->indnatts;
+	Form_ygp_projection prj;
+	HeapTuple projectionTuple;
 
-	pji->ii_NumIndexAttrs = numAtts;
+	projectionTuple = SearchSysCache1(PROJECTIONOID, ObjectIdGetDatum(RelationGetRelid(projection)));
+	if (!HeapTupleIsValid(projectionTuple))	/* should not happen */
+		elog(ERROR, "cache lookup failed for index %u", RelationGetRelid(projection));
+	prj = (Form_ygp_projection) GETSTRUCT(projectionTuple);
+
+	/* check the number of keys, and copy attr numbers into the IndexInfo */
+	numAtts = prj->prjnatts;
+
+	pji->pji_NumPrjAttrs = numAtts;
 
 	for (i = 0; i < numAtts; i++)
-		pji->pji_IndexAttrNumbers[i] = indexStruct->indkey.values[i];
+		pji->pji_PrjAttrNumbers[i] = prj->prjkey.values[i];
 
 	/* fetch projection predicate if any */
 	pji->pji_Predicate = NULL;

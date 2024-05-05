@@ -220,7 +220,7 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
         
 		Relation	prjRelation = relationDescs[i];
 		TupleDesc tupDesc;
-		TupleTableSlot slot;
+		TupleTableSlot* prjslot;
 		PrjInfo  *pjInfo;
 		bool		applyNoDupErr;
 		bool		satisfiesConstraint;
@@ -229,7 +229,7 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 			continue;
 
 		tupDesc = RelationGetDescr(prjRelation);
-		slot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);
+		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);
         
 		/*
 		 * FormProjectionDatum fills in its values and isnull parameters with the
@@ -241,13 +241,13 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 					   values,
 					   isnull);
 
-		tuple = heap_form_tuple(funcctx->tuple_desc, values, isnull);
+		tuple = heap_form_tuple(tupDesc, values, isnull);
 
-		ExecStoreHeapTuple(tuple, slot, true /* do pfree tuple */);
+		ExecStoreHeapTuple(tuple, prjslot, true /* do pfree tuple */);
 
         // !! reduce tuple, does it satify local prj?
 
-		(void)simple_table_tuple_insert_check_location(prjRelation, slot);
+		(void)simple_table_tuple_insert_check_location(prjRelation, prjslot);
 	}
 
 	return result;

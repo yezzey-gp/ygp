@@ -4829,7 +4829,7 @@ RelationGetPrjList(Relation relation) {
 
 	while (HeapTupleIsValid(htup = systable_getnext(prjscan)))
 	{
-		Form_ypg_projection prj = (Form_ypg_projection) GETSTRUCT(htup);
+		Form_ygp_projection prj = (Form_ygp_projection) GETSTRUCT(htup);
 
 		/* Add index's OID to result list in the proper order */
 		result = insert_ordered_oid(result, prj->prjrelid);

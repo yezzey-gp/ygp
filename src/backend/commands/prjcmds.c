@@ -24,7 +24,10 @@
 #include "access/table.h"
 #include "utils/rel.h"
 
+#include "nodes/makefuncs.h"
+
 #include "utils/builtins.h"
+#include "utils/syscache.h"
 
 #include "catalog/oid_dispatch.h"
 #include "access/xact.h"
@@ -33,12 +36,12 @@
 #include "cdb/cdbdisp_query.h"
 
 static void UpdateProjectionRelation(Oid prjoid,
-					Oid heapoid, PrjInfo info);
+					Oid heapoid, PrjInfo* info);
 
 
 static void
 UpdateProjectionRelation(Oid prjoid,
-					Oid heapoid, PrjInfo info)
+					Oid heapoid, PrjInfo* info)
 {
 	Datum		values[Natts_ygp_prj];
 	bool		nulls[Natts_ygp_prj];
@@ -51,9 +54,9 @@ UpdateProjectionRelation(Oid prjoid,
 	 * Copy the index key, opclass, and indoption info into arrays (should we
 	 * make the caller pass them like this to start with?)
 	 */
-	prjkey = buildint2vector(NULL, PrjInfo->pji_NumIndexAttrs);
-	for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
-		prjkey->values[i] = PrjInfo->pji_IndexAttrNumbers[i];
+	prjkey = buildint2vector(NULL, info->pji_NumPrjAttrs);
+	for (i = 0; i < info->pji_NumPrjAttrs; i++)
+		prjkey->values[i] = info->pji_PrjAttrNumbers[i];
 	
 	/*
 	 * open the system catalog index relation
@@ -67,6 +70,7 @@ UpdateProjectionRelation(Oid prjoid,
 
 	values[Anum_ygp_prj_prjrelid - 1] = ObjectIdGetDatum(prjoid);
 	values[Anum_ygp_prj_projectionrelid - 1] = ObjectIdGetDatum(heapoid);
+	values[Anum_ygp_prj_prjnatts - 1] = Int16GetDatum(info->pji_NumPrjAttrs);
 	values[Anum_ygp_prj_prjkey - 1] = PointerGetDatum(prjkey);
 
 	tuple = heap_form_tuple(RelationGetDescr(ygp_prj), values, nulls);
@@ -248,7 +252,6 @@ ConstructPrjTupleDescriptor(Relation heapRelation,
 {
 	int			numatts = prjInfo->pji_NumPrjAttrs;
 	ListCell   *colnames_item = list_head(projectionColNames);
-	IndexAmRoutine *amroutine;
 	TupleDesc	heapTupDesc;
 	TupleDesc	prjTupDesc;
 	int			natts;			/* #atts in heap rel --- for error checks */
@@ -268,11 +271,10 @@ ConstructPrjTupleDescriptor(Relation heapRelation,
 	 */
 	for (i = 0; i < numatts; i++)
 	{
-		AttrNumber	atnum = prjInfo->pji_NumPrjAttrs[i];
+		AttrNumber	atnum = prjInfo->pji_PrjAttrNumbers[i];
 		Form_pg_attribute to = TupleDescAttr(prjTupDesc, i);
 		HeapTuple	tuple;
 		Form_pg_type typeTup;
-		Form_pg_opclass opclassTup;
 		Oid			keyType;
 
 		/* Fill fixed part with errors */
@@ -423,7 +425,7 @@ DefineProjection(Oid relationId,
 			ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 							errmsg("column \"%s\" does not exist",
-								attribute->name)));
+								pelem->name)));
 		}
 		attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 		newInfo->pji_PrjAttrNumbers[ind] = attform->attnum;
