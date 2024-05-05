@@ -30,7 +30,8 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	int			len,
 				i;
 	RelationPtr relationDescs;
-	IndexInfo **prjInfoArray;
+	PrjInfo **prjInfoArray;
+
 
 	resultRelInfo->ri_NumProjection = 0;
 
@@ -54,6 +55,11 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	resultRelInfo->ri_NumProjection = len;
 	resultRelInfo->ri_PrjRelationDescs = relationDescs;
 
+
+	prjInfoArray = (PrjInfo **) palloc(len * sizeof(PrjInfo *));
+
+	resultRelInfo->ri_ProjectionRelationInfo = prjInfoArray;
+
 	/*
 	 * For each index, open the index relation and save pg_index info. We
 	 * acquire RowExclusiveLock, signifying we will update the index.
@@ -66,9 +72,13 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	{
 		Oid			prjOid = lfirst_oid(l);
 		Relation	prjDesc;
-		IndexInfo  *ii;
+		PrjInfo  *pji;
 
 		prjDesc = table_open(prjOid, RowExclusiveLock);
+		/* extract index key information from the index's pg_index info */
+		pji = BuildPrjInfo(prjDesc);
+
+		prjInfoArray[i] = pji;
 
 		relationDescs[i] = prjDesc;
 		i++;
@@ -132,23 +142,11 @@ FormProjectionDatum(struct PrjInfo *prjInfo,
 			   Datum *values,
 			   bool *isnull)
 {
-	// ListCell   *indexpr_item;
 	int			i;
 
-	// if (prjInfo->ii_Expressions != NIL &&
-	// 	prjInfo->ii_ExpressionsState == NIL)
-	// {
-	// 	/* First time through, set up expression evaluation state */
-	// 	prjInfo->ii_ExpressionsState =
-	// 		ExecPrepareExprList(prjInfo->ii_Expressions, estate);
-	// 	/* Check caller has set up context correctly */
-	// 	Assert(GetPerTupleExprContext(estate)->ecxt_scantuple == slot);
-	// }
-	// indexpr_item = list_head(prjInfo->ii_ExpressionsState);
-
-	for (i = 0; i < prjInfo->ii_NumPrjAttrs; i++)
+	for (i = 0; i < prjInfo->pji_NumPrjAttrs; i++)
 	{
-		int			keycol = prjInfo->ii_PrjAttrNumbers[i];
+		int			keycol = prjInfo->pji_PrjAttrNumbers[i];
 		Datum		iDatum;
 		bool		isNull;
 
@@ -164,28 +162,18 @@ FormProjectionDatum(struct PrjInfo *prjInfo,
 		}
 		else
 		{
-			// /*
-			//  * Projection expression --- need to evaluate it.
-			//  */
-			// if (indexpr_item == NULL)
-			// 	elog(ERROR, "wrong number of projection expressions");
-			// iDatum = ExecEvalExprSwitchContext((ExprState *) lfirst(indexpr_item),
-			// 								   GetPerTupleExprContext(estate),
-			// 								   &isNull);
-			// indexpr_item = lnext(indexpr_item);
+			/*
+			 * Projection expression --- need to evaluate it.
+			 */
 		}
 		values[i] = iDatum;
 		isnull[i] = isNull;
 	}
-
-	// if (indexpr_item != NULL)
-		// elog(ERROR, "wrong number of index expressions");
 }
 
 
-
-
-List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
+List *
+ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
 {
 	List	   *result = NIL;
 	ResultRelInfo *resultRelInfo;
@@ -205,6 +193,8 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 	numProjections = resultRelInfo->ri_NumProjection;
 	relationDescs = resultRelInfo->ri_PrjRelationDescs;
 	heapRelation = resultRelInfo->ri_RelationDesc;
+
+	// es_result_relation_info->
 
 	/* Sanity check: slot must belong to the same rel as the resultRelInfo. */
 	Assert(slot->tts_tableOid == RelationGetRelid(heapRelation));
@@ -231,7 +221,7 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 		Relation	prjRelation = relationDescs[i];
 		TupleDesc tupDesc;
 		TupleTableSlot slot;
-		IndexInfo  *indexInfo;
+		PrjInfo  *pjInfo;
 		bool		applyNoDupErr;
 		bool		satisfiesConstraint;
 
@@ -245,13 +235,11 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 		 * FormProjectionDatum fills in its values and isnull parameters with the
 		 * appropriate values for the column(s) of the projection.
 		 */
-		FormProjectionDatum(indexInfo,
+		FormProjectionDatum(pjInfo,
 					   slot,
 					   estate,
 					   values,
 					   isnull);
-
-
 
 		tuple = heap_form_tuple(funcctx->tuple_desc, values, isnull);
 

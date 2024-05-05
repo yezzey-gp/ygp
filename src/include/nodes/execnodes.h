@@ -452,8 +452,12 @@ typedef struct ResultRelInfo
 	/* array of key/attr info for indices */
 	IndexInfo **ri_IndexRelationInfo;
 
-		/* # of indices existing on result relation */
+	/* # of indices existing on result relation */
 	int			ri_NumProjection;
+
+
+	/* array of key/attr info for projection */
+	PrjInfo    **ri_ProjectionRelationInfo;
 
 	/* array of relation descriptors for indices */
 	RelationPtr ri_PrjRelationDescs;

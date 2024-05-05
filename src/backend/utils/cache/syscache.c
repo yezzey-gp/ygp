@@ -646,6 +646,17 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		128
 	},
+	{ProjectionRelationId,		/* PROJECTIONOID */
+		ProjectionRelidProjectionId,
+		1,
+		{
+			Anum_ygp_prj_projectionrelid,
+			0,
+			0,
+			0
+		},
+		64
+	},
 	{PublicationRelationId,		/* PUBLICATIONNAME */
 		PublicationNameIndexId,
 		1,

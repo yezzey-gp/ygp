@@ -1284,6 +1284,7 @@ retry:
 		case RELKIND_PROJECTION:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
+			RelationInitProjectionAccessInfo(relation);
 			break;
 		case RELKIND_PARTITIONED_TABLE:
 			Assert(relation->rd_rel->relam != InvalidOid);
