@@ -332,7 +332,7 @@ cdbllize_get_final_locus(PlannerInfo *root, PathTarget *target)
 			if (intoPolicy->ptype == POLICYTYPE_PARTITIONED &&
 				intoPolicy->nattrs > 0)
 			{
-				return cdbpathlocus_for_insert(root, intoPolicy, target, root->simple_rel_array[query->resultRelation]);
+				return cdbpathlocus_for_insert(root, intoPolicy, target, query->resultRelation == 0 ? false : rt_fetch(query->resultRelation,  root->parse->rtable)->relhasprj);
 			}
 			else if (intoPolicy->ptype == POLICYTYPE_REPLICATED)
 			{
@@ -526,8 +526,16 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target list will correspond to the attributes of
 			 * the target relation in order.
 			 */
+			bool relhasprj;
+
+			if (query->resultRelation != 0) {
+				relhasprj = rt_fetch(query->resultRelation, query->rtable)->relhasprj;
+			} else {
+				relhasprj = false;
+			}
+
 			best_path = create_motion_path_for_ctas(root, targetPolicy,
-													best_path, rt_fetch(query->resultRelation, query->rtable)->relhasprj);
+													best_path, relhasprj);
 		}
 
 		topslice->numsegments = targetPolicy->numsegments;
@@ -571,7 +579,7 @@ cdbllize_adjust_top_path(PlannerInfo *root, Path *best_path,
 			 * the target relation in order.
 			 */
 			best_path = create_motion_path_for_insert(root, targetPolicy,
-													  best_path, root->simple_rel_array[query->resultRelation]->nprjs);
+													  best_path, query->resultRelation == 0 ? 0 : root->simple_rel_array[query->resultRelation]->nprjs);
 		}
 
 		topslice->numsegments = targetPolicy->numsegments;

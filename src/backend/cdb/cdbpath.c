@@ -2528,7 +2528,7 @@ create_split_update_path(PlannerInfo *root, Index rti, GpPolicy *policy, Path *s
 		 * e.g. because the input was eliminated by constraint
 		 * exclusion, we can skip it.
 		 */
-		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget, root->simple_rel_array[rti]);
+		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget, rti == 0 ? false : rt_fetch(rti,  root->parse->rtable)->relhasprj);
 
 		subpath = (Path *) make_splitupdate_path(root, subpath, rti);
 		subpath = cdbpath_create_explicit_motion_path(root,
