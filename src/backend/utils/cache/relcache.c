@@ -2605,6 +2605,8 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
 		pfree(relation->rd_indextuple);
+	if (relation->rd_prjtuple)
+		pfree(relation->rd_prjtuple);
 	if (relation->rd_aotuple)
 		pfree(relation->rd_aotuple);
 	if (relation->rd_amcache)
@@ -6079,7 +6081,9 @@ load_relcache_init_file(bool shared)
 				RelationInitTableAccessMethod(rel);
 
 			Assert(rel->rd_index == NULL);
+			Assert(rel->rd_prj == NULL);
 			Assert(rel->rd_indextuple == NULL);
+			Assert(rel->rd_prjtuple == NULL);
 			Assert(rel->rd_indexcxt == NULL);
 			Assert(rel->rd_indam == NULL);
 			Assert(rel->rd_opfamily == NULL);

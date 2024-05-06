@@ -100,13 +100,13 @@ void
 ExecCloseProjection(ResultRelInfo *resultRelInfo)
 {
 	int			i;
-	int			numIndices;
+	int			numProjections;
 	RelationPtr prjDescs;
 
-	numIndices = resultRelInfo->ri_NumProjection;
+	numProjections = resultRelInfo->ri_NumProjection;
 	prjDescs = resultRelInfo->ri_PrjRelationDescs;
 
-	for (i = 0; i < numIndices; i++)
+	for (i = 0; i < numProjections; i++)
 	{
 		if (prjDescs[i] == NULL)
 			continue;			/* shouldn't happen? */
@@ -252,6 +252,9 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
         // !! reduce tuple, does it satify local prj?
 
 		(void)simple_table_tuple_insert_check_location(prjRelation, prjslot);
+
+
+		ExecDropSingleTupleTableSlot(prjslot);		
 	}
 
 	return result;
