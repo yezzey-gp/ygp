@@ -797,6 +797,7 @@ makePrjInfo(int numattrs, Oid amoid,
 	PrjInfo  *n = makeNode(PrjInfo);
 
 	n->pji_NumPrjAttrs = numattrs;
+	n->pji_PrjAttrNumbers = (Oid *) palloc(numattrs * sizeof(Oid));
 
 	/* predicates  */
 	n->pji_Predicate = predicates;

@@ -9981,6 +9981,7 @@ prj_elem:	ColId opt_collate opt_class
 
 
 prj_params: '(' projection_params ')' 
+	{ $$ = $2; }
 	;
 
 opt_prj_params:

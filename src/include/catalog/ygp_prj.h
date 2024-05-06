@@ -29,8 +29,8 @@
  */
 CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 {
-	Oid			prjrelid;		/* OID of the projection */
-	Oid			projectionrelid;		/* OID of the relation it projectiones */
+	Oid			projectionrelid;		/* OID of the projection */
+	Oid			prjrelid;		/* OID of the relation it projectiones */
 
 	int16		prjnatts;		/* total number of columns in index */
 	int2vector	prjkey;		/* column numbers of projectioned cols, or 0 */

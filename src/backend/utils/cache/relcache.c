@@ -1882,7 +1882,7 @@ RelationInitProjectionAccessInfo(Relation relation) {
 	tuple = SearchSysCache1(PROJECTIONOID,
 							ObjectIdGetDatum(RelationGetRelid(relation)));
 	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for index %u",
+		elog(ERROR, "cache lookup failed for projection %u",
 			 RelationGetRelid(relation));
 	oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
 	relation->rd_prjtuple = heap_copytuple(tuple);
@@ -4868,9 +4868,9 @@ RelationGetPrjList(Relation relation) {
 	 */
 	result = NIL;
 
-	/* Prepare to scan ygp_prj for entries having projectionrelid = this rel. */
+	/* Prepare to scan ygp_prj for entries having prjrelid = this rel. */
 	ScanKeyInit(&skey,
-				Anum_ygp_prj_projectionrelid,
+				Anum_ygp_prj_prjrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(relation)));
 
@@ -4883,7 +4883,7 @@ RelationGetPrjList(Relation relation) {
 		Form_ygp_projection prj = (Form_ygp_projection) GETSTRUCT(htup);
 
 		/* Add index's OID to result list in the proper order */
-		result = insert_ordered_oid(result, prj->prjrelid);
+		result = insert_ordered_oid(result, prj->projectionrelid);
 	}
 
 	systable_endscan(prjscan);

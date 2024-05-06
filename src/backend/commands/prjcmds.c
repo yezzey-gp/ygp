@@ -65,19 +65,19 @@ UpdateProjectionRelation(Oid prjoid,
 	ygp_prj = table_open(ProjectionRelationId, RowExclusiveLock);
 
 	/*
-	 * Build a pg_index tuple
+	 * Build a ygp_prj tuple
 	 */
 	MemSet(nulls, false, sizeof(nulls));
 
-	values[Anum_ygp_prj_prjrelid - 1] = ObjectIdGetDatum(prjoid);
-	values[Anum_ygp_prj_projectionrelid - 1] = ObjectIdGetDatum(heapoid);
+	values[Anum_ygp_prj_projectionrelid - 1] = ObjectIdGetDatum(prjoid);
+	values[Anum_ygp_prj_prjrelid - 1] = ObjectIdGetDatum(heapoid);
 	values[Anum_ygp_prj_prjnatts - 1] = Int16GetDatum(info->pji_NumPrjAttrs);
 	values[Anum_ygp_prj_prjkey - 1] = PointerGetDatum(prjkey);
 
 	tuple = heap_form_tuple(RelationGetDescr(ygp_prj), values, nulls);
 
 	/*
-	 * insert the tuple into the pg_index catalog
+	 * insert the tuple into the ygp_prj catalog
 	 */
 	CatalogTupleInsert(ygp_prj, tuple);
 
@@ -428,7 +428,11 @@ DefineProjection(Oid relationId,
 		ProjectionElem    *pelem = (ProjectionElem *) lfirst(cell);
 		prjColNames = lappend(prjColNames, pelem->name);
 
-		collationObjectId[ind] = get_collation_oid(pelem->collation, false /*missing not ok*/);
+		if (pelem->collation != NULL) {
+			collationObjectId[ind] = get_collation_oid(pelem->collation, false /*missing not ok*/);
+		} else {
+			collationObjectId[ind] = InvalidOid;
+		}
 
 		atttuple = SearchSysCacheAttName(relationId, pelem->name);
 		if (!HeapTupleIsValid(atttuple))
@@ -477,8 +481,8 @@ DefineProjection(Oid relationId,
 	);
 
 
-  	/* Make this prj visible */
-	CommandCounterIncrement();
+  	// /* Make this prj visible */
+	// CommandCounterIncrement();
 
 
 	UpdateProjectionRelation(
