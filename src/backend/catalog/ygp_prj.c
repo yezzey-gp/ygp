@@ -45,10 +45,10 @@ BuildPrjInfo(Relation projection)
 
 	projectionTuple = SearchSysCache1(PROJECTIONOID, ObjectIdGetDatum(RelationGetRelid(projection)));
 	if (!HeapTupleIsValid(projectionTuple))	/* should not happen */
-		elog(ERROR, "cache lookup failed for index %u", RelationGetRelid(projection));
+		elog(ERROR, "cache lookup failed for projection %u", RelationGetRelid(projection));
 	prj = (Form_ygp_projection) GETSTRUCT(projectionTuple);
 
-	/* check the number of keys, and copy attr numbers into the IndexInfo */
+	/* check the number of keys, and copy attr numbers into the PrjInfo */
 	numAtts = prj->prjnatts;
 
 	pji->pji_NumPrjAttrs = numAtts;
@@ -66,6 +66,8 @@ BuildPrjInfo(Relation projection)
 	pji->pji_Context = CurrentMemoryContext;
 
 	pji->pji_Am = projection->rd_rel->relam;
+
+	ReleaseSysCache(projectionTuple);
 
 	return pji;
 }

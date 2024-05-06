@@ -375,9 +375,6 @@ DefineProjection(Oid relationId,
 	 * deals with column names, types, and NOT NULL constraints, but not
 	 * default values or CHECK constraints; we handle those below.
 	 */
-	/* todo: get schem a from query */
-	// descriptor = BuildDescForRelation(schema);
-	//descriptor = RelationGetDescr(rel);
 
 	int numberOfAttributes;
 
@@ -444,6 +441,9 @@ DefineProjection(Oid relationId,
 		}
 		attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 		newInfo->pji_PrjAttrNumbers[ind] = attform->attnum;
+
+
+		ReleaseSysCache(atttuple);
 
 		++ind;
 	}

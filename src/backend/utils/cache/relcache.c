@@ -1862,14 +1862,7 @@ void
 RelationInitProjectionAccessInfo(Relation relation) {
 	HeapTuple	tuple;
 	Form_pg_am	aform;
-	Datum		indcollDatum;
-	Datum		indclassDatum;
-	Datum		indoptionDatum;
 	bool		isnull;
-	oidvector  *indcoll;
-	oidvector  *indclass;
-	int2vector *indoption;
-	MemoryContext indexcxt;
 	MemoryContext oldcontext;
 	int			prjnatts;
 	uint16		amsupport;
