@@ -4021,6 +4021,8 @@ transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
 	bool bQuiet;
 	DistributedBy*likeDistributedBy;
 	CreateStmtContext cxt;
+	RangeTblEntry *rte;
+	Relation rel;
 
 	likeDistributedBy = NULL;
 
@@ -4056,15 +4058,46 @@ transformPrjStmt(Oid relid, CreateProjectionStmt *stmt,
 	/* Set up pstate */
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = queryString;
+
+
+
+	/*
+	 * Put the parent table into the rtable so that the expressions can refer
+	 * to its fields without qualification.  Caller is responsible for locking
+	 * relation, but we still need to open it.
+	 */
+	rel = relation_open(relid, NoLock);
+	rte = addRangeTableEntryForRelation(pstate, rel,
+										AccessShareLock,
+										NULL, false, true);
+
+	/* no to join list, yes to namespaces */
+	addRTEtoQuery(pstate, rte, false, true, true);
+
+	/* take care of the where clause */
+	if (stmt->whereClause)
+	{
+		stmt->whereClause = transformWhereClause(pstate,
+												 stmt->whereClause,
+												 EXPR_KIND_INDEX_PREDICATE,
+												 "WHERE");
+		/* we have to fix its collations too */
+		assign_expr_collations(pstate, stmt->whereClause);
+	}
+
+
 	/*
 	 * Transform DISTRIBUTED BY (or construct a default one, if not given
 	 * explicitly).
 	 */
-	
+
 	stmt->distributedBy = transformDistributedBy(pstate, &cxt,
 													stmt->distributedBy,
 													likeDistributedBy, bQuiet);
 	free_parsestate(pstate);
+
+	/* Close relation */
+	table_close(rel, NoLock);
 
 	MemoryContextDelete(cxt.tempCtx);
 

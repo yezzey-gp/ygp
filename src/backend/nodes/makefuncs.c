@@ -791,7 +791,7 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
  *	  create an PrjInfo node
  */
 PrjInfo *
-makePrjInfo(int numattrs, Oid amoid,
+makePrjInfo(int numattrs, Oid amoid, List* expressions,
 			  List *predicates)
 {
 	PrjInfo  *n = makeNode(PrjInfo);
@@ -802,6 +802,10 @@ makePrjInfo(int numattrs, Oid amoid,
 	/* predicates  */
 	n->pji_Predicate = predicates;
 	n->pji_PredicateState = NULL;
+
+	/* predicates  */
+	n->pji_Expressions = expressions;
+	n->pji_ExpressionsState = NULL;
 
 	/* set up for possible use by index AM */
 	n->pji_Am = amoid;

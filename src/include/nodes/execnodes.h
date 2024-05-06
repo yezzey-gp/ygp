@@ -202,6 +202,9 @@ typedef struct PrjInfo {
 
 	ExprState  *pji_PredicateState;
 
+	List       *pji_Expressions; /* list of Expr */
+	ExprState  *pji_ExpressionsState; /* list of ExprState */
+
 	Oid			pji_Am;
 	void	   *pji_AmCache;
 	MemoryContext pji_Context;

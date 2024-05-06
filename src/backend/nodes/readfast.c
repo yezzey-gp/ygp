@@ -794,6 +794,7 @@ _readCreateProjection_common(CreateProjectionStmt *local_node)
 	READ_STRING_FIELD(tableSpace);
 	READ_STRING_FIELD(prjcomment);
 	READ_NODE_FIELD(prjParams);
+	READ_NODE_FIELD(whereClause);
 	READ_NODE_FIELD(distributedBy);
 }
 

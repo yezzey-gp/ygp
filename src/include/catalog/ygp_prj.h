@@ -32,12 +32,18 @@ CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 	Oid			projectionrelid;		/* OID of the projection */
 	Oid			prjrelid;		/* OID of the relation it projectiones */
 
-	int16		prjnatts;		/* total number of columns in index */
+	int16		prjnatts;		/* total number of columns in projection */
 	int2vector	prjkey;		/* column numbers of projectioned cols, or 0 */
 
 #ifdef CATALOG_VARLEN
 	/* variable-length fields start here, but we allow direct access to prjkey */
 	/* currently we store projection key in gp_distr_policy */
+
+	pg_node_tree projectionxprs;		/* expression trees for projection attributes that
+								 * are not simple column references; one for
+								 * each zero entry in indkey[] */
+	pg_node_tree prjpred;		/* expression tree for predicate, if a partial
+								 * projection; else NULL */
 #endif
 } FormData_ypg_projection;
 

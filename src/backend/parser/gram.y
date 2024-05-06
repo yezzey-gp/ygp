@@ -9990,7 +9990,10 @@ opt_prj_params:
 		{ $$ = NULL; }
 	;
 
-PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params table_access_method_clause DistributedBy 
+PrjStmt: 
+	CREATE PROJECTION 
+		projection_name 
+	ON relation_expr opt_prj_params table_access_method_clause where_clause DistributedBy 
 	{
 		CreateProjectionStmt *n = makeNode(CreateProjectionStmt);
 
@@ -10001,7 +10004,9 @@ PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params table
 
 		n->accessMethod = $7;
 
-		n->distributedBy = (DistributedBy *) $8;
+		n->whereClause = $8;
+
+		n->distributedBy = (DistributedBy *) $9;
 
 		$$ = (Node *)n;
 	}

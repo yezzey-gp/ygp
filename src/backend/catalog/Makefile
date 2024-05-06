@@ -30,7 +30,7 @@ OBJS += pg_extprotocol.o \
        storage_tablespace_twophase.o storage_tablespace_xact.o \
        gp_partition_template.o
 
-OBJS += ygp_prj.o
+OBJS += projection.o
 
 BKIFILES = postgres.bki postgres.description postgres.shdescription
 

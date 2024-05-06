@@ -145,6 +145,16 @@ FormProjectionDatum(struct PrjInfo *prjInfo,
 {
 	int			i;
 
+	if (prjInfo->pji_Expressions != NIL &&
+		prjInfo->pji_ExpressionsState == NIL)
+	{
+		/* First time through, set up expression evaluation state */
+		prjInfo->pji_ExpressionsState =
+			ExecPrepareExprList(prjInfo->pji_Expressions, estate);
+		/* Check caller has set up context correctly */
+		Assert(GetPerTupleExprContext(estate)->ecxt_scantuple == slot);
+	}
+
 	for (i = 0; i < prjInfo->pji_NumPrjAttrs; i++)
 	{
 		int			keycol = prjInfo->pji_PrjAttrNumbers[i];
@@ -231,6 +241,27 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 			continue;
 
 		pjInfo = resultRelInfo->ri_ProjectionRelationInfo[i];
+
+		/* Check for partial projection */
+		if (pjInfo->pji_Predicate != NIL)
+		{
+			ExprState  *predicate;
+
+			/*
+			 * If predicate state not set up yet, create it (in the estate's
+			 * per-query context)
+			 */
+			predicate = pjInfo->pji_PredicateState;
+			if (predicate == NULL)
+			{
+				predicate = ExecPrepareQual(pjInfo->pji_Predicate, estate);
+				pjInfo->pji_PredicateState = predicate;
+			}
+
+			/* Skip this index-update if the predicate isn't satisfied */
+			if (!ExecQual(predicate, econtext))
+				continue;
+		}
 
 		tupDesc = RelationGetDescr(prjRelation);
 		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsHeapTuple);

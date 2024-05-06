@@ -51,6 +51,11 @@ UpdateProjectionRelation(Oid prjoid,
 	int			i;
 	int2vector *prjkey;
 
+	char *exprsString;
+	Datum exprsDatum;
+	char *predString;
+	Datum predDatum;
+
 	/*
 	 * Copy the index key, opclass, and indoption info into arrays (should we
 	 * make the caller pass them like this to start with?)
@@ -59,6 +64,36 @@ UpdateProjectionRelation(Oid prjoid,
 	for (i = 0; i < info->pji_NumPrjAttrs; i++)
 		prjkey->values[i] = info->pji_PrjAttrNumbers[i];
 	
+
+	/*
+	 * Convert the projection expressions (if any) to a text datum
+	 */
+	if (info->pji_Expressions != NIL)
+	{
+		char	   *exprsString;
+
+		exprsString = nodeToString(info->pji_Expressions);
+		exprsDatum = CStringGetTextDatum(exprsString);
+		pfree(exprsString);
+	}
+	else
+		exprsDatum = (Datum) 0;
+
+	/*
+	 * Convert the projection predicate (if any) to a text datum.  Note we convert
+	 * implicit-AND format to normal explicit-AND for storage.
+	 */
+	if (info->pji_Predicate != NIL)
+	{
+		char	   *predString;
+
+		predString = nodeToString(make_ands_explicit(info->pji_Predicate));
+		predDatum = CStringGetTextDatum(predString);
+		pfree(predString);
+	}
+	else
+		predDatum = (Datum) 0;
+
 	/*
 	 * open the system catalog index relation
 	 */
@@ -74,6 +109,13 @@ UpdateProjectionRelation(Oid prjoid,
 	values[Anum_ygp_prj_prjnatts - 1] = Int16GetDatum(info->pji_NumPrjAttrs);
 	values[Anum_ygp_prj_prjkey - 1] = PointerGetDatum(prjkey);
 
+	values[Anum_ygp_prj_projectionxprs - 1] = exprsDatum;
+	if (exprsDatum == (Datum) 0)
+		nulls[Anum_ygp_prj_projectionxprs - 1] = true;
+	values[Anum_ygp_prj_prjpred - 1] = predDatum;
+	if (predDatum == (Datum) 0)
+		nulls[Anum_ygp_prj_prjpred - 1] = true;
+
 	tuple = heap_form_tuple(RelationGetDescr(ygp_prj), values, nulls);
 
 	/*
@@ -87,157 +129,6 @@ UpdateProjectionRelation(Oid prjoid,
 	table_close(ygp_prj, RowExclusiveLock);
 	heap_freetuple(tuple);
 }
-
-
-// IndexTuple
-// prj_form_tuple(TupleDesc tupleDescriptor,
-// 				 Datum *values,
-// 				 bool *isnull)
-// {
-// 	char	   *tp;				/* tuple pointer */
-// 	IndexTuple	tuple;			/* return tuple */
-// 	Size		size,
-// 				data_size,
-// 				hoff;
-// 	int			i;
-// 	unsigned short infomask = 0;
-// 	bool		hasnull = false;
-// 	uint16		tupmask = 0;
-// 	int			numberOfAttributes = tupleDescriptor->natts;
-
-// 	Datum		untoasted_values[INDEX_MAX_KEYS];
-// 	bool		untoasted_free[INDEX_MAX_KEYS];
-
-// 	if (numberOfAttributes > INDEX_MAX_KEYS)
-// 		ereport(ERROR,
-// 				(errcode(ERRCODE_TOO_MANY_COLUMNS),
-// 				 errmsg("number of index columns (%d) exceeds limit (%d)",
-// 						numberOfAttributes, INDEX_MAX_KEYS)));
-
-// #ifdef TOAST_INDEX_HACK
-// 	for (i = 0; i < numberOfAttributes; i++)
-// 	{
-// 		Form_pg_attribute att = TupleDescAttr(tupleDescriptor, i);
-
-// 		untoasted_values[i] = values[i];
-// 		untoasted_free[i] = false;
-
-// 		/* Do nothing if value is NULL or not of varlena type */
-// 		if (isnull[i] || att->attlen != -1)
-// 			continue;
-
-// 		/*
-// 		 * If value is stored EXTERNAL, must fetch it so we are not depending
-// 		 * on outside storage.  This should be improved someday.
-// 		 */
-// 		if (VARATT_IS_EXTERNAL(DatumGetPointer(values[i])))
-// 		{
-// 			untoasted_values[i] =
-// 				PointerGetDatum(heap_tuple_fetch_attr((struct varlena *)
-// 													  DatumGetPointer(values[i])));
-// 			untoasted_free[i] = true;
-// 		}
-
-// 		/*
-// 		 * If value is above size target, and is of a compressible datatype,
-// 		 * try to compress it in-line.
-// 		 */
-// 		if (!VARATT_IS_EXTENDED(DatumGetPointer(untoasted_values[i])) &&
-// 			VARSIZE(DatumGetPointer(untoasted_values[i])) > TOAST_INDEX_TARGET &&
-// 			(att->attstorage == 'x' || att->attstorage == 'm'))
-// 		{
-// 			Datum		cvalue = toast_compress_datum(untoasted_values[i]);
-
-// 			if (DatumGetPointer(cvalue) != NULL)
-// 			{
-// 				/* successful compression */
-// 				if (untoasted_free[i])
-// 					pfree(DatumGetPointer(untoasted_values[i]));
-// 				untoasted_values[i] = cvalue;
-// 				untoasted_free[i] = true;
-// 			}
-// 		}
-// 	}
-// #endif
-
-// 	for (i = 0; i < numberOfAttributes; i++)
-// 	{
-// 		if (isnull[i])
-// 		{
-// 			hasnull = true;
-// 			break;
-// 		}
-// 	}
-
-// 	if (hasnull)
-// 		infomask |= INDEX_NULL_MASK;
-
-// 	hoff = IndexInfoFindDataOffset(infomask);
-// #ifdef TOAST_INDEX_HACK
-// 	data_size = heap_compute_data_size(tupleDescriptor,
-// 									   untoasted_values, isnull);
-// #else
-// 	data_size = heap_compute_data_size(tupleDescriptor,
-// 									   values, isnull);
-// #endif
-// 	size = hoff + data_size;
-// 	size = MAXALIGN(size);		/* be conservative */
-
-// 	tp = (char *) palloc0(size);
-// 	tuple = (IndexTuple) tp;
-
-// 	heap_fill_tuple(tupleDescriptor,
-// #ifdef TOAST_INDEX_HACK
-// 					untoasted_values,
-// #else
-// 					values,
-// #endif
-// 					isnull,
-// 					(char *) tp + hoff,
-// 					data_size,
-// 					&tupmask,
-// 					(hasnull ? (bits8 *) tp + sizeof(IndexTupleData) : NULL));
-
-// #ifdef TOAST_INDEX_HACK
-// 	for (i = 0; i < numberOfAttributes; i++)
-// 	{
-// 		if (untoasted_free[i])
-// 			pfree(DatumGetPointer(untoasted_values[i]));
-// 	}
-// #endif
-
-// 	/*
-// 	 * We do this because heap_fill_tuple wants to initialize a "tupmask"
-// 	 * which is used for HeapTuples, but we want an indextuple infomask. The
-// 	 * only relevant info is the "has variable attributes" field. We have
-// 	 * already set the hasnull bit above.
-// 	 */
-// 	if (tupmask & HEAP_HASVARWIDTH)
-// 		infomask |= INDEX_VAR_MASK;
-
-// 	/* Also assert we got rid of external attributes */
-// #ifdef TOAST_INDEX_HACK
-// 	Assert((tupmask & HEAP_HASEXTERNAL) == 0);
-// #endif
-
-// 	/*
-// 	 * Here we make sure that the size will fit in the field reserved for it
-// 	 * in t_info.
-// 	 */
-// 	if ((size & INDEX_SIZE_MASK) != size)
-// 		ereport(ERROR,
-// 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-// 				 errmsg("index row requires %zu bytes, maximum size is %zu",
-// 						size, (Size) INDEX_SIZE_MASK)));
-
-// 	infomask |= size;
-
-// 	/*
-// 	 * initialize metadata
-// 	 */
-// 	tuple->t_info = infomask;
-// 	return tuple;
-// }
 
 
 /*
@@ -399,7 +290,9 @@ DefineProjection(Oid relationId,
 	accessMethodForm = (Form_pg_am) GETSTRUCT(amtuple);
 	accessMethodId = accessMethodForm->oid;
 
-	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, stmt->prjParams);
+	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, 
+							  NIL,	/* expressions, NIL for now */
+							  make_ands_implicit((Expr *) stmt->whereClause));
 
 		/*
 	 * Extract the list of column names and the column numbers for the new
