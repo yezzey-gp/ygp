@@ -51,6 +51,11 @@ UpdateProjectionRelation(Oid prjoid,
 	int			i;
 	int2vector *prjkey;
 
+	char *exprsString;
+	Datum exprsDatum;
+	char *predString;
+	Datum predDatum;
+
 	/*
 	 * Copy the index key, opclass, and indoption info into arrays (should we
 	 * make the caller pass them like this to start with?)
@@ -59,6 +64,36 @@ UpdateProjectionRelation(Oid prjoid,
 	for (i = 0; i < info->pji_NumPrjAttrs; i++)
 		prjkey->values[i] = info->pji_PrjAttrNumbers[i];
 	
+
+	/*
+	 * Convert the projection expressions (if any) to a text datum
+	 */
+	if (info->pji_Expressions != NIL)
+	{
+		char	   *exprsString;
+
+		exprsString = nodeToString(info->pji_Expressions);
+		exprsDatum = CStringGetTextDatum(exprsString);
+		pfree(exprsString);
+	}
+	else
+		exprsDatum = (Datum) 0;
+
+	/*
+	 * Convert the projection predicate (if any) to a text datum.  Note we convert
+	 * implicit-AND format to normal explicit-AND for storage.
+	 */
+	if (info->pji_Predicate != NIL)
+	{
+		char	   *predString;
+
+		predString = nodeToString(make_ands_explicit(info->pji_Predicate));
+		predDatum = CStringGetTextDatum(predString);
+		pfree(predString);
+	}
+	else
+		predDatum = (Datum) 0;
+
 	/*
 	 * open the system catalog index relation
 	 */
@@ -73,6 +108,13 @@ UpdateProjectionRelation(Oid prjoid,
 	values[Anum_ygp_prj_prjrelid - 1] = ObjectIdGetDatum(heapoid);
 	values[Anum_ygp_prj_prjnatts - 1] = Int16GetDatum(info->pji_NumPrjAttrs);
 	values[Anum_ygp_prj_prjkey - 1] = PointerGetDatum(prjkey);
+
+	values[Anum_ygp_prj_projectionxprs - 1] = exprsDatum;
+	if (exprsDatum == (Datum) 0)
+		nulls[Anum_ygp_prj_projectionxprs - 1] = true;
+	values[Anum_ygp_prj_prjpred - 1] = predDatum;
+	if (predDatum == (Datum) 0)
+		nulls[Anum_ygp_prj_prjpred - 1] = true;
 
 	tuple = heap_form_tuple(RelationGetDescr(ygp_prj), values, nulls);
 
