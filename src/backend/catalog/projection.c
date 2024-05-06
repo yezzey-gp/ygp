@@ -16,17 +16,17 @@
 #include "catalog/projection.h"
 
 /* ----------------------------------------------------------------
- *						index_build support
+ *						projection_build support
  * ----------------------------------------------------------------
  */
 
 /* ----------------
- *		BuildIndexInfo
- *			Construct an IndexInfo record for an open index
+ *		BuildProjectionInfo
+ *			Construct an ProjectionInfo record for an open projection
  *
- * IndexInfo stores the information about the index that's needed by
- * FormIndexDatum, which is used for both index_build() and later insertion
- * of individual index tuples.  Normally we build an IndexInfo for an index
+ * ProjectionInfo stores the information about the projection that's needed by
+ * FormProjectionDatum, which is used for both projection_build() and later insertion
+ * of individual projection tuples.  Normally we build an ProjectionInfo for an projection
  * just once per command, and then use it for (potentially) many tuples.
  * ----------------
  */
@@ -58,9 +58,14 @@ BuildPrjInfo(Relation projection)
 	for (i = 0; i < numAtts; i++)
 		pji->pji_PrjAttrNumbers[i] = prj->prjkey.values[i];
 
+	/* fetch any expressions needed for expressional projections */
+	pji->pji_Expressions = RelationGetProjectionExpressions(projection);
+	pji->pji_ExpressionsState = NIL;
+
 	/* fetch projection predicate if any */
-	pji->pji_Predicate = NULL;
+	pji->pji_Predicate = RelationGetProjectionPredicate(projection);
 	pji->pji_PredicateState = NULL;
+
 
 	pji->pji_AmCache = NULL;
 	pji->pji_Context = CurrentMemoryContext;

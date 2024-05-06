@@ -133,6 +133,8 @@ static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_in
 static const FormData_pg_attribute Desc_pg_shseclabel[Natts_pg_shseclabel] = {Schema_pg_shseclabel};
 static const FormData_pg_attribute Desc_pg_subscription[Natts_pg_subscription] = {Schema_pg_subscription};
 
+static const FormData_pg_attribute Desc_ygp_prj[Natts_ygp_prj] = {Schema_ygp_prj};
+
 /*
  *		Hash tables that index the relation cache
  *
@@ -1864,6 +1866,7 @@ RelationInitProjectionAccessInfo(Relation relation) {
 	Form_pg_am	aform;
 	bool		isnull;
 	MemoryContext oldcontext;
+	MemoryContext prjcxt;
 	int			prjnatts;
 	uint16		amsupport;
 
@@ -1895,6 +1898,17 @@ RelationInitProjectionAccessInfo(Relation relation) {
 	ReleaseSysCache(tuple);
 
 	prjnatts = RelationGetNumberOfAttributes(relation);
+
+
+	/*
+	 * Make the private context to hold projection access info.  The reason we need
+	 * a context, and not just a couple of pallocs, is so that we won't leak
+	 * any subsidiary info attached to fmgr lookup records.
+	 */
+	prjcxt = AllocSetContextCreate(CacheMemoryContext,
+									 "projection info",
+									 ALLOCSET_SMALL_SIZES);
+	relation->rd_prjcxt = prjcxt;
 
 	/*
 	 * Now we can fetch the projection AM's API struct
@@ -4454,6 +4468,20 @@ GetPgIndexDescriptor(void)
 	return pgindexdesc;
 }
 
+
+static TupleDesc
+GetProjectionDescriptor(void)
+{
+	static TupleDesc pgprojectiondesc = NULL;
+
+	/* Already done? */
+	if (pgprojectiondesc == NULL)
+		pgprojectiondesc = BuildHardcodedDescriptor(Natts_ygp_prj,
+											   Desc_ygp_prj);
+
+	return pgprojectiondesc;
+}
+
 /*
  * Load any default attribute value definitions for the relation.
  */
@@ -5116,6 +5144,69 @@ RelationGetIndexExpressions(Relation relation)
 	return result;
 }
 
+
+/*
+ * RelationGetProjectionExpressions -- get the projection expressions for an projection
+ *
+ * We cache the result of transforming ygp_prj.prjexprs into a node tree.
+ * If the rel is not an projection or has no expressional columns, we return NIL.
+ * Otherwise, the returned tree is copied into the caller's memory context.
+ * (We don't want to return a pointer to the relcache copy, since it could
+ * disappear due to relcache invalidation.)
+ */
+List *
+RelationGetProjectionExpressions(Relation relation)
+{
+	List	   *result;
+	Datum		exprsDatum;
+	bool		isnull;
+	char	   *exprsString;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the result. */
+	if (relation->rd_prjexprs)
+		return copyObject(relation->rd_prjexprs);
+
+	/* Quick exit if there is nothing to do. */
+	if (relation->rd_prjtuple == NULL ||
+		heap_attisnull(relation->rd_prjtuple, Anum_ygp_prj_projectionxprs, NULL))
+		return NIL;
+
+	/*
+	 * We build the tree we intend to return in the caller's context. After
+	 * successfully completing the work, we copy it into the relcache entry.
+	 * This avoids problems if we get some sort of error partway through.
+	 */
+	exprsDatum = heap_getattr(relation->rd_indextuple,
+							  Anum_ygp_prj_projectionxprs,
+							  GetProjectionDescriptor(),
+							  &isnull);
+	Assert(!isnull);
+	exprsString = TextDatumGetCString(exprsDatum);
+	result = (List *) stringToNode(exprsString);
+	pfree(exprsString);
+
+	/*
+	 * Run the expressions through eval_const_expressions. This is not just an
+	 * optimization, but is necessary, because the planner will be comparing
+	 * them to similarly-processed qual clauses, and may fail to detect valid
+	 * matches without this.  We must not use canonicalize_qual, however,
+	 * since these aren't qual expressions.
+	 */
+	result = (List *) eval_const_expressions(NULL, (Node *) result);
+
+	/* May as well fix opfuncids too */
+	fix_opfuncids((Node *) result);
+
+	/* Now save a copy of the completed tree in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(relation->rd_indexcxt);
+	relation->rd_prjexprs = copyObject(result);
+	MemoryContextSwitchTo(oldcxt);
+
+	return result;
+}
+
+
 /*
  * RelationGetDummyIndexExpressions -- get dummy expressions for an index
  *
@@ -5235,6 +5326,79 @@ RelationGetIndexPredicate(Relation relation)
 
 	return result;
 }
+
+
+
+
+/*
+ * RelationGetProjectionPredicate -- get the index predicate for an index
+ *
+ * We cache the result of transforming pg_index.indpred into an implicit-AND
+ * node tree (suitable for use in planning).
+ * If the rel is not an index or has no predicate, we return NIL.
+ * Otherwise, the returned tree is copied into the caller's memory context.
+ * (We don't want to return a pointer to the relcache copy, since it could
+ * disappear due to relcache invalidation.)
+ */
+List *
+RelationGetProjectionPredicate(Relation relation)
+{
+	List	   *result;
+	Datum		predDatum;
+	bool		isnull;
+	char	   *predString;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the result. */
+	if (relation->rd_prjpred)
+		return copyObject(relation->rd_prjpred);
+
+	/* Quick exit if there is nothing to do. */
+	if (relation->rd_prjtuple == NULL ||
+		heap_attisnull(relation->rd_prjtuple, Anum_ygp_prj_prjpred, NULL))
+		return NIL;
+
+	/*
+	 * We build the tree we intend to return in the caller's context. After
+	 * successfully completing the work, we copy it into the relcache entry.
+	 * This avoids problems if we get some sort of error partway through.
+	 */
+	predDatum = heap_getattr(relation->rd_prjtuple,
+							 Anum_ygp_prj_prjpred,
+							 GetProjectionDescriptor(),
+							 &isnull);
+	Assert(!isnull);
+	predString = TextDatumGetCString(predDatum);
+	result = (List *) stringToNode(predString);
+	pfree(predString);
+
+	/*
+	 * Run the expression through const-simplification and canonicalization.
+	 * This is not just an optimization, but is necessary, because the planner
+	 * will be comparing it to similarly-processed qual clauses, and may fail
+	 * to detect valid matches without this.  This must match the processing
+	 * done to qual clauses in preprocess_expression()!  (We can skip the
+	 * stuff involving subqueries, however, since we don't allow any in index
+	 * predicates.)
+	 */
+	result = (List *) eval_const_expressions(NULL, (Node *) result);
+
+	result = (List *) canonicalize_qual((Expr *) result, false);
+
+	/* Also convert to implicit-AND format */
+	result = make_ands_implicit((Expr *) result);
+
+	/* May as well fix opfuncids too */
+	fix_opfuncids((Node *) result);
+
+	/* Now save a copy of the completed tree in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(relation->rd_prjcxt);
+	relation->rd_prjpred = copyObject(result);
+	MemoryContextSwitchTo(oldcxt);
+
+	return result;
+}
+
 
 /*
  * RelationGetIndexAttrBitmap -- get a bitmap of index attribute numbers

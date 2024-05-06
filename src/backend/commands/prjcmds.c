@@ -248,7 +248,9 @@ DefineProjection(Oid relationId,
 	accessMethodForm = (Form_pg_am) GETSTRUCT(amtuple);
 	accessMethodId = accessMethodForm->oid;
 
-	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, stmt->prjParams);
+	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, 
+							  NIL,	/* expressions, NIL for now */
+							  make_ands_implicit((Expr *) stmt->whereClause));
 
 		/*
 	 * Extract the list of column names and the column numbers for the new

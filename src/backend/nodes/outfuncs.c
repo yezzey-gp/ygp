@@ -3200,6 +3200,7 @@ _outCreateProjectionStmtInfo(StringInfo str, const CreateProjectionStmt *node) {
 	WRITE_STRING_FIELD(tableSpace);
 	WRITE_STRING_FIELD(prjcomment);
 	WRITE_NODE_FIELD(prjParams);
+	WRITE_NODE_FIELD(whereClause);
 	WRITE_NODE_FIELD(distributedBy);
 }
 

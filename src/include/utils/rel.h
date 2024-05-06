@@ -212,6 +212,11 @@ typedef struct RelationData
 	/* use "struct" here to avoid needing to include htup.h: */
 	struct HeapTupleData *rd_prjtuple;	/* all of ygp_prj tuple */
 
+
+	List	   *rd_prjexprs;	/* projection expression trees, if any */
+	List	   *rd_prjpred;		/* projection predicate tree, if any */
+
+	MemoryContext rd_prjcxt;	/* private memory cxt for this stuff */
 	/*
 	 * foreign-table support
 	 *
