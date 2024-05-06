@@ -233,7 +233,7 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 		pjInfo = resultRelInfo->ri_ProjectionRelationInfo[i];
 
 		tupDesc = RelationGetDescr(prjRelation);
-		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);
+		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsHeapTuple);
         
 		/*
 		 * FormProjectionDatum fills in its values and isnull parameters with the

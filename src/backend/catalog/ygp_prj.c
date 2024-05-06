@@ -53,6 +53,8 @@ BuildPrjInfo(Relation projection)
 
 	pji->pji_NumPrjAttrs = numAtts;
 
+	pji->pji_PrjAttrNumbers = (Oid *) palloc(numAtts * sizeof(Oid));
+
 	for (i = 0; i < numAtts; i++)
 		pji->pji_PrjAttrNumbers[i] = prj->prjkey.values[i];
 
