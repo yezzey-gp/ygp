@@ -31,6 +31,7 @@
 
 #include "catalog/oid_dispatch.h"
 #include "access/xact.h"
+#include "access/tableam.h"
 
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp_query.h"
@@ -352,6 +353,8 @@ DefineProjection(Oid relationId,
 	HeapTuple	tuple;
 	Form_pg_am	accessMethodForm;
 	PrjInfo *newInfo;
+	Oid accessMethodId;
+
 	char * accessMethodName;
 	bool		shouldDispatch = dispatch &&
 								 Gp_role == GP_ROLE_DISPATCH &&
@@ -383,7 +386,13 @@ DefineProjection(Oid relationId,
 	/*
 	 * look up the access method, verify it can handle the requested features
 	 */
-	accessMethodName = stmt->accessMethod;
+	if (stmt->accessMethod != NULL) {
+		accessMethodName = stmt->accessMethod;
+	} else {
+		accessMethodName = default_table_access_method;
+	}
+
+
 	tuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
 	if (!HeapTupleIsValid(tuple))
 	{
@@ -401,8 +410,10 @@ DefineProjection(Oid relationId,
 	 * creation.
 	 */
     ListCell *cell;
-	List *projectionColNames,
-	Oid *collationObjectId,
+	List *prjColNames;
+	Oid *collationObjectId;
+	
+	prjColNames = NULL;
 
 	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	int ind;

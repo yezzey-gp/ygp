@@ -3194,11 +3194,12 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 
 static void
 _outCreateProjectionStmtInfo(StringInfo str, const CreateProjectionStmt *node) {
-	WRITE_NODE_FIELD(relation);
 	WRITE_STRING_FIELD(prjname);
+	WRITE_NODE_FIELD(relation);
 	WRITE_STRING_FIELD(accessMethod);
 	WRITE_STRING_FIELD(tableSpace);
 	WRITE_STRING_FIELD(prjcomment);
+	WRITE_NODE_FIELD(prjParams);
 	WRITE_NODE_FIELD(distributedBy);
 }
 

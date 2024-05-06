@@ -1858,6 +1858,57 @@ InitTableAmRoutine(Relation relation)
 	relation->rd_tableam = GetTableAmRoutine(relation->rd_amhandler);
 }
 
+void
+RelationInitProjectionAccessInfo(Relation relation) {
+	HeapTuple	tuple;
+	Form_pg_am	aform;
+	Datum		indcollDatum;
+	Datum		indclassDatum;
+	Datum		indoptionDatum;
+	bool		isnull;
+	oidvector  *indcoll;
+	oidvector  *indclass;
+	int2vector *indoption;
+	MemoryContext indexcxt;
+	MemoryContext oldcontext;
+	int			prjnatts;
+	uint16		amsupport;
+
+	/*
+	 * Make a copy of the pg_index entry for the index.  Since pg_index
+	 * contains variable-length and possibly-null fields, we have to do this
+	 * honestly rather than just treating it as a Form_pg_index struct.
+	 */
+	tuple = SearchSysCache1(PROJECTIONOID,
+							ObjectIdGetDatum(RelationGetRelid(relation)));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for index %u",
+			 RelationGetRelid(relation));
+	oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
+	relation->rd_prjtuple = heap_copytuple(tuple);
+	relation->rd_prj = (Form_ygp_projection) GETSTRUCT(relation->rd_prjtuple);
+	MemoryContextSwitchTo(oldcontext);
+	ReleaseSysCache(tuple);
+
+	/*
+	 * Look up the projection's access method, save the OID of its handler function
+	 */
+	tuple = SearchSysCache1(AMOID, ObjectIdGetDatum(relation->rd_rel->relam));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for access method %u",
+			 relation->rd_rel->relam);
+	aform = (Form_pg_am) GETSTRUCT(tuple);
+	relation->rd_amhandler = aform->amhandler;
+	ReleaseSysCache(tuple);
+
+	prjnatts = RelationGetNumberOfAttributes(relation);
+
+	/*
+	 * Now we can fetch the projection AM's API struct
+	 */
+	InitTableAmRoutine(relation);
+}
+
 /*
  * Initialize table access method support for a table like relation
  */

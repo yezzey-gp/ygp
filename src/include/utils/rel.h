@@ -167,11 +167,6 @@ typedef struct RelationData
 	/* use "struct" here to avoid needing to include htup.h: */
 	struct HeapTupleData *rd_indextuple;	/* all of pg_index tuple */
 
-	/* These are non-NULL only for an projection relation: */
-	Form_ygp_projection rd_prj;		/* ygp_prj tuple describing this projection */
-	/* use "struct" here to avoid needing to include htup.h: */
-	struct HeapTupleData *rd_prjtuple;	/* all of ygp_prj tuple */
-
 	/*
 	 * index access support info (used only for an index relation)
 	 *
@@ -211,6 +206,11 @@ typedef struct RelationData
 	 */
 	Form_pg_appendonly rd_appendonly;
 	struct HeapTupleData *rd_aotuple;		/* all of pg_appendonly tuple */
+
+	/* These are non-NULL only for an projection relation: */
+	Form_ygp_projection rd_prj;		/* ygp_prj tuple describing this projection */
+	/* use "struct" here to avoid needing to include htup.h: */
+	struct HeapTupleData *rd_prjtuple;	/* all of ygp_prj tuple */
 
 	/*
 	 * foreign-table support

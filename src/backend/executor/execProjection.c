@@ -10,6 +10,7 @@
 
 #include "access/table.h"
 #include "utils/relcache.h"
+#include "catalog/projection.h"
 
 /* ----------------------------------------------------------------
  *		ExecOpenIndices
@@ -117,21 +118,21 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
 
 
 /* ----------------
- *		FormIndexDatum
- *			Construct values[] and isnull[] arrays for a new index tuple.
+ *		FormProjectionDatum
+ *			Construct values[] and isnull[] arrays for a new projection tuple.
  *
- *	indexInfo		Info about the index
- *	slot			Heap tuple for which we must prepare an index entry
- *	estate			executor state for evaluating any index expressions
- *	values			Array of index Datums (output area)
+ *	prjInfo		Info about the projection
+ *	slot			Heap tuple for which we must prepare an projection entry
+ *	estate			executor state for evaluating any projection expressions
+ *	values			Array of projection Datums (output area)
  *	isnull			Array of is-null indicators (output area)
  *
- * When there are no index expressions, estate may be NULL.  Otherwise it
+ * When there are no projection expressions, estate may be NULL.  Otherwise it
  * must be supplied, *and* the ecxt_scantuple slot of its per-tuple expr
  * context must point to the heap tuple passed in.
  *
  * Notice we don't actually call index_form_tuple() here; we just prepare
- * its input arrays values[] and isnull[].  This is because the index AM
+ * its input arrays values[] and isnull[].  This is because the projection AM
  * may wish to alter the data before storage.
  * ----------------
  */
@@ -165,6 +166,7 @@ FormProjectionDatum(struct PrjInfo *prjInfo,
 			/*
 			 * Projection expression --- need to evaluate it.
 			 */
+			elog(ERROR, "projection expression");
 		}
 		values[i] = iDatum;
 		isnull[i] = isNull;
@@ -227,6 +229,8 @@ ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 
 		if (prjRelation == NULL)
 			continue;
+
+		pjInfo = resultRelInfo->ri_ProjectionRelationInfo[i];
 
 		tupDesc = RelationGetDescr(prjRelation);
 		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsVirtual);

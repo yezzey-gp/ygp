@@ -1,5 +1,3 @@
-
-
 /*
 * ygp_prj.c
 */
@@ -15,6 +13,7 @@
 #include "utils/syscache.h"
 
 #include "catalog/ygp_prj.h"
+#include "catalog/projection.h"
 
 /* ----------------------------------------------------------------
  *						index_build support

@@ -19,9 +19,8 @@
 #define PG_PROJECTION_H
 
 #include "catalog/genbki.h"
-
-#include "nodes/execnodes.h"
 #include "catalog/ygp_prj_d.h"
+
 
 /* ----------------
  *		ygp_prj definition.  cpp turns this into
@@ -47,9 +46,6 @@ CATALOG(ygp_prj,4189,ProjectionRelationId) BKI_SCHEMA_MACRO
 FOREIGN_KEY(projectionrelid REFERENCES pg_class(oid));
 FOREIGN_KEY(prjrelid REFERENCES pg_class(oid));
 /*   alter table ygp_prj add vector_fk indclass on pg_opclass(oid); */
-
-
-extern PrjInfo *BuildPrjInfo(Relation index);
 
 /* ----------------
  *		Form_pg_projection corresponds to a pointer to a tuple with
