@@ -350,7 +350,7 @@ DefineProjection(Oid relationId,
 	Relation rel;
 	Oid prjOid;
 	ObjectAddress address;
-	HeapTuple	tuple;
+	HeapTuple	amtuple;
 	Form_pg_am	accessMethodForm;
 	PrjInfo *newInfo;
 	Oid accessMethodId;
@@ -390,13 +390,13 @@ DefineProjection(Oid relationId,
 	}
 
 
-	tuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
-	if (!HeapTupleIsValid(tuple))
+	amtuple = SearchSysCache1(AMNAME, PointerGetDatum(accessMethodName));
+	if (!HeapTupleIsValid(amtuple))
 	{
 		/* invalid access method */ 
 		elog(ERROR, "invalid access method %s", accessMethodName);
 	}
-	accessMethodForm = (Form_pg_am) GETSTRUCT(tuple);
+	accessMethodForm = (Form_pg_am) GETSTRUCT(amtuple);
 	accessMethodId = accessMethodForm->oid;
 
 	newInfo = makePrjInfo(numberOfAttributes, accessMethodId, stmt->prjParams);
@@ -483,6 +483,8 @@ DefineProjection(Oid relationId,
 
   	// /* Make this prj visible */
 	// CommandCounterIncrement();
+
+	ReleaseSysCache(amtuple);
 
 
 	UpdateProjectionRelation(
