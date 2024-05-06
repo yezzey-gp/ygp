@@ -9981,6 +9981,7 @@ prj_elem:	ColId opt_collate opt_class
 
 
 prj_params: '(' projection_params ')' 
+	{ $$ = $2; }
 	;
 
 opt_prj_params:
@@ -9989,14 +9990,18 @@ opt_prj_params:
 		{ $$ = NULL; }
 	;
 
-PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params DistributedBy 
+PrjStmt: CREATE PROJECTION projection_name ON relation_expr opt_prj_params table_access_method_clause DistributedBy 
 	{
 		CreateProjectionStmt *n = makeNode(CreateProjectionStmt);
 
 		n->prjname = $3;
 		n->relation = $5;
 
-		n->distributedBy = (DistributedBy *) $7;
+		n->prjParams = $6;
+
+		n->accessMethod = $7;
+
+		n->distributedBy = (DistributedBy *) $8;
 
 		$$ = (Node *)n;
 	}

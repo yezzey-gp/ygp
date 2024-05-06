@@ -1284,6 +1284,7 @@ retry:
 		case RELKIND_PROJECTION:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
+			RelationInitProjectionAccessInfo(relation);
 			break;
 		case RELKIND_PARTITIONED_TABLE:
 			Assert(relation->rd_rel->relam != InvalidOid);
@@ -1855,6 +1856,50 @@ static void
 InitTableAmRoutine(Relation relation)
 {
 	relation->rd_tableam = GetTableAmRoutine(relation->rd_amhandler);
+}
+
+void
+RelationInitProjectionAccessInfo(Relation relation) {
+	HeapTuple	tuple;
+	Form_pg_am	aform;
+	bool		isnull;
+	MemoryContext oldcontext;
+	int			prjnatts;
+	uint16		amsupport;
+
+	/*
+	 * Make a copy of the pg_index entry for the index.  Since pg_index
+	 * contains variable-length and possibly-null fields, we have to do this
+	 * honestly rather than just treating it as a Form_pg_index struct.
+	 */
+	tuple = SearchSysCache1(PROJECTIONOID,
+							ObjectIdGetDatum(RelationGetRelid(relation)));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for projection %u",
+			 RelationGetRelid(relation));
+	oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
+	relation->rd_prjtuple = heap_copytuple(tuple);
+	relation->rd_prj = (Form_ygp_projection) GETSTRUCT(relation->rd_prjtuple);
+	MemoryContextSwitchTo(oldcontext);
+	ReleaseSysCache(tuple);
+
+	/*
+	 * Look up the projection's access method, save the OID of its handler function
+	 */
+	tuple = SearchSysCache1(AMOID, ObjectIdGetDatum(relation->rd_rel->relam));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for access method %u",
+			 relation->rd_rel->relam);
+	aform = (Form_pg_am) GETSTRUCT(tuple);
+	relation->rd_amhandler = aform->amhandler;
+	ReleaseSysCache(tuple);
+
+	prjnatts = RelationGetNumberOfAttributes(relation);
+
+	/*
+	 * Now we can fetch the projection AM's API struct
+	 */
+	InitTableAmRoutine(relation);
 }
 
 /*
@@ -2553,6 +2598,8 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
 		pfree(relation->rd_indextuple);
+	if (relation->rd_prjtuple)
+		pfree(relation->rd_prjtuple);
 	if (relation->rd_aotuple)
 		pfree(relation->rd_aotuple);
 	if (relation->rd_amcache)
@@ -4816,9 +4863,9 @@ RelationGetPrjList(Relation relation) {
 	 */
 	result = NIL;
 
-	/* Prepare to scan ygp_prj for entries having projectionrelid = this rel. */
+	/* Prepare to scan ygp_prj for entries having prjrelid = this rel. */
 	ScanKeyInit(&skey,
-				Anum_ygp_prj_projectionrelid,
+				Anum_ygp_prj_prjrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
 				ObjectIdGetDatum(RelationGetRelid(relation)));
 
@@ -4828,10 +4875,10 @@ RelationGetPrjList(Relation relation) {
 
 	while (HeapTupleIsValid(htup = systable_getnext(prjscan)))
 	{
-		Form_ypg_projection prj = (Form_ypg_projection) GETSTRUCT(htup);
+		Form_ygp_projection prj = (Form_ygp_projection) GETSTRUCT(htup);
 
 		/* Add index's OID to result list in the proper order */
-		result = insert_ordered_oid(result, prj->prjrelid);
+		result = insert_ordered_oid(result, prj->projectionrelid);
 	}
 
 	systable_endscan(prjscan);
@@ -6027,7 +6074,9 @@ load_relcache_init_file(bool shared)
 				RelationInitTableAccessMethod(rel);
 
 			Assert(rel->rd_index == NULL);
+			Assert(rel->rd_prj == NULL);
 			Assert(rel->rd_indextuple == NULL);
+			Assert(rel->rd_prjtuple == NULL);
 			Assert(rel->rd_indexcxt == NULL);
 			Assert(rel->rd_indam == NULL);
 			Assert(rel->rd_opfamily == NULL);

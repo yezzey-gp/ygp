@@ -222,6 +222,11 @@ DECLARE_UNIQUE_INDEX(pg_proc_oid_index, 2690, on pg_proc using btree(oid oid_ops
 DECLARE_UNIQUE_INDEX(pg_proc_proname_args_nsp_index, 2691, on pg_proc using btree(proname name_ops, proargtypes oidvector_ops, pronamespace oid_ops));
 #define ProcedureNameArgsNspIndexId  2691
 
+DECLARE_INDEX(ygp_prj_prjrelid_index, 4190, on ygp_prj using btree(prjrelid oid_ops));
+#define ProjectionOidPrjIndexId  4190
+DECLARE_UNIQUE_INDEX(ygp_prj_projectionrelid_index, 4191, on ygp_prj using btree(projectionrelid oid_ops));
+#define ProjectionRelidProjectionIndexId  4191
+
 DECLARE_UNIQUE_INDEX(pg_rewrite_oid_index, 2692, on pg_rewrite using btree(oid oid_ops));
 #define RewriteOidIndexId  2692
 DECLARE_UNIQUE_INDEX(pg_rewrite_rel_rulename_index, 2693, on pg_rewrite using btree(ev_class oid_ops, rulename name_ops));

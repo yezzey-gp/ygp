@@ -788,11 +788,12 @@ _readCreateStmt(void)
 static void
 _readCreateProjection_common(CreateProjectionStmt *local_node)
 {
-	READ_NODE_FIELD(relation);
 	READ_STRING_FIELD(prjname);
+	READ_NODE_FIELD(relation);
 	READ_STRING_FIELD(accessMethod);
 	READ_STRING_FIELD(tableSpace);
 	READ_STRING_FIELD(prjcomment);
+	READ_NODE_FIELD(prjParams);
 	READ_NODE_FIELD(distributedBy);
 }
 

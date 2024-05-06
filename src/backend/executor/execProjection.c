@@ -10,6 +10,7 @@
 
 #include "access/table.h"
 #include "utils/relcache.h"
+#include "catalog/projection.h"
 
 /* ----------------------------------------------------------------
  *		ExecOpenIndices
@@ -30,7 +31,8 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	int			len,
 				i;
 	RelationPtr relationDescs;
-	IndexInfo **prjInfoArray;
+	PrjInfo **prjInfoArray;
+
 
 	resultRelInfo->ri_NumProjection = 0;
 
@@ -54,6 +56,11 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	resultRelInfo->ri_NumProjection = len;
 	resultRelInfo->ri_PrjRelationDescs = relationDescs;
 
+
+	prjInfoArray = (PrjInfo **) palloc(len * sizeof(PrjInfo *));
+
+	resultRelInfo->ri_ProjectionRelationInfo = prjInfoArray;
+
 	/*
 	 * For each index, open the index relation and save pg_index info. We
 	 * acquire RowExclusiveLock, signifying we will update the index.
@@ -66,9 +73,13 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 	{
 		Oid			prjOid = lfirst_oid(l);
 		Relation	prjDesc;
-		IndexInfo  *ii;
+		PrjInfo  *pji;
 
 		prjDesc = table_open(prjOid, RowExclusiveLock);
+		/* extract index key information from the index's pg_index info */
+		pji = BuildPrjInfo(prjDesc);
+
+		prjInfoArray[i] = pji;
 
 		relationDescs[i] = prjDesc;
 		i++;
@@ -89,13 +100,13 @@ void
 ExecCloseProjection(ResultRelInfo *resultRelInfo)
 {
 	int			i;
-	int			numIndices;
+	int			numProjections;
 	RelationPtr prjDescs;
 
-	numIndices = resultRelInfo->ri_NumProjection;
+	numProjections = resultRelInfo->ri_NumProjection;
 	prjDescs = resultRelInfo->ri_PrjRelationDescs;
 
-	for (i = 0; i < numIndices; i++)
+	for (i = 0; i < numProjections; i++)
 	{
 		if (prjDescs[i] == NULL)
 			continue;			/* shouldn't happen? */
@@ -107,48 +118,36 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
 
 
 /* ----------------
- *		FormIndexDatum
- *			Construct values[] and isnull[] arrays for a new index tuple.
+ *		FormProjectionDatum
+ *			Construct values[] and isnull[] arrays for a new projection tuple.
  *
- *	indexInfo		Info about the index
- *	slot			Heap tuple for which we must prepare an index entry
- *	estate			executor state for evaluating any index expressions
- *	values			Array of index Datums (output area)
+ *	prjInfo		Info about the projection
+ *	slot			Heap tuple for which we must prepare an projection entry
+ *	estate			executor state for evaluating any projection expressions
+ *	values			Array of projection Datums (output area)
  *	isnull			Array of is-null indicators (output area)
  *
- * When there are no index expressions, estate may be NULL.  Otherwise it
+ * When there are no projection expressions, estate may be NULL.  Otherwise it
  * must be supplied, *and* the ecxt_scantuple slot of its per-tuple expr
  * context must point to the heap tuple passed in.
  *
  * Notice we don't actually call index_form_tuple() here; we just prepare
- * its input arrays values[] and isnull[].  This is because the index AM
+ * its input arrays values[] and isnull[].  This is because the projection AM
  * may wish to alter the data before storage.
  * ----------------
  */
 void
-FormProjectionDatum(struct ProjectionInfo *prjInfo,
+FormProjectionDatum(struct PrjInfo *prjInfo,
 			   TupleTableSlot *slot,
 			   struct EState *estate,
 			   Datum *values,
 			   bool *isnull)
 {
-	// ListCell   *indexpr_item;
 	int			i;
 
-	// if (prjInfo->ii_Expressions != NIL &&
-	// 	prjInfo->ii_ExpressionsState == NIL)
-	// {
-	// 	/* First time through, set up expression evaluation state */
-	// 	prjInfo->ii_ExpressionsState =
-	// 		ExecPrepareExprList(prjInfo->ii_Expressions, estate);
-	// 	/* Check caller has set up context correctly */
-	// 	Assert(GetPerTupleExprContext(estate)->ecxt_scantuple == slot);
-	// }
-	// indexpr_item = list_head(prjInfo->ii_ExpressionsState);
-
-	for (i = 0; i < prjInfo->ii_NumPrjAttrs; i++)
+	for (i = 0; i < prjInfo->pji_NumPrjAttrs; i++)
 	{
-		int			keycol = prjInfo->ii_PrjAttrNumbers[i];
+		int			keycol = prjInfo->pji_PrjAttrNumbers[i];
 		Datum		iDatum;
 		bool		isNull;
 
@@ -164,28 +163,19 @@ FormProjectionDatum(struct ProjectionInfo *prjInfo,
 		}
 		else
 		{
-			// /*
-			//  * Index expression --- need to evaluate it.
-			//  */
-			// if (indexpr_item == NULL)
-			// 	elog(ERROR, "wrong number of index expressions");
-			// iDatum = ExecEvalExprSwitchContext((ExprState *) lfirst(indexpr_item),
-			// 								   GetPerTupleExprContext(estate),
-			// 								   &isNull);
-			// indexpr_item = lnext(indexpr_item);
+			/*
+			 * Projection expression --- need to evaluate it.
+			 */
+			elog(ERROR, "projection expression");
 		}
 		values[i] = iDatum;
 		isnull[i] = isNull;
 	}
-
-	// if (indexpr_item != NULL)
-		// elog(ERROR, "wrong number of index expressions");
 }
 
 
-
-
-List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
+List *
+ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate) 
 {
 	List	   *result = NIL;
 	ResultRelInfo *resultRelInfo;
@@ -206,6 +196,8 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 	relationDescs = resultRelInfo->ri_PrjRelationDescs;
 	heapRelation = resultRelInfo->ri_RelationDesc;
 
+	// es_result_relation_info->
+
 	/* Sanity check: slot must belong to the same rel as the resultRelInfo. */
 	Assert(slot->tts_tableOid == RelationGetRelid(heapRelation));
 
@@ -224,34 +216,45 @@ List *ExecInsertProjectionTuples(TupleTableSlot *slot, EState *estate)
 	for (i = 0; i < numProjections; i++)
 	{
 
-
-        // Datum		values[INDEX_MAX_KEYS];
-        // bool		isnull[INDEX_MAX_KEYS];
+		HeapTuple tuple;
+        Datum		values[INDEX_MAX_KEYS];
+        bool		isnull[INDEX_MAX_KEYS];
         
 		Relation	prjRelation = relationDescs[i];
-		IndexInfo  *indexInfo;
+		TupleDesc tupDesc;
+		TupleTableSlot* prjslot;
+		PrjInfo  *pjInfo;
 		bool		applyNoDupErr;
 		bool		satisfiesConstraint;
 
 		if (prjRelation == NULL)
 			continue;
-        
-		// /*
-		//  * FormIndexDatum fills in its values and isnull parameters with the
-		//  * appropriate values for the column(s) of the index.
-		//  */
-		// FormIndexDatum(indexInfo,
-		// 			   slot,
-		// 			   estate,
-		// 			   values,
-		// 			   isnull);
 
+		pjInfo = resultRelInfo->ri_ProjectionRelationInfo[i];
+
+		tupDesc = RelationGetDescr(prjRelation);
+		prjslot = MakeSingleTupleTableSlot(tupDesc, &TTSOpsHeapTuple);
+        
+		/*
+		 * FormProjectionDatum fills in its values and isnull parameters with the
+		 * appropriate values for the column(s) of the projection.
+		 */
+		FormProjectionDatum(pjInfo,
+					   slot,
+					   estate,
+					   values,
+					   isnull);
+
+		tuple = heap_form_tuple(tupDesc, values, isnull);
+
+		ExecStoreHeapTuple(tuple, prjslot, true /* do pfree tuple */);
 
         // !! reduce tuple, does it satify local prj?
 
-        //!! form prj datum here
+		(void)simple_table_tuple_insert_check_location(prjRelation, prjslot);
 
-		(void)simple_table_tuple_insert_check_location(prjRelation, slot);
+
+		ExecDropSingleTupleTableSlot(prjslot);		
 	}
 
 	return result;

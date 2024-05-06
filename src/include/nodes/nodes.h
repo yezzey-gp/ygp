@@ -35,6 +35,7 @@ typedef enum NodeTag
 	T_IndexInfo,
 	T_ExprContext,
 	T_ProjectionInfo,
+	T_PrjInfo /* reflection */,
 	T_JunkFilter,
 	T_OnConflictSetState,
 	T_ResultRelInfo,

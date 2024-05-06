@@ -192,6 +192,21 @@ typedef struct IndexInfo
 	MemoryContext ii_Context;
 } IndexInfo;
 
+typedef struct PrjInfo {
+	NodeTag		type;
+	int			pji_NumPrjAttrs;	/* total number of columns in projection */;
+
+	AttrNumber	*pji_PrjAttrNumbers /* List of column attrib number */;
+
+	List	   *pji_Predicate; /* list of Expr */
+
+	ExprState  *pji_PredicateState;
+
+	Oid			pji_Am;
+	void	   *pji_AmCache;
+	MemoryContext pji_Context;
+} PrjInfo;
+
 /* ----------------
  *	  ExprContext_CB
  *
@@ -344,10 +359,6 @@ typedef struct ProjectionInfo
 	NodeTag		type;
 	/* instructions to evaluate projection */
 	ExprState	pi_state;
-
-	int			ii_NumPrjAttrs;	/* total number of columns in index */
-	
-	AttrNumber	ii_PrjAttrNumbers[INDEX_MAX_KEYS];
 	/* expression context in which to evaluate expression */
 	ExprContext *pi_exprContext;
 } ProjectionInfo;
@@ -441,8 +452,12 @@ typedef struct ResultRelInfo
 	/* array of key/attr info for indices */
 	IndexInfo **ri_IndexRelationInfo;
 
-		/* # of indices existing on result relation */
+	/* # of indices existing on result relation */
 	int			ri_NumProjection;
+
+
+	/* array of key/attr info for projection */
+	PrjInfo    **ri_ProjectionRelationInfo;
 
 	/* array of relation descriptors for indices */
 	RelationPtr ri_PrjRelationDescs;
