@@ -291,7 +291,7 @@ projection_populate(CreateProjectionStmt *stmt, Relation heapRelation,
 
 	appendStringInfoString(&buf, "FROM ");
 	
-	appendStringInfoString(&buf, stmt->relation->schemaname ? "public" :  stmt->relation->schemaname);
+	appendStringInfoString(&buf, stmt->relation->schemaname ? stmt->relation->schemaname :  "public" );
 
 	appendStringInfoString(&buf, ".");
 
@@ -390,7 +390,7 @@ projection_populate(CreateProjectionStmt *stmt, Relation heapRelation,
 	UpdateActiveSnapshotCommandId();
 
 	/* call ExecutorStart to prepare the plan for execution */
-	ExecutorStart(queryDesc, into);
+	ExecutorStart(queryDesc, 0);
 
 	// if (Gp_role == GP_ROLE_DISPATCH)
 	// 	autostats_get_cmdtype(queryDesc, &cmdType, &relationOid);
@@ -582,15 +582,6 @@ DefineProjection(Oid relationId,
 	*  relation tuples  */
 
 
-	prjrel = table_open(prjOid, AccessExclusiveLock);
-
-	projection_populate(stmt, rel, prjrel, newInfo);
-	
-	table_close(prjrel, AccessExclusiveLock);
-	
-  	/* Make this changes visible */
-	CommandCounterIncrement();
-
 	/* It is now safe to dispatch */
 	if (shouldDispatch)
 	{
@@ -612,6 +603,18 @@ DefineProjection(Oid relationId,
 	ObjectAddressSet(address, ProjectionRelationId, prjOid);
 
 	elog(LOG, "created projection %s", stmt->prjname);
+
+
+	prjrel = table_open(prjOid, AccessExclusiveLock);
+
+	projection_populate(stmt, rel, prjrel, newInfo);
+	
+  	/* Make this changes visible */
+	CommandCounterIncrement();
+
+	table_close(prjrel, AccessExclusiveLock);
+
+	elog(LOG, "populated projection %s", stmt->prjname);
 
 	table_close(rel, ShareLock);
 
