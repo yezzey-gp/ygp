@@ -1,13 +1,13 @@
 /*-------------------------------------------------------------------------
  *
- * prjcmds.c
+ * projectioncmds.c
  *	  projections
  *
  *
- * Copyright (c) 2024-, Mother Russia
+ * Copyright (c) 2024-,
  *
  * IDENTIFICATION
- *	  src/backend/commands/prjcmds.c
+ *	  src/backend/commands/projectioncmds.c
  *
  *-------------------------------------------------------------------------
  */
@@ -35,6 +35,17 @@
 
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp_query.h"
+
+#include "utils/snapmgr.h"
+
+#include "executor/execdesc.h"
+
+#include "executor/executor.h"
+#include "postmaster/autostats.h"
+
+#include "tcop/tcopprot.h"
+
+#include "commands/createas.h"
 
 static void UpdateProjectionRelation(Oid prjoid,
 					Oid heapoid, PrjInfo* info);
@@ -228,6 +239,186 @@ ConstructPrjTupleDescriptor(Relation heapRelation,
 }
 
 
+/*
+ * projection_populate - invoke access-method-specific projection build procedure
+ *
+ */
+static void
+projection_populate(CreateProjectionStmt *stmt, Relation heapRelation,
+			Relation projectionRelation,
+			PrjInfo *info) {
+
+	Query *query;
+	List *raw_parsetree_list;
+
+	RawStmt	   *parsetree;
+	List	   *querytree_list;
+	List	   *plantree_list;
+	PlannedStmt *plan_stmt;
+
+    ListCell *cell;
+
+	StringInfoData buf;
+	initStringInfo(&buf);
+
+	appendStringInfoString(&buf, "INSERT INTO ");
+
+	appendStringInfoString(&buf, stmt->prjname);
+
+	appendStringInfoString(&buf, " SELECT ");
+
+	bool first = true;
+
+	foreach(cell, stmt->prjParams) {		
+		/* Simple projection attribute */
+
+		ProjectionElem    *pelem = (ProjectionElem *) lfirst(cell);
+
+		if (first) {
+			appendStringInfoString(&buf, " ");
+			appendStringInfoString(&buf, pelem->name);
+			appendStringInfoString(&buf, " ");
+
+		} else {
+			appendStringInfoString(&buf, ", ");
+			appendStringInfoString(&buf, pelem->name);
+			appendStringInfoString(&buf, " ");
+		}
+
+		first = false;
+	}
+
+
+	appendStringInfoString(&buf, "FROM ");
+	
+	appendStringInfoString(&buf, stmt->relation->schemaname ? "public" :  stmt->relation->schemaname);
+
+	appendStringInfoString(&buf, ".");
+
+	appendStringInfoString(&buf, stmt->relation->relname);
+
+	appendStringInfoString(&buf, " ");
+
+
+
+	// appendStringInfoString(&buf, "WHERE %s", stmt->whereClause);
+
+	/* deparse actual query from projection definition */
+	char *sql = buf.data;
+
+
+
+	DestReceiver *destReceiver;
+	QueryDesc  *queryDesc = NULL;
+	// destReceiver = CreateDestReceiver(DestTuplestore);
+
+
+	IntoClause *into;
+
+	into = makeNode(IntoClause);
+	into->rel = projectionRelation;
+	into->accessMethod = get_am_name(projectionRelation->rd_rel->relam);
+	into->options = NIL;
+	into->tableSpaceName = NULL; // get_tablespace_name(tblspc);
+	into->distributedBy = (Node *)stmt->distributedBy;
+
+	/*
+	 * Create the tuple receiver object and insert info it will need
+	 */
+	destReceiver = CreateIntoRelDestReceiver(into);
+
+
+	// SetTuplestoreDestReceiverParams(destReceiver,
+	// 								portal->holdStore,
+	// 								portal->holdContext,
+	// 								false);
+
+	/*
+	 * Parse the SQL string into a list of raw parse trees.
+	 */
+	raw_parsetree_list = pg_parse_query(sql);
+
+	/*
+	 * Do parse analysis, rule rewrite, planning, and execution for each raw
+	 * parsetree.
+	 */
+
+	/* There is only one element in list due to simple select. */
+	Assert(list_length(raw_parsetree_list) == 1);
+	parsetree = (RawStmt *) linitial(raw_parsetree_list);
+
+	querytree_list = pg_analyze_and_rewrite(parsetree,
+											sql,
+											NULL,
+											0,
+											NULL);
+	plantree_list = pg_plan_queries(querytree_list, 0, NULL);
+
+	/* There is only one statement in list due to simple select. */
+	Assert(list_length(plantree_list) == 1);
+	plan_stmt = (PlannedStmt *) linitial(plantree_list);
+
+
+	queryDesc = CreateQueryDesc(plan_stmt,
+								sql,
+								GetActiveSnapshot(),
+								InvalidSnapshot,
+								destReceiver,
+								NULL,
+								NULL,
+								INSTRUMENT_NONE);
+
+
+	list_free_deep(querytree_list);
+	list_free_deep(raw_parsetree_list);
+
+
+	/*GPDB: Save the target information in PlannedStmt */
+	/*
+		* GPDB_92_MERGE_FIXME: it really should be an optimizer's responsibility
+		* to correctly set the into-clause and into-policy of the PlannedStmt.
+		*/
+
+	/*
+		* Use a snapshot with an updated command ID to ensure this query sees
+		* results of any previously executed queries.  (This could only
+		* matter if the planner executed an allegedly-stable function that
+		* changed the database contents, but let's do it anyway to be
+		* parallel to the EXPLAIN code path.)
+		*/
+	PushCopiedSnapshot(GetActiveSnapshot());
+	UpdateActiveSnapshotCommandId();
+
+	/* call ExecutorStart to prepare the plan for execution */
+	ExecutorStart(queryDesc, into);
+
+	// if (Gp_role == GP_ROLE_DISPATCH)
+	// 	autostats_get_cmdtype(queryDesc, &cmdType, &relationOid);
+
+	/* run the plan to completion */
+	ExecutorRun(queryDesc, ForwardScanDirection, 0L, true);
+
+	/* and clean up */
+	ExecutorFinish(queryDesc);
+	ExecutorEnd(queryDesc);
+
+	// /* save the rowcount if we're given a completionTag to fill */
+	// if (completionTag)
+	// 	snprintf(completionTag, COMPLETION_TAG_BUFSIZE,
+	// 				"SELECT " UINT64_FORMAT,
+	// 				queryDesc->es_processed);
+
+	{
+		destReceiver->rDestroy(destReceiver);
+
+		FreeQueryDesc(queryDesc);
+
+		PopActiveSnapshot();
+	}
+
+}
+
+
 ObjectAddress
 DefineProjection(Oid relationId,
 			CreateProjectionStmt *stmt,
@@ -238,7 +429,7 @@ DefineProjection(Oid relationId,
 	GpPolicy   *policy;
 	TupleDesc	descriptor;
 	Oid			namespaceId;
-	Relation rel;
+	Relation rel, prjrel;
 	Oid prjOid;
 	ObjectAddress address;
 	HeapTuple	amtuple;
@@ -374,9 +565,6 @@ DefineProjection(Oid relationId,
 	);
 
 
-  	// /* Make this prj visible */
-	// CommandCounterIncrement();
-
 	ReleaseSysCache(amtuple);
 
 
@@ -386,10 +574,23 @@ DefineProjection(Oid relationId,
 		newInfo
 	);
 
+
   	/* Make this changes visible */
 	CommandCounterIncrement();
 
+	/* Populate newly created projection with source
+	*  relation tuples  */
+
+
+	prjrel = table_open(prjOid, AccessExclusiveLock);
+
+	projection_populate(stmt, rel, prjrel, newInfo);
 	
+	table_close(prjrel, AccessExclusiveLock);
+	
+  	/* Make this changes visible */
+	CommandCounterIncrement();
+
 	/* It is now safe to dispatch */
 	if (shouldDispatch)
 	{

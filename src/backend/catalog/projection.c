@@ -1,5 +1,5 @@
 /*
-* ygp_prj.c
+* projection.c
 */
 
 #include "postgres.h"
@@ -76,4 +76,3 @@ BuildPrjInfo(Relation projection)
 
 	return pji;
 }
-
