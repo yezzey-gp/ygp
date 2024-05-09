@@ -50,7 +50,6 @@
 static void UpdateProjectionRelation(Oid prjoid,
 					Oid heapoid, PrjInfo* info);
 
-
 static void
 UpdateProjectionRelation(Oid prjoid,
 					Oid heapoid, PrjInfo* info)

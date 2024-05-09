@@ -8895,6 +8895,7 @@ drop_type_any_name:
 			| SEQUENCE								{ $$ = OBJECT_SEQUENCE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| MATERIALIZED VIEW						{ $$ = OBJECT_MATVIEW; }
+			| PROJECTION       						{ $$ = OBJECT_PROJECTION; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
 			| FOREIGN TABLE							{ $$ = OBJECT_FOREIGN_TABLE; }
 			| EXTERNAL TABLE						{ $$ = OBJECT_FOREIGN_TABLE; }

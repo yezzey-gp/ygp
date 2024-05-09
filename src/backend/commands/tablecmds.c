@@ -1727,6 +1727,10 @@ RemoveRelations(DropStmt *drop)
 			relkind = RELKIND_FOREIGN_TABLE;
 			break;
 
+		case OBJECT_PROJECTION:
+			relkind = RELKIND_PROJECTION;
+			break;
+
 		default:
 			elog(ERROR, "unrecognized drop object type: %d",
 				 (int) drop->removeType);
