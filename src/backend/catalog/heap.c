@@ -2384,6 +2384,7 @@ heap_drop_with_catalog(Oid relid)
 	HeapTuple	tuple;
 	Oid			parentOid = InvalidOid,
 				defaultPartOid = InvalidOid;
+	char relkind;
 
 	/*
 	 * To drop a partition safely, we must grab exclusive lock on its parent,
@@ -2419,6 +2420,9 @@ heap_drop_with_catalog(Oid relid)
 	 */
 	rel = relation_open(relid, AccessExclusiveLock);
 
+
+	relkind = rel->rd_rel->relkind;
+
 	is_appendonly_rel = RelationStorageIsAO(rel);
 
 	/*
@@ -2426,8 +2430,11 @@ heap_drop_with_catalog(Oid relid)
 	 * might still have open queries or cursors, or pending trigger events, in
 	 * our own session.
 	 */
-	CheckTableNotInUse(rel, "DROP TABLE");
-
+	if (relkind == RELKIND_PROJECTION) {
+		CheckTableNotInUse(rel, "DROP PROJECTION");
+	} else {
+		CheckTableNotInUse(rel, "DROP TABLE");
+	}
 	/*
 	 * This effectively deletes all rows in the table, and may be done in a
 	 * serializable transaction.  In that case we must record a rw-conflict in
@@ -2439,7 +2446,7 @@ heap_drop_with_catalog(Oid relid)
 	/*
 	 * Delete pg_foreign_table tuple first.
 	 */
-	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
+	if (relkind == RELKIND_FOREIGN_TABLE)
 	{
 		Relation	rel;
 		HeapTuple	tuple;
@@ -2554,6 +2561,36 @@ heap_drop_with_catalog(Oid relid)
 	 * delete relation tuple
 	 */
 	DeleteRelationTuple(relid);
+
+
+	/*
+	* Clean up ygp_prj tuple, if projection
+	* we do this after RelationForgetRelation!!!
+	*/
+
+	if (relkind == RELKIND_PROJECTION) 
+	{
+		Relation projectionRelation;
+		HeapTuple	tuple;
+		Form_ygp_projection prj;
+
+		/*
+		* fix PROJECTION relation
+		*/
+		projectionRelation = table_open(ProjectionRelationId, RowExclusiveLock);
+
+		tuple = SearchSysCache1(PROJECTIONOID, ObjectIdGetDatum(relid));
+		if (!HeapTupleIsValid(tuple))
+			elog(ERROR, "cache lookup failed for projection %u", relid);
+
+		prj = (Form_ygp_projection) GETSTRUCT(tuple);
+
+		CatalogTupleDelete(projectionRelation, &tuple->t_self);
+
+		ReleaseSysCache(tuple);
+
+		table_close(projectionRelation, RowExclusiveLock);
+	}
 
 	if (OidIsValid(parentOid))
 	{

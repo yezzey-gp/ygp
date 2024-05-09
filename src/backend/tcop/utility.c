@@ -2272,6 +2272,7 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
 		case OBJECT_FOREIGN_TABLE:
+		case OBJECT_PROJECTION:
 			RemoveRelations(stmt);
 			break;
 		default:
@@ -2590,6 +2591,9 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 			break;
 		case OBJECT_PROCEDURE:
 			tag = "ALTER PROCEDURE";
+			break;
+		case OBJECT_PROJECTION:
+			tag = "ALTER PROJECTION";
 			break;
 		case OBJECT_ROLE:
 			tag = "ALTER ROLE";
@@ -2924,6 +2928,9 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_PROCEDURE:
 					tag = "DROP PROCEDURE";
+					break;
+				case OBJECT_PROJECTION:
+					tag = "DROP PROJECTION";
 					break;
 				case OBJECT_ROUTINE:
 					tag = "DROP ROUTINE";
