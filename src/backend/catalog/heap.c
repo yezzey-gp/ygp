@@ -2573,6 +2573,7 @@ heap_drop_with_catalog(Oid relid)
 		Relation projectionRelation;
 		HeapTuple	tuple;
 		Form_ygp_projection prj;
+		Oid heapOid;
 
 		/*
 		* fix PROJECTION relation
@@ -2584,12 +2585,18 @@ heap_drop_with_catalog(Oid relid)
 			elog(ERROR, "cache lookup failed for projection %u", relid);
 
 		prj = (Form_ygp_projection) GETSTRUCT(tuple);
+		heapOid = prj->prjrelid;
 
 		CatalogTupleDelete(projectionRelation, &tuple->t_self);
 
 		ReleaseSysCache(tuple);
 
 		table_close(projectionRelation, RowExclusiveLock);
+
+		deleteDependencyRecordsForClass(RelationRelationId, heapOid,
+				ProjectionRelationId,
+				DEPENDENCY_INTERNAL);
+
 	}
 
 	if (OidIsValid(parentOid))

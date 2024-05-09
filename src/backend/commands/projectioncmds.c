@@ -47,6 +47,8 @@
 
 #include "commands/createas.h"
 
+#include "catalog/dependency.h"
+
 static void UpdateProjectionRelation(Oid prjoid,
 					Oid heapoid, PrjInfo* info);
 
@@ -574,6 +576,19 @@ DefineProjection(Oid relationId,
 		relationId,
 		newInfo
 	);
+
+	ObjectAddress myself, referenced;
+
+
+	myself.classId = ProjectionRelationId;
+	myself.objectId = prjOid;
+	myself.objectSubId = 0;
+
+	/* dependency on table */
+	referenced.classId = RelationRelationId;
+	referenced.objectId = relationId;
+	referenced.objectSubId = 0;
+	recordDependencyOn(&referenced, &myself, DEPENDENCY_INTERNAL);
 
 
   	/* Make this changes visible */
