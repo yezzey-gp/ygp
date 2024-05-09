@@ -440,6 +440,8 @@ DefineProjection(Oid relationId,
 	bool		shouldDispatch = dispatch &&
 								 Gp_role == GP_ROLE_DISPATCH &&
                                  IsNormalProcessingMode();
+	bool        shouldPopulate = Gp_role == GP_ROLE_DISPATCH &&
+                                 IsNormalProcessingMode();
 
 	rel = table_open(relationId, ShareLock);
 	/*
@@ -546,7 +548,7 @@ DefineProjection(Oid relationId,
 		InvalidOid /* relation type oid */,
 		InvalidOid /* rel of type oid */,
  		GetUserId() /* owner */,
-		HEAP_TABLE_AM_OID /* access method -- fixx !! learn it from define stmt */,
+		accessMethodId /* access method */,
 		descriptor /* tuple desc */, 
 		NIL /* cooked contrains */,
 		RELKIND_PROJECTION /*relation kind*/,
@@ -603,17 +605,19 @@ DefineProjection(Oid relationId,
 
 	elog(LOG, "created projection %s", stmt->prjname);
 
+	if (shouldPopulate)
+	{
+		prjrel = table_open(prjOid, AccessExclusiveLock);
 
-	prjrel = table_open(prjOid, AccessExclusiveLock);
+		projection_populate(stmt, rel, prjrel, newInfo);
+		
+		/* Make this changes visible */
+		CommandCounterIncrement();
 
-	projection_populate(stmt, rel, prjrel, newInfo);
-	
-  	/* Make this changes visible */
-	CommandCounterIncrement();
+		table_close(prjrel, AccessExclusiveLock);
 
-	table_close(prjrel, AccessExclusiveLock);
-
-	elog(LOG, "populated projection %s", stmt->prjname);
+		elog(LOG, "populated projection %s", stmt->prjname);
+	}
 
 	table_close(rel, ShareLock);
 
