@@ -4625,7 +4625,7 @@ RelationGetYezzeyKeyByRelid(Oid reloid)
 		yForm = (Form_yezzey_distrib) GETSTRUCT(ytup);
 		retkeys = (int2vector *) DatumGetPointer(
 					heap_getattr(ytup,
-									Anum_yezzey_distrib_distkey, tupleDescriptor,
+									Anum_yezzey_distrib_y_key_distriubtion, tupleDescriptor,
 									&isNull));
 
 	}

@@ -31,7 +31,7 @@ CATALOG(yezzey_distrib,8777,YezzeyDistribRelationId)
 {
 	Oid			reloid;
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	int2vector	distkey;		/* column numbers of distribution key cols */
+	int2vector	y_key_distriubtion;		/* column numbers of distribution key cols */
 #endif
 } FormData_yezzey_distrib;
 
