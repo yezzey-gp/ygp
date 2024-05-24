@@ -52,6 +52,8 @@ Datum
 gp_distribution_policy_table_check(PG_FUNCTION_ARGS)
 {
 	Oid			relOid = PG_GETARG_OID(0);
+
+	// ! get yezzey/yeneid key ranges if external relation
 	bool		result = true;
 	TupleTableSlot *slot;
 

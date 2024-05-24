@@ -75,13 +75,13 @@ static inline int32 jump_consistent_hash(uint64 key, int32 num_segments);
  * The hash value itself will be initialized for every tuple in cdbhashinit()
  */
 CdbHash *
-makeCdbHash(int numsegs, int natts, Oid *hashfuncs)
+makeCdbHash(int numsegs, int natts, Oid *hashfuncs, int* yezzey_key_ranges, int yezzey_key_ranges_sz)
 {
 	CdbHash    *h;
 	int			i;
 	bool		is_legacy_hash = false;
 
-	Assert(numsegs > 0);		/* verify number of segments is legal. */
+	Assert(numsegs > 0 || yezzey_key_ranges != NULL);		/* verify number of segments is legal. */
 
 	/* Allocate a new CdbHash, with space for the datatype OIDs. */
 	h = palloc(sizeof(CdbHash));
@@ -112,6 +112,8 @@ makeCdbHash(int numsegs, int natts, Oid *hashfuncs)
 	 */
 	if (is_legacy_hash)
 		h->reducealg = ispowof2(numsegs) ? REDUCE_BITMASK : REDUCE_LAZYMOD;
+	else if (yezzey_key_ranges != NULL /* yezzey */) 
+		h->reducealg = REDUCE_YENEID, h->yezzey_key_ranges = yezzey_key_ranges, h->yezzey_key_ranges_sz = yezzey_key_ranges_sz;
 	else
 		h->reducealg = REDUCE_JUMP_HASH;
 
@@ -133,7 +135,10 @@ makeCdbHashForRelation(Relation rel)
 	Oid		   *hashfuncs;
 	int			i;
 	TupleDesc	desc = RelationGetDescr(rel);
+	int2vector *yezzey_key_ranges;
+	int        *yezzeyKeyRanges;
 
+	yezzey_key_ranges = RelationGetYezzeyKey(rel);
 	hashfuncs = palloc(policy->nattrs * sizeof(Oid));
 
 	for (i = 0; i < policy->nattrs; i++)
@@ -147,7 +152,16 @@ makeCdbHashForRelation(Relation rel)
 		hashfuncs[i] = cdb_hashproc_in_opfamily(opfamily, typeoid);
 	}
 
-	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs);
+	if (yezzey_key_ranges != NULL) {
+		yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));
+		for (i = 0; i < yezzey_key_ranges->dim1; i ++) {
+			yezzeyKeyRanges[i] = yezzey_key_ranges->values[i];
+		}
+	} else {
+		yezzeyKeyRanges = NULL;
+	}
+
+	h = makeCdbHash(policy->numsegments, policy->nattrs, hashfuncs, yezzeyKeyRanges, yezzey_key_ranges ? yezzey_key_ranges->dim1 : 0);
 
 	pfree(hashfuncs);
 	return h;
@@ -260,7 +274,8 @@ cdbhashreduce(CdbHash *h)
 
 	Assert(h->reducealg == REDUCE_BITMASK ||
 		   h->reducealg == REDUCE_LAZYMOD ||
-		   h->reducealg == REDUCE_JUMP_HASH);
+		   h->reducealg == REDUCE_JUMP_HASH ||
+		   h->reducealg == REDUCE_YENEID);
 	Assert(h->natts > 0);
 
 	/*
@@ -278,6 +293,10 @@ cdbhashreduce(CdbHash *h)
 
 		case REDUCE_JUMP_HASH:
 			result = jump_consistent_hash(h->hash, h->numsegs);
+			break;
+
+		case REDUCE_YENEID:
+			result = h->yezzey_key_ranges[h->hash % h->yezzey_key_ranges_sz]; // array[h->hash % array.len]
 			break;
 	}
 
