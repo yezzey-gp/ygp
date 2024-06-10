@@ -187,7 +187,7 @@ BufferedReadIo(
 
 
 		/* Read file using Yezzey AO smgr API */
-		actualLen = FileRead(bufferedRead->file,
+		actualLen = bufferedRead->smgr->smgr_FileRead(bufferedRead->file,
 							 (char *) largeReadMemory,
 							 largeReadLen,
 							 bufferedRead->fileOff,

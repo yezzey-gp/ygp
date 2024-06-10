@@ -88,7 +88,7 @@ static const f_smgr smgrsw[] = {
 	}
 };
 
-SMGRFile AORelOpenSegFile(char * nspname, char * relname, const char * fileName, int fileFlags, int64 modcount) {
+SMGRFile AORelOpenSegFile(Oid reloid, char * nspname, char * relname, const char * fileName, int fileFlags, int64 modcount) {
 	return PathNameOpenFile(fileName, fileFlags);
 }
 
@@ -245,6 +245,7 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which)
 
 	/* GPDB: don't support MyBackendId as a possible backend. */
 	Assert(backend == InvalidBackendId || backend == TempRelBackendId);
+	Assert(which == SMGR_AO || which == SMGR_MD);
 
 	if (SMgrRelationHash == NULL)
 	{
