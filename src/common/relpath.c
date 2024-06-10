@@ -114,7 +114,7 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 		Assert(dbNode == 0);
 		return pstrdup("global");
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == HEAPYTABLESPACE_OID)
+	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == YEZZEYTABLESPACE_OID)
 	{
 		/* The default tablespace is {datadir}/base */
 		return psprintf("base/%u", dbNode);
@@ -166,7 +166,7 @@ GetRelationPath(Oid dbNode, Oid spcNode, Oid relNode,
 		else
 			path = psprintf("global/%u", relNode);
 	}
-	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == HEAPYTABLESPACE_OID)
+	else if (spcNode == DEFAULTTABLESPACE_OID || spcNode == YEZZEYTABLESPACE_OID)
 	{
 		/* The default tablespace is {datadir}/base */
 		if (backendId == InvalidBackendId)

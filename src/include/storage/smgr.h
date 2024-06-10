@@ -137,7 +137,7 @@ typedef struct f_smgr_ao {
 		Oid reloid,
 		char * nspname, 
 		char * relname,
-		FileName fileName,
+		const char * fileName,
 		int fileFlags,
 		int fileMode,
 		int64 modcount);

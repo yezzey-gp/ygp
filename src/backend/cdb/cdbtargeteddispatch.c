@@ -158,7 +158,7 @@ GetContentIdsFromPlanForSingleRelation(PlannerInfo *root, Plan *plan, int rangeT
 	}
 
 	// 
-	if (relation != NULL && relation->rd_node.spcNode == HEAPYTABLESPACE_OID) {
+	if (relation != NULL && relation->rd_node.spcNode == YEZZEYTABLESPACE_OID) {
 		// use yezzey(yeneid) hash for yezzey(yeneid) relations
 
 		

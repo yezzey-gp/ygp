@@ -96,7 +96,7 @@ ao_insert_replay(XLogReaderState *record)
 		return;
 	}
 
-	written_len = smgrao_curr->smgr_FileWrite(file, buffer, len,xlrec->target.offset,
+	written_len = smgrao_curr->smgr_FileWrite(file, buffer, len, xlrec->target.offset,
 							WAIT_EVENT_COPY_FILE_WRITE);
 	if (written_len < 0 || written_len != len)
 	{
