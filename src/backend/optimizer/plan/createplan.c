@@ -2949,6 +2949,23 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 			Oid			reloid = planner_rt_fetch(idx, root)->relid;
 			GpPolicy   *policy = GpPolicyFetch(reloid);
 
+			int2vector *yezzey_key_ranges;
+			int        *yezzeyKeyRanges;
+			int i;
+
+			yezzey_key_ranges = RelationGetYezzeyKeyByRelid(reloid);
+			if (yezzey_key_ranges != NULL) {
+				plan->numYezzeyKeyRanges = yezzey_key_ranges->dim1;
+				plan->yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));
+							
+				for (i = 0; i < yezzey_key_ranges->dim1; i ++) {
+					plan->yezzeyKeyRanges[i] = yezzey_key_ranges->values[i];
+				}
+			} else {
+				plan->numYezzeyKeyRanges = 0;
+				plan->yezzeyKeyRanges = NULL;
+			}
+
 			/*
 			 * We cannot update tables on segments and on the entry DB in the
 			 * same process.
@@ -2980,6 +2997,8 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 			isfirst = false;
 		}
 	}
+
+	/* YezzeyDistribRelationId */
 
 	return plan;
 }

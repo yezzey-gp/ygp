@@ -28,6 +28,8 @@ SUBDIRS = access bootstrap catalog commands common datatype \
 
 SUBDIRS += cdb
 
+SUBDIRS += yezzey
+
 # Install all headers
 install: all installdirs
 # These headers are needed by the public headers of the interfaces.

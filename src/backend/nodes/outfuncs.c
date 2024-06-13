@@ -602,6 +602,11 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_NODE_FIELD(exclRelTlist);
 	WRITE_NODE_FIELD(isSplitUpdates);
 	WRITE_BOOL_FIELD(forceTupleRouting);
+
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
 }
 
 static void

@@ -187,6 +187,9 @@ PQmakeEmptyPGresult(PGconn *conn, ExecStatusType status)
 	result->nWaits = 0;
 	result->waitGxids = NULL;
 
+	result->nTuples = 0;
+	result->tuples = NULL;
+
 	if (conn)
 	{
 		/* copy connection data we might need for operations on PGresult */
@@ -766,6 +769,8 @@ PQclear(PGresult *res)
 		free(res->waitGxids);
 	res->waitGxids = NULL;
 	res->nWaits = 0;
+
+	// for (int i = 0; )
 
 	/* Free the PGresult structure itself */
 	free(res);

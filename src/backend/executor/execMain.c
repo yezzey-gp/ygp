@@ -109,6 +109,8 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbendpoint.h"
 
+#include "yezzey/yezzey.h"
+
 #define IS_PARALLEL_RETRIEVE_CURSOR(queryDesc)	(queryDesc->ddesc &&	\
 										queryDesc->ddesc->parallelCursorName &&	\
 										strlen(queryDesc->ddesc->parallelCursorName) > 0)
@@ -1095,6 +1097,8 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 	/* Execute queued AFTER triggers, unless told not to */
 	if (!(estate->es_top_eflags & EXEC_FLAG_SKIP_TRIGGERS))
 		AfterTriggerEndQuery(estate);
+
+	YezzeyPopulateMetadataRelation(estate);
 
 	if (queryDesc->totaltime)
 		InstrStopNode(queryDesc->totaltime, 0);

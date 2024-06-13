@@ -410,6 +410,9 @@ typedef struct ModifyTable
 	List	   *isSplitUpdates;
 
 	bool		forceTupleRouting; /* dynamic scans require tuple routing */
+
+	int numYezzeyKeyRanges;
+	int *yezzeyKeyRanges; /* yezzey */
 } ModifyTable;
 
 struct PartitionPruneInfo;		/* forward reference to struct below */

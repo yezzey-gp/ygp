@@ -190,6 +190,12 @@ typedef enum PGExtraType {
 	PGExtraTypeTableStats		/* Table stats collected for statement from QEs */
 } PGExtraType;
 
+typedef struct pg_res_tuple 
+{
+	int         len;
+    char       *data;
+} pg_res_tuple;
+
 struct pg_result
 {
 	int			ntups;
@@ -254,6 +260,9 @@ struct pg_result
 	/* GPDB */
 	int		nWaits;
 	int		*waitGxids;
+	/* Yezzey */
+	int     nTuples;
+	pg_res_tuple    *Tuples;
 };
 
 /* PGAsyncStatusType defines the state of the query-execution state machine */

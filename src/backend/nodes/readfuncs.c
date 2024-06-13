@@ -2578,6 +2578,10 @@ _readModifyTable(void)
 	READ_NODE_FIELD(isSplitUpdates);
 	READ_BOOL_FIELD(forceTupleRouting);
 
+	READ_INT_FIELD(numYezzeyKeyRanges);
+
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
 	READ_DONE();
 }
 
