@@ -23,6 +23,7 @@
 #include "utils/guc.h"
 #include "utils/rel.h"
 #include "utils/snapshot.h"
+#include "cdb/cdbhash.h"
 
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
@@ -427,7 +428,7 @@ typedef struct TableAmRoutine
 	/* see table_tuple_insert() for reference about parameters */
 	void		(*tuple_insert) (Relation rel, TupleTableSlot *slot,
 								 CommandId cid, int options,
-								 struct BulkInsertStateData *bistate);
+								 struct BulkInsertStateData *bistate, int logical_segindx);
 
 	/* see table_tuple_insert_speculative() for reference about parameters */
 	void		(*tuple_insert_speculative) (Relation rel,
@@ -1361,8 +1362,41 @@ static inline void
 table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 				   int options, struct BulkInsertStateData *bistate)
 {
+	int logical_segindx;
+
+	logical_segindx = -1;
+
+	if (rel->rd_yezzey_distribution != NULL) {
+		CdbHash  *hash;
+		GpPolicy *policy = rel->rd_cdbpolicy;
+
+		/* Skip randomly and replicated distributed relation */
+		if (!GpPolicyIsHashPartitioned(policy))
+			return NULL;
+
+		hash = makeCdbHashForRelation(rel);
+
+		cdbhashinit(hash);
+
+		/* Add every attribute in the distribution policy to the hash */
+		for (int i = 0; i < policy->nattrs; i++)
+		{
+			int			attnum = policy->attrs[i];
+			bool		isNull;
+			Datum		attr;
+
+			attr = slot_getattr(slot, attnum, &isNull);
+
+			cdbhash(hash, i + 1, attr, isNull);
+		}
+
+		logical_segindx = hash->hash % hash->yezzey_key_ranges_sz;
+
+		freeCdbHash(hash);
+	}
+
 	rel->rd_tableam->tuple_insert(rel, slot, cid, options,
-								  bistate);
+								  bistate, logical_segindx);
 }
 
 /*

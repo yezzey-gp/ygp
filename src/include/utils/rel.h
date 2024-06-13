@@ -31,6 +31,7 @@
 #include "utils/reltrigger.h"
 
 #include "catalog/pg_am.h"
+#include "catalog/yezzey_distrib.h"
 
 
 /*
@@ -201,6 +202,14 @@ typedef struct RelationData
 	 */
 	Form_pg_appendonly rd_appendonly;
 	struct HeapTupleData *rd_aotuple;		/* all of pg_appendonly tuple */
+
+	/*
+	* Yezzey Support
+	*/
+
+	Form_yezzey_distrib rd_yezzey_distribution;
+	struct HeapTupleData *rd_ydtuple;		/* all of yezzey_distribution tuple */
+
 
 	/*
 	 * foreign-table support

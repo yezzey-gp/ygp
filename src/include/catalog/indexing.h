@@ -338,6 +338,9 @@ DECLARE_UNIQUE_INDEX(pg_extension_name_index, 3081, on pg_extension using btree(
 DECLARE_UNIQUE_INDEX(gp_distribution_policy_localoid_index, 6103, on gp_distribution_policy using btree(localoid oid_ops));
 #define GpPolicyLocalOidIndexId  6103
 
+DECLARE_UNIQUE_INDEX(yezzey_distribution_reloid_index, 8778, on yezzey_distrib using btree(reloid oid_ops));
+#define YezzeyDistribRelOidIndexId  8778
+
 DECLARE_UNIQUE_INDEX(pg_appendonly_relid_index, 7141, on pg_appendonly using btree(relid oid_ops));
 #define AppendOnlyRelidIndexId  7141
 

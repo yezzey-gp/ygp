@@ -260,7 +260,7 @@ heap_dml_finish(Relation relation)
 
 static void
 heapam_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
-					int options, BulkInsertState bistate)
+					int options, BulkInsertState bistate, int logical_blkno)
 {
 	bool		shouldFree = true;
 	HeapTuple	tuple = ExecFetchSlotHeapTuple(slot, true, &shouldFree);

@@ -73,6 +73,7 @@ typedef enum
  * local functions
  */
 static int choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode);
+static int prepare_logical_segno_internal(Relation rel, int blkno, choose_segno_mode mode);
 static int choose_new_segfile(Relation rel, bool *used, List *avoid_segnos);
 static void get_aoseg_fields(Relation rel, Relation pg_aoseg_rel, HeapTuple tuple,
 							 int32 *segno, int64 *tupcount, int16 *state, int16 *formatversion);
@@ -293,6 +294,20 @@ ChooseSegnoForWrite(Relation rel)
 				 (errmsg("could not find segment file to use for inserting into relation \"%s\"",
 						 RelationGetRelationName(rel)))));
 	return chosen_segno;
+}
+
+
+int
+PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno)
+{
+	if (Debug_appendonly_print_segfile_choice)
+		ereport(LOG,
+				(errmsg("PrepareLogicalSegnoForWrite: Choosing a segfile for relation \"%s\"",
+						RelationGetRelationName(rel))));
+
+	 prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE);
+
+	return 0;
 }
 
 /*
@@ -590,6 +605,269 @@ choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode)
 		!tried_creating_new_segfile)
 	{
 		chosen_segno = choose_new_segfile(rel, used, avoid_segnos);
+	}
+
+	UnlockRelationForExtension(rel, ExclusiveLock);
+
+	if (Debug_appendonly_print_segfile_choice && chosen_segno != -1)
+		ereport(LOG,
+				(errmsg("Segno chosen for append-only relation \"%s\" is %d",
+						RelationGetRelationName(rel), chosen_segno)));
+
+	heap_close(pg_aoseg_rel, AccessShareLock);
+
+	return chosen_segno;
+}
+
+static int
+choose_new_logical_yezzey_segno(Relation rel, int chosen_segno)
+{
+	Assert(RelationStorageIsAO(rel));
+
+	/* If can't create a new one because MAX_AOREL_CONCURRENCY was reached */
+	if (chosen_segno != -1)
+	{
+		if (Debug_appendonly_print_segfile_choice)
+			elog(LOG, "choose_new_segfile: creating new segfile %d",
+				 chosen_segno);
+
+		if (RelationIsAoRows(rel))
+			InsertInitialSegnoEntry(rel, chosen_segno);
+		else
+		{
+			Oid segrelid;
+			Snapshot appendOnlyMetaDataSnapshot;
+
+			appendOnlyMetaDataSnapshot = RegisterSnapshot(GetCatalogSnapshot(InvalidOid));
+			GetAppendOnlyEntryAuxOids(rel,
+									  &segrelid, NULL, NULL);
+			UnregisterSnapshot(appendOnlyMetaDataSnapshot);
+
+			InsertInitialAOCSFileSegInfo(rel, chosen_segno,
+										 RelationGetNumberOfAttributes(rel), segrelid);
+		}
+	}
+	else
+	{
+		if (Debug_appendonly_print_segfile_choice)
+			elog(LOG, "choose_new_segfile: could not create segfile, all segfiles are in use");
+	}
+
+	return chosen_segno;
+}
+
+
+static int
+prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mode mode)
+{
+	Relation	pg_aoseg_rel;
+	TupleDesc	pg_aoseg_dsc;
+	int			i;
+	int32		chosen_segno = -1;
+	candidate_segment candidates[MAX_AOREL_CONCURRENCY];
+	bool		used[MAX_AOREL_CONCURRENCY];
+	int			ncandidates = 0;
+	SysScanDesc aoscan;
+	HeapTuple	tuple;
+	Snapshot	snapshot;
+	Oid			segrelid;
+	bool		tried_creating_new_segfile = false;
+
+	memset(used, 0, sizeof(used));
+
+	if (ShouldUseReservedSegno(rel, mode))
+	{
+		if (Debug_appendonly_print_segfile_choice)
+			elog(LOG, "prepare_logical_segno_internal: chose RESERVED_SEGNO for write");
+
+		LockSegnoForWrite(rel, RESERVED_SEGNO);
+		return RESERVED_SEGNO;
+	}
+
+	/*
+	 * The algorithm below for choosing a target segment is not concurrent-safe.
+	 * Grab a lock to serialize.
+	 */
+	LockRelationForExtension(rel, ExclusiveLock);
+
+	/*
+	 * Obtain the snapshot that is taken at the beginning of the transaction.
+	 * If a tuple is visible to this snapshot, and it hasn't been updated since
+	 * (that's checked implicitly by heap_lock_tuple()), it's visible to any
+	 * snapshot in this backend, and can be used as insertion target. We can't
+	 * simply call GetTransactionSnapshot() here because it will create a new
+	 * distributed snapshot for non-serializable transaction isolation level,
+	 * and it may be too late.
+	 */
+	snapshot = GetOldestSnapshot();
+	if (snapshot == NULL)
+		snapshot = GetTransactionSnapshot();
+
+	if (Debug_appendonly_print_segfile_choice)
+	{
+		elog(LOG, "prepare_logical_segno_internal: TransactionXmin = %u, xmin = %u, xmax = %u, myxid = %u",
+			 TransactionXmin, snapshot->xmin, snapshot->xmax, GetCurrentTransactionIdIfAny());
+		LogDistributedSnapshotInfo(snapshot, "Used snapshot: ");
+	}
+
+	GetAppendOnlyEntryAuxOids(rel,
+							  &segrelid, NULL, NULL);
+
+	/*
+	 * Now pick a segment that is not in use, and is not over the allowed
+	 * size threshold (90% full).
+	 */
+	pg_aoseg_rel = heap_open(segrelid, AccessShareLock);
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
+
+	/*
+	 * Scan through all the pg_aoseg (or pg_aocs) entries, and make note of
+	 * all "candidates".
+	 */
+
+	ScanKeyData scanKey;
+
+	ScanKeyInit(&scanKey,
+				Anum_pg_aoseg_segno,				/* segno */
+				BTEqualStrategyNumber,
+				F_INT4EQ,
+				Int32GetDatum(logical_blkno));
+
+	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, false, snapshot, 1, &scanKey);
+	while ((tuple = systable_getnext(aoscan)) != NULL)
+	{
+		int32		segno;
+		int64		tupcount;
+		int16		state;
+		int16		formatversion;
+
+		get_aoseg_fields(rel, pg_aoseg_rel, tuple, &segno,
+						 &tupcount, &state, &formatversion);
+
+		used[segno] = true;
+
+		/* never write to AWAITING_DROP segments */
+		if (state != AOSEG_STATE_DEFAULT)
+			continue;
+
+		/* skip over segfiles that the caller asked to avoid */
+
+		if (mode != CHOOSE_MODE_COMPACTION_TARGET)
+		{
+			/* Skip using the ao segment if not latest version (except as a compaction target) */
+			if (formatversion != AOSegfileFormatVersion_GetLatest())
+				continue;
+
+			/*
+			 * Historically, segment 0 was only used in utility mode.
+			 * Nowadays, segment 0 is also used for CTAS and alter table
+			 * rewrite commands.
+			 */
+			if (Gp_role != GP_ROLE_UTILITY && segno == RESERVED_SEGNO)
+				continue;
+
+			/*
+			 * If we have already used this segment in this transaction, no need
+			 * to look further. We can continue to use it. We should already hold
+			 * a tuple lock on the pg_aoseg row, too.
+			 */
+			if (HeapTupleHeaderGetXmin(tuple->t_data) == GetCurrentTransactionId())
+			{
+				chosen_segno = segno;
+
+				if (Debug_appendonly_print_segfile_choice)
+					elog(LOG, "prepare_logical_segno_internal: chose segfile %d because it was updated earlier in the transaction already",
+						 chosen_segno);
+				break;
+			}
+		}
+		else
+		{
+			/* If the ao segment is empty, do not choose it for compaction */
+			if (tupcount == 0)
+				continue;
+		}
+
+		candidates[ncandidates].segno = segno;
+		candidates[ncandidates].ctid = tuple->t_self;
+		candidates[ncandidates].tupcount = tupcount;
+		ncandidates++;
+	}
+	systable_endscan(aoscan);
+
+	/*
+	 * Try to find a segment we can use among the candidates, and lock it.
+	 */
+	if (chosen_segno == -1)
+	{
+
+		/*
+		 * Sort the candidates by tuple count, to prefer segment with fewest existing
+		 * tuples. (In particular, in COMPACTION_WRITE mode, this puts all empty
+		 * segfiles to the front).
+		 */
+		qsort((void *) candidates, ncandidates, sizeof(candidate_segment),
+			  compare_candidates);
+
+		for (i = 0; i < ncandidates; i++)
+		{
+			HeapTupleData locktup;
+			Buffer		buf = InvalidBuffer;
+			TM_FailureData hufd;
+			TM_Result result;
+
+			/*
+			 * When performing VACUUM compaction, we prefer to create a new segment
+			 * over reusing a non-empty segfile, as the target to write the surviving
+			 * tuples to. Because if we insert to a non-empty segfile, we won't be
+			 * able to compact it later in the VACUUM cycle. (Or if we do, we'll scan
+			 * through all the tuples we moved onto it earlier.) So before we proceed
+			 * to try locking any non-empty segments, try to create a new one.
+			 */
+			if (mode == CHOOSE_MODE_COMPACTION_WRITE &&
+				!tried_creating_new_segfile &&
+				candidates[i].tupcount > 0)
+			{
+				/* ?? */
+				Assert(false);
+			}
+
+			locktup.t_self = candidates[i].ctid;
+			result = heap_lock_tuple(pg_aoseg_rel, &locktup,
+									 GetCurrentCommandId(true),
+									 LockTupleExclusive,
+									 LockWaitSkip,
+									 false, /* follow_updates */
+									 &buf,
+									 &hufd);
+			if (BufferIsValid(buf))
+				ReleaseBuffer(buf);
+			if (result == TM_Ok)
+			{
+				chosen_segno = candidates[i].segno;
+				if (Debug_appendonly_print_segfile_choice)
+					elog(LOG, "prepare_logical_segno_internal: locked existing segfile %d", chosen_segno);
+				break;
+			}
+			else
+			{
+				if (Debug_appendonly_print_segfile_choice)
+					elog(LOG, "prepare_logical_segno_internal: skipped segfile %d because could not be locked",
+						 candidates[i].segno);
+			}
+		}
+	}
+
+	/*
+	 * If no existing segment could be used, create a new one.
+	 */
+	if (chosen_segno == -1 &&
+		mode != CHOOSE_MODE_COMPACTION_TARGET &&
+		!tried_creating_new_segfile)
+	{
+		int chosen_segno = -1;
+
+		choose_new_logical_yezzey_segno(rel, logical_blkno);
 	}
 
 	UnlockRelationForExtension(rel, ExclusiveLock);

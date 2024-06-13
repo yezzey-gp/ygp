@@ -977,7 +977,7 @@ aocs_index_fetch_tuple_visible(struct IndexFetchTableData *scan,
 
 static void
 aoco_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
-                        int options, BulkInsertState bistate)
+                        int options, BulkInsertState bistate, int logical_blkno)
 {
 
 	AOCSInsertDesc          insertDesc;
@@ -1038,7 +1038,7 @@ aoco_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 {
 	(void) get_or_create_aoco_insert_descriptor(relation, ntuples);
 	for (int i = 0; i < ntuples; i++)
-		aoco_tuple_insert(relation, slots[i], cid, options, bistate);
+		aoco_tuple_insert(relation, slots[i], cid, options, bistate, -1);
 }
 
 static TM_Result
