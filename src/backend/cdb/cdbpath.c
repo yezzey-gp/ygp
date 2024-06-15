@@ -2431,7 +2431,7 @@ create_motion_path_for_upddel(PlannerInfo *root, Index rti, GpPolicy *policy, in
 				ykrarr[i] = ykr->values[i];
 			}
 		}
-		if (can_elide_explicit_motion(root, rti, subpath, policy, ykrarr, ykr ? ykr->dim1 : 0))
+		if (can_elide_explicit_motion(root, rti, subpath, policy, ykr ? ykr->dim1 : 0, ykrarr))
 			return subpath;
 		else
 		{

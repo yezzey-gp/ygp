@@ -25,6 +25,8 @@
 #include "utils/snapshot.h"
 #include "cdb/cdbhash.h"
 
+#include "cdb/cdbvars.h"
+
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
 
@@ -1364,15 +1366,12 @@ table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 {
 	int logical_segindx;
 
-	logical_segindx = -1;
-
 	if (rel->rd_yezzey_distribution != NULL) {
 		CdbHash  *hash;
 		GpPolicy *policy = rel->rd_cdbpolicy;
 
 		/* Skip randomly and replicated distributed relation */
-		if (!GpPolicyIsHashPartitioned(policy))
-			return NULL;
+		Assert(GpPolicyIsHashPartitioned(policy));
 
 		hash = makeCdbHashForRelation(rel);
 
@@ -1392,11 +1391,18 @@ table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 
 		logical_segindx = hash->hash % hash->yezzey_key_ranges_sz;
 
+		if (hash->yezzey_key_ranges[logical_segindx] == GpIdentity.segindex) {
+			rel->rd_tableam->tuple_insert(rel, slot, cid, options,
+										bistate, logical_segindx);
+		}
+
 		freeCdbHash(hash);
+
+		return;
 	}
 
 	rel->rd_tableam->tuple_insert(rel, slot, cid, options,
-								  bistate, logical_segindx);
+								  bistate, -1);
 }
 
 /*
