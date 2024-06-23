@@ -96,6 +96,8 @@
 
 #include "cdb/memquota.h"
 
+#include "yezzey/yezzey.h"
+
 static bool tlist_matches_tupdesc(PlanState *ps, List *tlist, Index varno, TupleDesc tupdesc);
 static void ShutdownExprContext(ExprContext *econtext, bool isCommit);
 
@@ -1576,6 +1578,9 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 
 		/* sum up rejected rows if any (single row error handling only) */
 		cdbdisp_sumRejectedRows(pr);
+
+
+		YezzeyPopulateMetadataRelation(estate);
 
 		/*
 		 * Check and free the results of all gangs. If any QE had an

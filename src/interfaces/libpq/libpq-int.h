@@ -260,9 +260,6 @@ struct pg_result
 	/* GPDB */
 	int		nWaits;
 	int		*waitGxids;
-	/* Yezzey */
-	int     nTuples;
-	pg_res_tuple    *Tuples;
 };
 
 /* PGAsyncStatusType defines the state of the query-execution state machine */
@@ -521,6 +518,10 @@ struct pg_conn
 	PGresult   *result;			/* result being constructed */
 	PGresult   *next_result;	/* next result (used in single-row mode) */
 
+	/* Yezzey result */
+	int             nTuples;
+	pg_res_tuple   *Tuples;
+
 	char		wrote_xlog;
 
 	/* Assorted state for SASL, SSL, GSS, etc */
@@ -671,6 +672,14 @@ extern void pqSaveParameterStatus(PGconn *conn, const char *name,
 								  const char *value);
 extern int	pqRowProcessor(PGconn *conn, const char **errmsgp);
 extern bool PQsendQueryStart(PGconn *conn);
+
+/* yezzey */
+inline int PQgetYezzeyTupleCount(PGconn *conn) {
+	return conn->nTuples;
+}
+inline pg_res_tuple* PQgetYezzeyTupleBufPtr(PGconn *conn) {
+	return conn->Tuples;
+}
 
 /* === in fe-protocol2.c === */
 

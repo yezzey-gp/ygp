@@ -3980,6 +3980,9 @@ makeEmptyPGconn(void)
 	initPQExpBuffer(&conn->errorMessage);
 	initPQExpBuffer(&conn->workBuffer);
 
+	conn->Tuples = NULL;
+	conn->nTuples = 0;
+
 	if (conn->inBuffer == NULL ||
 		conn->outBuffer == NULL ||
 		conn->rowBuf == NULL ||
@@ -4125,6 +4128,9 @@ freePGconn(PGconn *conn)
 		free(conn->target_session_attrs);
 	termPQExpBuffer(&conn->errorMessage);
 	termPQExpBuffer(&conn->workBuffer);
+
+	if (conn->Tuples)
+		free(conn->Tuples);
 
 	free(conn);
 }

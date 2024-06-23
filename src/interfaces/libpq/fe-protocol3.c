@@ -539,18 +539,14 @@ pqParseInput3(PGconn *conn)
 
 				/* yezzey data from QE */
 				case 'z':
-					conn->result->nTuples++;
+					i = conn->nTuples++;
 
-					conn->result->Tuples = realloc(conn->result->Tuples, sizeof(pg_res_tuple) * conn->result->nTuples);
-					for (i = 0; i < conn->result->nTuples; i++)
-					{
-						int tupLen;
-						if (pqGetInt(&conn->result->Tuples[i].len, 4, conn))
-							return;
-						conn->result->Tuples[i].data = malloc(conn->result->Tuples[i].len);
-						pqGetnchar(conn->result->Tuples[i].data, conn->result->Tuples[i].len, conn);
-					}
-
+					conn->Tuples = realloc(conn->Tuples, sizeof(pg_res_tuple) * conn->nTuples);
+					if (pqGetInt(&conn->Tuples[i].len, 4, conn))
+						return;
+					conn->Tuples[i].data = malloc(conn->Tuples[i].len);
+					pqGetnchar(conn->Tuples[i].data, conn->Tuples[i].len, conn);
+				
 					break;
 #endif
 				default:

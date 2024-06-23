@@ -305,7 +305,7 @@ PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno)
 				(errmsg("PrepareLogicalSegnoForWrite: Choosing a segfile for relation \"%s\"",
 						RelationGetRelationName(rel))));
 
-	 prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE);
+	prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE);
 
 	return 0;
 }
@@ -500,7 +500,7 @@ choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode)
 			 * Nowadays, segment 0 is also used for CTAS and alter table
 			 * rewrite commands.
 			 */
-			if (Gp_role != GP_ROLE_UTILITY && segno == RESERVED_SEGNO)
+			if (Gp_role != GP_ROLE_UTILITY)
 				continue;
 
 			/*
@@ -754,32 +754,6 @@ prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mod
 
 		if (mode != CHOOSE_MODE_COMPACTION_TARGET)
 		{
-			/* Skip using the ao segment if not latest version (except as a compaction target) */
-			if (formatversion != AOSegfileFormatVersion_GetLatest())
-				continue;
-
-			/*
-			 * Historically, segment 0 was only used in utility mode.
-			 * Nowadays, segment 0 is also used for CTAS and alter table
-			 * rewrite commands.
-			 */
-			if (Gp_role != GP_ROLE_UTILITY && segno == RESERVED_SEGNO)
-				continue;
-
-			/*
-			 * If we have already used this segment in this transaction, no need
-			 * to look further. We can continue to use it. We should already hold
-			 * a tuple lock on the pg_aoseg row, too.
-			 */
-			if (HeapTupleHeaderGetXmin(tuple->t_data) == GetCurrentTransactionId())
-			{
-				chosen_segno = segno;
-
-				if (Debug_appendonly_print_segfile_choice)
-					elog(LOG, "prepare_logical_segno_internal: chose segfile %d because it was updated earlier in the transaction already",
-						 chosen_segno);
-				break;
-			}
 		}
 		else
 		{

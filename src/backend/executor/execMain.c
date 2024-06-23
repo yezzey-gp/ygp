@@ -1098,8 +1098,6 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 	if (!(estate->es_top_eflags & EXEC_FLAG_SKIP_TRIGGERS))
 		AfterTriggerEndQuery(estate);
 
-	YezzeyPopulateMetadataRelation(estate);
-
 	if (queryDesc->totaltime)
 		InstrStopNode(queryDesc->totaltime, 0);
 
