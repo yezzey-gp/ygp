@@ -15,6 +15,6 @@
 #include "nodes/execnodes.h"
 
 void YezzeyPopulateMetadataRelation(EState *estate);
-
+void YeneidPopulateMetadataRelation(EState *estate);
 
 #endif /* GP_YEZZEY_H */

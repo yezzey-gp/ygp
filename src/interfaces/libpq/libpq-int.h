@@ -366,6 +366,14 @@ typedef struct pg_conn_host
 								 * found in password file. */
 } pg_conn_host;
 
+typedef struct yeneid_tup {
+	Oid  relOid;
+	int segrelid;
+	int optype;
+	int len;
+	char * data;
+} yeneid_tup;
+
 /*
  * PGconn stores all the state data associated with a single connection
  * to a backend.
@@ -521,6 +529,10 @@ struct pg_conn
 	/* Yezzey result */
 	int             nTuples;
 	pg_res_tuple   *Tuples;
+
+	/* Yeneid result */
+	int             AOnTuples;
+	yeneid_tup     *AOTuples;
 
 	char		wrote_xlog;
 
@@ -679,6 +691,14 @@ inline int PQgetYezzeyTupleCount(PGconn *conn) {
 }
 inline pg_res_tuple* PQgetYezzeyTupleBufPtr(PGconn *conn) {
 	return conn->Tuples;
+}
+
+/* yeneid */
+inline int PQgetYeneidTupleCount(PGconn *conn) {
+	return conn->AOnTuples;
+}
+inline yeneid_tup* PQgetYeneidTupleBufPtr(PGconn *conn) {
+	return conn->AOTuples;
 }
 
 /* === in fe-protocol2.c === */

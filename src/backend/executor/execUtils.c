@@ -1581,6 +1581,7 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 
 
 		YezzeyPopulateMetadataRelation(estate);
+		YeneidPopulateMetadataRelation(estate);
 
 		/*
 		 * Check and free the results of all gangs. If any QE had an

@@ -548,6 +548,29 @@ pqParseInput3(PGconn *conn)
 					pqGetnchar(conn->Tuples[i].data, conn->Tuples[i].len, conn);
 				
 					break;
+
+				/* yeneid data from QE */
+				case '4':
+					i = conn->AOnTuples++;
+
+					conn->AOTuples = realloc(conn->AOTuples, sizeof(yeneid_tup) * conn->AOnTuples);
+
+					if (pqGetInt(&conn->AOTuples[i].relOid, 4, conn))
+						return;
+
+					if (pqGetInt(&conn->AOTuples[i].segrelid, 4, conn))
+						return;
+
+					if (pqGetInt(&conn->AOTuples[i].optype, 4, conn))
+						return;
+
+					if (pqGetInt(&conn->AOTuples[i].len, 4, conn))
+						return;
+
+					conn->AOTuples[i].data = malloc(conn->AOTuples[i].len);
+					pqGetnchar(conn->AOTuples[i].data, conn->AOTuples[i].len, conn);
+				
+					break;
 #endif
 				default:
 					printfPQExpBuffer(&conn->errorMessage,

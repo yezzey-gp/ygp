@@ -3983,6 +3983,9 @@ makeEmptyPGconn(void)
 	conn->Tuples = NULL;
 	conn->nTuples = 0;
 
+	conn->AOTuples = NULL;
+	conn->AOnTuples = 0;
+
 	if (conn->inBuffer == NULL ||
 		conn->outBuffer == NULL ||
 		conn->rowBuf == NULL ||
@@ -4131,6 +4134,9 @@ freePGconn(PGconn *conn)
 
 	if (conn->Tuples)
 		free(conn->Tuples);
+
+	if (conn->AOTuples)
+		free(conn->AOTuples);
 
 	free(conn);
 }

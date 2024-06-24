@@ -54,6 +54,8 @@
 #include "utils/fmgroids.h"
 #include "utils/numeric.h"
 
+#include "libpq/pqformat.h"
+
 static float8 aorow_compression_ratio_internal(Relation parentrel);
 static void UpdateFileSegInfo_internal(Relation parentrel,
 						   int segno,
@@ -103,6 +105,9 @@ InsertInitialSegnoEntry(Relation parentrel, int segno)
 	Datum	   *values;
 	int16		formatVersion;
 	Oid segrelid;
+
+	MemTupleBinding * mt_bind;
+	MemTuple memtup;
 
 	ValidateAppendonlySegmentDataBeforeStorage(segno);
 
@@ -162,6 +167,20 @@ InsertInitialSegnoEntry(Relation parentrel, int segno)
 		elog(ERROR, "could not lock newly-inserted gp_fastsequence tuple");
 	if (BufferIsValid(buf))
 		ReleaseBuffer(buf);
+
+	mt_bind = create_memtuple_binding(
+      RelationGetDescr(pg_aoseg_rel), RelationGetNumberOfAttributes(pg_aoseg_rel));
+
+	memtup = memtuple_form(mt_bind, values, nulls);
+	int itemLen = memtuple_get_size(memtup);
+
+	pq_beginmessage(&buf, '4');
+	pq_sendint(&buf, segrelid, 4);
+	pq_sendint(&buf, segno, 4);
+	pq_sendint(&buf, 1 /* update */, 4);
+	pq_sendint(&buf, itemLen, sizeof(itemLen));
+	pq_sendbytes(&buf, (const char*) memtup, itemLen);
+	pq_endmessage(&buf);
 
 	heap_freetuple(pg_aoseg_tuple);
 	table_close(pg_aoseg_rel, RowExclusiveLock);
@@ -756,6 +775,10 @@ UpdateFileSegInfo_internal(Relation parentrel,
 	bool	   *new_record_repl;
 	bool		isNull;
 	Oid segrelid;
+	StringInfoData buf;
+
+	MemTupleBinding * mt_bind;
+	MemTuple memtup;
 
 	Assert(RelationStorageIsAoRows(parentrel));
 	GetAppendOnlyEntryAuxOids(parentrel, &segrelid, NULL, NULL);
@@ -925,6 +948,26 @@ UpdateFileSegInfo_internal(Relation parentrel,
 								  new_record_nulls, new_record_repl);
 
 	simple_heap_update(pg_aoseg_rel, &tuple->t_self, new_tuple);
+
+	mt_bind = create_memtuple_binding(
+      RelationGetDescr(pg_aoseg_rel), RelationGetNumberOfAttributes(pg_aoseg_rel));
+
+
+	memtup = memtuple_form(mt_bind, new_record, new_record_nulls);
+
+	/*
+	* get space to insert our next item (tuple)
+	*/
+  	int itemLen = memtuple_get_size(memtup);
+
+
+	pq_beginmessage(&buf, '4');
+	pq_sendint(&buf, segrelid, 4);
+	pq_sendint(&buf, segno, 4);
+	pq_sendint(&buf, 2 /* update */, 4);
+	pq_sendint(&buf, itemLen, sizeof(itemLen));
+	pq_sendbytes(&buf, (const char*) memtup, itemLen);
+	pq_endmessage(&buf);
 
 	heap_freetuple(new_tuple);
 
