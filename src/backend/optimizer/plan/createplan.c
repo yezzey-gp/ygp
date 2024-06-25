@@ -65,6 +65,8 @@
 #include "rewrite/rewriteManip.h"
 #include "utils/guc.h"
 
+#include "utils/snapmgr.h"
+
 /*
  * Flag bits that can appear in the flags argument of create_plan_recurse().
  * These can be OR-ed together.
@@ -200,7 +202,7 @@ static void copy_generic_path_info(Plan *dest, Path *src);
 static void copy_plan_costsize(Plan *dest, Plan *src);
 static void label_sort_with_costsize(PlannerInfo *root, Sort *plan,
 									 double limit_tuples);
-static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid);
+static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid, int segfile_count, FileSegInfo **seginfo);
 static SampleScan *make_samplescan(List *qptlist, List *qpqual, Index scanrelid,
 								   TableSampleClause *tsc);
 static IndexScan *make_indexscan(List *qptlist, List *qpqual, Index scanrelid,
@@ -3170,12 +3172,12 @@ create_motion_plan(PlannerInfo *root, CdbMotionPath *path)
 		case CdbLocusType_Hashed:
 		case CdbLocusType_HashedOJ:
 		case CdbLocusType_Strewn:
+		case CdbLocusType_Yezzey:
 			// might be writer, set already
 			//sendSlice->gangType == GANGTYPE_PRIMARY_READER;
 			sendSlice->numsegments = subpath->locus.numsegments;
 			sendSlice->segindex = 0;
 			break;
-
 		default:
 			elog(ERROR, "unknown locus type %d", subpath->locus.locustype);
 	}
@@ -3359,6 +3361,9 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 	Assert(scan_relid > 0);
 	Assert(best_path->parent->rtekind == RTE_RELATION);
 
+
+	RangeTblEntry *rte = planner_rt_fetch(scan_relid, root);
+
 	/* Sort clauses into best execution order */
 	scan_clauses = order_qual_clauses(root, scan_clauses);
 
@@ -3372,9 +3377,28 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 			replace_nestloop_params(root, (Node *) scan_clauses);
 	}
 
-	scan_plan = make_seqscan(tlist,
-							 scan_clauses,
-							 scan_relid);
+	if (best_path->parent->yezzey_key_ranges == NULL) {
+		scan_plan = make_seqscan(tlist,
+								scan_clauses,
+								scan_relid, 0, NULL);
+	} else {
+		FileSegInfo ** seginfo;
+		int segfile_count;
+
+		Relation relation;
+
+		relation = relation_open(rte->relid, AccessShareLock);
+
+		seginfo = GetAllFileSegInfo(relation,
+									SnapshotSelf, &segfile_count, NULL);
+
+		scan_plan = make_seqscan(tlist,
+								scan_clauses,
+								scan_relid, segfile_count, seginfo);
+
+
+		relation_close(relation, AccessShareLock);
+	}
 
 	copy_generic_path_info(&scan_plan->plan, best_path);
 
@@ -6187,7 +6211,7 @@ label_sort_with_costsize(PlannerInfo *root, Sort *plan, double limit_tuples)
 static SeqScan *
 make_seqscan(List *qptlist,
 			 List *qpqual,
-			 Index scanrelid)
+			 Index scanrelid, int segfile_count, FileSegInfo **seginfo)
 {
 	SeqScan    *node = makeNode(SeqScan);
 	Plan	   *plan = &node->plan;
@@ -6197,6 +6221,9 @@ make_seqscan(List *qptlist,
 	plan->lefttree = NULL;
 	plan->righttree = NULL;
 	node->scanrelid = scanrelid;
+
+	node->segfile_count = segfile_count;
+	node->seginfo = seginfo;
 
 	return node;
 }

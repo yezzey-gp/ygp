@@ -89,13 +89,13 @@ void YeneidPopulateMetadataRelation(EState *estate) {
     if (ds == NULL) {
         return;
     }
-    memset(recordRepl, false, sizeof(recordRepl));
+    MemSet(recordRepl, false, sizeof(recordRepl));
     recordRepl[Anum_pg_aoseg_eof - 1] = true;
     recordRepl[Anum_pg_aoseg_tupcount - 1] = true;
     recordRepl[Anum_pg_aoseg_varblockcount - 1] = true;
     recordRepl[Anum_pg_aoseg_eofuncompressed - 1] = true;
-    recordRepl[Anum_pg_aoseg_formatversion - 1] = true;
-    recordRepl[Anum_pg_aoseg_state - 1] = true;
+    recordRepl[Anum_pg_aoseg_modcount - 1] = true;
+
 
     Oid yrelationOid = InvalidOid;
 

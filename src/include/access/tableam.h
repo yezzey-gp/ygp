@@ -27,6 +27,8 @@
 
 #include "cdb/cdbvars.h"
 
+#include "access/aosegfiles.h"
+
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
 
@@ -236,7 +238,14 @@ typedef struct TableAmRoutine
 								 int nkeys, struct ScanKeyData *key,
 								 ParallelTableScanDesc pscan,
 								 uint32 flags);
-
+	/*
+	 * Yeneid: ugly hack
+	 */
+	TableScanDesc (*scan_begin_y)(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo);
 	/*
 	 * GPDB: Extract columns for scan from either a projection array
 	 * or a targetlist and quals. This is currently used for AOCO
@@ -873,7 +882,7 @@ table_beginscan(Relation rel, Snapshot snapshot,
  */
 static inline TableScanDesc
 table_beginscan_es(Relation rel, Snapshot snapshot,
-				   List *targetList, List *qual, bool *proj, List *constraintList)
+				   List *targetList, List *qual, bool *proj, List *constraintList, int segfile_count, FileSegInfo **seginfo)
 {
 	uint32		flags = SO_TYPE_SEQSCAN |
 	SO_ALLOW_STRAT | SO_ALLOW_SYNC | SO_ALLOW_PAGEMODE;
@@ -882,6 +891,11 @@ table_beginscan_es(Relation rel, Snapshot snapshot,
 		return rel->rd_tableam->scan_begin_extractcolumns(rel, snapshot,
 														  targetList, qual, proj, constraintList,
 														  flags);
+	if (rel->rd_tableam->scan_begin_y && rel->rd_yezzey_distribution != NULL) {
+		return rel->rd_tableam->scan_begin_y(rel, snapshot,
+									   0, NULL,
+									   NULL, flags, segfile_count, seginfo);
+	}
 
 	return rel->rd_tableam->scan_begin(rel, snapshot,
 									   0, NULL,

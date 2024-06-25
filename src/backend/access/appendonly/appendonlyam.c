@@ -1906,6 +1906,77 @@ appendonly_beginrangescan(Relation relation,
 											  0);
 }
 
+
+/* ugly hack, TBD: separate access method */
+/* ----------------
+ *		appendonly_beginscan_y	- begin yeneid relation scan
+ * ----------------
+ */
+TableScanDesc
+appendonly_beginscan_y(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo)
+{
+	Snapshot	appendOnlyMetaDataSnapshot;
+	AppendOnlyScanDesc aoscan;
+
+	appendOnlyMetaDataSnapshot = snapshot;
+	if (appendOnlyMetaDataSnapshot == SnapshotAny)
+	{
+		/*
+		 * The append-only meta data should never be fetched with
+		 * SnapshotAny as bogus results are returned.
+		 * We use SnapshotSelf for metadata, as regular MVCC snapshot can hide
+		 * newly globally inserted tuples from global index build process.
+		 */
+		appendOnlyMetaDataSnapshot = SnapshotSelf;
+	}
+
+	/*
+	 * Get the pg_appendonly information for this table
+	 */
+
+	int local_segfile_count = 0;
+	FileSegInfo **local_seginfo;
+	bool isNull;
+
+	int2vector *distribution;
+	
+	distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, relation->rd_ydtuple,
+					Anum_yezzey_distrib_y_key_distriubtion,
+					&isNull)); 
+
+	for (int i = 0 ; i < distribution->dim1; ++ i) {
+		if (distribution->values[i] == GpIdentity.segindex) {
+			++local_segfile_count;
+		}
+	}
+
+	local_seginfo = palloc0(sizeof(FileSegInfo *) * local_segfile_count);
+
+	local_segfile_count = 0;
+
+	for (int i = 0 ; i < distribution->dim1 ; ++ i) {
+		if (distribution->values[i] == GpIdentity.segindex) {
+			local_seginfo[local_segfile_count++] = seginfo[i];
+		}
+	}
+
+	aoscan = appendonly_beginrangescan_internal(relation,
+												snapshot,
+												appendOnlyMetaDataSnapshot,
+												local_seginfo,
+												local_segfile_count,
+												nkeys,
+												key,
+												pscan,
+												flags);
+
+	return (TableScanDesc) aoscan;
+}
+
 /* ----------------
  *		appendonly_beginscan	- begin relation scan
  * ----------------
@@ -1952,6 +2023,7 @@ appendonly_beginscan(Relation relation,
 
 	return (TableScanDesc) aoscan;
 }
+
 
 /* ----------------
  *		appendonly_rescan		- restart a relation scan

@@ -24,6 +24,8 @@
 #include "nodes/primnodes.h"
 #include "parsenodes.h"
 
+#include "access/aosegfiles.h"
+
 typedef struct DirectDispatchInfo
 {
 	/*
@@ -540,6 +542,10 @@ typedef struct Scan
 {
 	Plan		plan;
 	Index		scanrelid;		/* relid is index into the range table */
+
+	/* yeneid segments */
+	int segfile_count;
+	FileSegInfo **seginfo;
 } Scan;
 
 /* ----------------

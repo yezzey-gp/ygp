@@ -1906,7 +1906,7 @@ aoco_index_build_range_scan(Relation heapRelation,
 									  tlist,		/* targetlist */
 									  qual,			/* qual */
 									  NULL,			/* constraintList */
-									  NULL);
+									  NULL, 0, NULL);
 		}
 	}
 	else

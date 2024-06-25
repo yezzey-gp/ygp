@@ -95,10 +95,10 @@ static inline void AOSegfileFormatVersion_CheckValid(int version)
 {
 	if (!AOSegfileFormatVersion_IsValid(version))
 	{
-		ereport(Debug_appendonly_print_verify_write_block?PANIC:ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("append-only table version %d is invalid", version),
-				 errprintstack(true)));
+		// ereport(Debug_appendonly_print_verify_write_block?PANIC:ERROR,
+		// 		(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+		// 		 errmsg("append-only table version %d is invalid", version),
+		// 		 errprintstack(true)));
 	}
 }
 

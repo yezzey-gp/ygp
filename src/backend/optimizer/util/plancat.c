@@ -129,7 +129,7 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	int        *yezzeyKeyRanges;
 	int i;
 
-	yezzey_key_ranges = RelationGetYezzeyKeyByRelid(rel->relid);
+	yezzey_key_ranges = RelationGetYezzeyKeyByRelid(relationObjectId);
 
 	if (yezzey_key_ranges != NULL) {
 		yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));

@@ -522,6 +522,18 @@ _outScanInfo(StringInfo str, const Scan *node)
 	_outPlanInfo(str, (const Plan *) node);
 
 	WRITE_UINT_FIELD(scanrelid);
+	WRITE_UINT_FIELD(segfile_count);
+
+	for (int i = 0; i < node->segfile_count; ++ i) {
+		WRITE_UINT64_FIELD(seginfo[i]->segno);
+		WRITE_UINT64_FIELD(seginfo[i]->total_tupcount);
+		WRITE_UINT64_FIELD(seginfo[i]->varblockcount);
+		WRITE_UINT64_FIELD(seginfo[i]->modcount);
+		WRITE_UINT64_FIELD(seginfo[i]->eof);
+		WRITE_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		WRITE_INT_FIELD(seginfo[i]->formatversion);
+		WRITE_INT_FIELD(seginfo[i]->state);
+	}
 }
 
 /*

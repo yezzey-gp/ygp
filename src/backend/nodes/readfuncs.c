@@ -2688,6 +2688,24 @@ ReadCommonScan(Scan *local_node)
 	ReadCommonPlan(&local_node->plan);
 
 	READ_UINT_FIELD(scanrelid);
+
+	READ_UINT_FIELD(segfile_count);
+
+	local_node->seginfo = palloc0(sizeof(FileSegInfo*) * local_node->segfile_count);
+
+	for (int i = 0; i < local_node->segfile_count; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+
+		READ_UINT64_FIELD(seginfo[i]->segno);
+		READ_UINT64_FIELD(seginfo[i]->total_tupcount);
+		READ_UINT64_FIELD(seginfo[i]->varblockcount);
+		READ_UINT64_FIELD(seginfo[i]->modcount);
+		READ_UINT64_FIELD(seginfo[i]->eof);
+		READ_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		READ_INT_FIELD(seginfo[i]->formatversion);
+		READ_INT_FIELD(seginfo[i]->state);
+	}
+
 }
 
 /*

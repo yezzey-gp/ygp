@@ -466,6 +466,12 @@ extern TableScanDesc appendonly_beginscan(Relation relation,
 										  int nkeys, struct ScanKeyData *key,
 										  ParallelTableScanDesc pscan,
 										  uint32 flags);
+extern TableScanDesc appendonly_beginscan_y(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo);
+
 extern void appendonly_rescan(TableScanDesc scan, ScanKey key,
 								bool set_params, bool allow_strat,
 								bool allow_sync, bool allow_pagemode);

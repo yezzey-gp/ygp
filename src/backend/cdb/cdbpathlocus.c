@@ -304,7 +304,14 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy, int2vector * ykr,
 
 	if (ykr != NULL) {
 		int numykr = ykr->dim1;
-		CdbPathLocus_MakeYezzey(&targetLocus, distkeys, numykr, ykr_ar);
+
+
+		int numseg = 0;
+		for (int i = 0; i < numykr; ++i) {
+			if (ykr_ar[i] + 1 > numseg) numseg = ykr_ar[i] + 1;
+		}
+		
+		CdbPathLocus_MakeYezzey(&targetLocus, distkeys, numykr, ykr_ar, numseg);
 	} else if (failed) {
 		CdbPathLocus_MakeNull(&targetLocus);
 	}
@@ -345,7 +352,11 @@ cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy, 
 															   policy);
 
 			if (ykr != NULL) {
-				CdbPathLocus_MakeYezzey(&result, distkeys, numykr, ykr);
+				int numseg = 0;
+				for (int i = 0; i < numykr; ++i) {
+					if (ykr[i] + 1 > numseg) numseg = ykr[i] + 1;
+				}
+				CdbPathLocus_MakeYezzey(&result, distkeys, numykr, ykr, numseg);
 			} else if (distkeys)
 				CdbPathLocus_MakeHashed(&result, distkeys, policy->numsegments);
 			else

@@ -58,7 +58,7 @@ cdbpathtoplan_create_flow(PlannerInfo *root,
 		flow = makeFlow(FLOW_REPLICATED, locus.numsegments);
 	}
 	else if (CdbPathLocus_IsHashed(locus) ||
-			 CdbPathLocus_IsHashedOJ(locus))
+			 CdbPathLocus_IsHashedOJ(locus) || CdbPathLocus_IsYezzey(locus))
 	{
 		flow = makeFlow(FLOW_PARTITIONED, locus.numsegments);
 

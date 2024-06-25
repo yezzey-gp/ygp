@@ -268,11 +268,11 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_MakeStrewn(plocus, numsegments_)                 \
             CdbPathLocus_MakeSimple((plocus), CdbLocusType_Strewn, (numsegments_))
 
-#define CdbPathLocus_MakeYezzey(plocus, distkey_, numykr, ykr_)       \
+#define CdbPathLocus_MakeYezzey(plocus, distkey_, numykr, ykr_, numseg)       \
     do {                                                \
         CdbPathLocus *_locus = (plocus);                \
         _locus->locustype = CdbLocusType_Yezzey;		\
-        _locus->numsegments = -1;                       \
+        _locus->numsegments = numseg;                       \
         _locus->distkey = (distkey_);					\
         _locus->numykr = (numykr);					     \
         _locus->ykr = (ykr_);					        \

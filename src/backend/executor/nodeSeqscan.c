@@ -74,12 +74,14 @@ SeqNext(SeqScanState *node)
 		 * scan state with the column info needed for AOCO relations. Check the
 		 * comment in table_beginscan_es() for more info.
 		 */
+
 		scandesc = table_beginscan_es(node->ss.ss_currentRelation,
-									  estate->es_snapshot,
-									  node->ss.ps.plan->targetlist,
-									  node->ss.ps.plan->qual,
-									  NULL,
-									  NULL);
+									estate->es_snapshot,
+									node->ss.ps.plan->targetlist,
+									node->ss.ps.plan->qual,
+									NULL,
+									NULL, node->segfile_count, node->seginfo);
+		
 		node->ss.ss_currentScanDesc = scandesc;
 	}
 
@@ -161,7 +163,9 @@ ExecInitSeqScanForPartition(SeqScan *node, EState *estate,
 	scanstate->ss.ps.plan = (Plan *) node;
 	scanstate->ss.ps.state = estate;
 	scanstate->ss.ps.ExecProcNode = ExecSeqScan;
-
+	
+	scanstate->seginfo = node->seginfo;
+	scanstate->segfile_count = node->segfile_count;
 	/*
 	 * Miscellaneous initialization
 	 *
