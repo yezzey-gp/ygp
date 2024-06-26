@@ -427,7 +427,7 @@ typedef struct TableAmRoutine
 	 * GPDB: DML state manipulation functions
 	 * ------------------------------------------------------------------------
 	 */
-	void		(*dml_init) (Relation rel);
+	void		(*dml_init) (Relation rel, int segfile_count, FileSegInfo** segfiles);
 
 	void		(*dml_finish) (Relation rel);
 
@@ -1314,9 +1314,9 @@ table_compute_xid_horizon_for_tuples(Relation rel,
  * command's execution.
  */
 static inline void
-table_dml_init(Relation rel)
+table_dml_init(Relation rel, int segfile_count, FileSegInfo** segfiles)
 {
-	rel->rd_tableam->dml_init(rel);
+	rel->rd_tableam->dml_init(rel, segfile_count, segfiles);
 }
 
 /*

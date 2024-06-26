@@ -451,6 +451,9 @@ typedef struct ViewOptions
 #define RelationIsAoRows(relation) \
 	((relation)->rd_rel->relam == AO_ROW_TABLE_AM_OID)
 
+#define RelationIsYeneid(relation) \
+	((relation)->rd_yezzey_distribution != NULL)
+
 #define RelationStorageIsAoRows(relation) \
 	((relation)->rd_rel->relam == AO_ROW_TABLE_AM_OID && \
 		(relation)->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)

@@ -2812,6 +2812,9 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	mtstate->mt_arowmarks = (List **) palloc0(sizeof(List *) * nplans);
 	mtstate->mt_nplans = nplans;
 
+	mtstate->segfile_count = node->segfile_count;
+	mtstate->seginfo = node->seginfo;
+
 	/* set up epqstate with dummy subplan data for the moment */
 	EvalPlanQualInit(&mtstate->mt_epqstate, estate, NULL, NIL, node->epqParam);
 
@@ -2912,7 +2915,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 								   table_slot_callbacks(resultRelInfo->ri_RelationDesc));
 
 		if (resultRelInfo->ri_RelationDesc->rd_tableam)
-			table_dml_init(resultRelInfo->ri_RelationDesc);
+			table_dml_init(resultRelInfo->ri_RelationDesc, node->segfile_count, node->seginfo);
 
 		/* Also let FDWs init themselves for foreign-table result rels */
 		if (!resultRelInfo->ri_usesFdwDirectModify &&

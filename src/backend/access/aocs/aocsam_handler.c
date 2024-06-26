@@ -249,7 +249,7 @@ remove_dml_state(const Oid relationOid)
  * the course of the current DML or DML-like command, for the given relation.
  */
 void
-aoco_dml_init(Relation relation)
+aoco_dml_init(Relation relation, int segfile_count, FileSegInfo** seginfo)
 {
 	init_aoco_dml_states();
 	init_dml_state(RelationGetRelid(relation));

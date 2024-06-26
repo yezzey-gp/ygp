@@ -109,6 +109,8 @@ InsertInitialSegnoEntry(Relation parentrel, int segno)
 	MemTupleBinding * mt_bind;
 	MemTuple memtup;
 
+	Assert(parentrel->rd_yezzey_distribution == NULL);
+
 	ValidateAppendonlySegmentDataBeforeStorage(segno);
 
 	/* New segments are always created in the latest format */
@@ -168,8 +170,81 @@ InsertInitialSegnoEntry(Relation parentrel, int segno)
 	if (BufferIsValid(buf))
 		ReleaseBuffer(buf);
 
-	mt_bind = create_memtuple_binding(
-      RelationGetDescr(pg_aoseg_rel), RelationGetNumberOfAttributes(pg_aoseg_rel));
+	heap_freetuple(pg_aoseg_tuple);
+	table_close(pg_aoseg_rel, RowExclusiveLock);
+}
+
+
+void InsertInitialYeneidSegnoEntry(Relation parentrel, int segno, FileSegInfo *fsInfo) {
+	Relation	pg_aoseg_rel;
+	TupleDesc	tupdesc;
+	TM_Result	result;
+	TM_FailureData hufd;
+	int			natts;
+	bool	   *nulls;
+	Datum	   *values;
+	int16		formatVersion;
+	Oid segrelid;
+
+	StringInfoData buf;
+
+	MemTupleBinding * mt_bind;
+	MemTuple memtup;
+
+
+	Assert(fsInfo != NULL);
+
+	Assert(Gp_role == GP_ROLE_EXECUTE);
+
+	/* New segments are always created in the latest format */
+	formatVersion = AOSegfileFormatVersion_GetLatest();
+
+	GetAppendOnlyEntryAuxOids(parentrel, &segrelid, NULL, NULL);
+
+	pg_aoseg_rel = heap_open(segrelid, RowExclusiveLock);
+
+	nulls = palloc(sizeof(bool) * Natts_pg_aoseg);
+	values = palloc0(sizeof(Datum) * Natts_pg_aoseg);
+	MemSet(nulls, false, sizeof(char) * Natts_pg_aoseg);
+
+	values[Anum_pg_aoseg_segno - 1] = Int32GetDatum(segno);
+	fsInfo->segno = segno;
+	values[Anum_pg_aoseg_tupcount - 1] = Int64GetDatum(0);
+	fsInfo->total_tupcount = 0;
+	values[Anum_pg_aoseg_varblockcount - 1] = Int64GetDatum(0);
+	fsInfo->varblockcount = 0;
+	values[Anum_pg_aoseg_eof - 1] = Int64GetDatum(0);
+	fsInfo->eof = 0;
+	values[Anum_pg_aoseg_eofuncompressed - 1] = Int64GetDatum(0);
+	fsInfo->eof_uncompressed = 0;
+	values[Anum_pg_aoseg_modcount - 1] = Int64GetDatum(0);
+	fsInfo->modcount = 0;
+	values[Anum_pg_aoseg_formatversion - 1] = Int16GetDatum(formatVersion);
+	fsInfo->formatversion = formatVersion;
+	values[Anum_pg_aoseg_state - 1] = Int16GetDatum(AOSEG_STATE_DEFAULT);
+	fsInfo->state = AOSEG_STATE_DEFAULT;
+
+	/* build tupdesc for result tuples */
+	tupdesc = CreateTemplateTupleDesc(Natts_pg_aoseg);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_segno, "segno",
+					INT4OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_eof, "eof",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_tupcount, "tupcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_varblockcount, "varblockcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_eofuncompressed, "eof_uncompressed",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_modcount, "modcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_formatversion, "formatversion",
+					INT2OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_state, "state",
+					INT2OID, -1, 0);
+
+
+	mt_bind = create_memtuple_binding(tupdesc, Natts_pg_aoseg);
 
 	memtup = memtuple_form(mt_bind, values, nulls);
 	int itemLen = memtuple_get_size(memtup);
@@ -181,8 +256,7 @@ InsertInitialSegnoEntry(Relation parentrel, int segno)
 	pq_sendint(&buf, itemLen, sizeof(itemLen));
 	pq_sendbytes(&buf, (const char*) memtup, itemLen);
 	pq_endmessage(&buf);
-
-	heap_freetuple(pg_aoseg_tuple);
+	
 	table_close(pg_aoseg_rel, RowExclusiveLock);
 }
 
@@ -737,6 +811,177 @@ UpdateFileSegInfo(Relation parentrel,
 							   newState);
 }
 
+
+void
+UpdateYeneidFileSegInfo(Relation parentrel,
+				  FileSegInfo *fsInfo,
+				  int segno,
+				  int64 eof,
+				  int64 eof_uncompressed,
+				  int64 tuples_added,
+				  int64 varblocks_added,
+				  int64 modcount_added,
+				  FileSegInfoState newState)
+{
+	int			tuple_segno = InvalidFileSegNumber;
+	int64		filetupcount;
+	int64		filevarblockcount;
+	int64		new_tuple_count;
+	int64		new_varblock_count;
+	int64		new_modcount;
+	int64		old_eof;
+	int64		old_eof_uncompressed;
+	int64		old_modcount;
+	Datum	   *new_record;
+	bool	   *new_record_nulls;
+	bool	   *new_record_repl;
+	bool		isNull;
+	StringInfoData buf;
+
+	MemTupleBinding * mt_bind;
+	MemTuple memtup;
+
+	TupleDesc tupdesc;
+
+
+	Oid segrelid;
+	GetAppendOnlyEntryAuxOids(parentrel, &segrelid, NULL, NULL);
+
+	Assert(Gp_role == GP_ROLE_EXECUTE);
+
+	Assert(eof >= 0);
+	Assert(eof_uncompressed >= 0);
+
+	Assert(newState >= AOSEG_STATE_USECURRENT && newState <= AOSEG_STATE_AWAITING_DROP);
+
+	new_record = palloc0(sizeof(Datum) * Natts_pg_aoseg);
+	new_record_nulls = palloc0(sizeof(bool) * Natts_pg_aoseg);
+	new_record_repl = palloc0(sizeof(bool) * Natts_pg_aoseg);
+
+	old_eof = fsInfo->eof;
+
+	/*
+	 * For AO by design due to append-only nature, new end-of-file (EOF) to be
+	 * recorded in aoseg table has to be greater than currently stored EOF
+	 * value, as new writes must move it forward only. If new end-of-file
+	 * value is less than currently stored end-of-file something is incorrect
+	 * and updating the same will yield incorrect result during reads. Hence
+	 * abort the write transaction trying to update the incorrect EOF value.
+	 */
+	if (eof < 0)
+	{
+		eof = old_eof;
+	}
+	else if (eof < old_eof)
+	{
+		elog(ERROR, "Unexpected compressed EOF for yeneid, segment file %d. "
+			 "EOF " INT64_FORMAT " to be updated cannot be smaller than current EOF " INT64_FORMAT " in pg_aoseg",
+			 segno, eof, old_eof);
+	}
+
+	old_eof_uncompressed = fsInfo->eof_uncompressed;
+
+	if (eof_uncompressed < 0)
+	{
+		eof_uncompressed = old_eof_uncompressed;
+	}
+	else if (eof_uncompressed < old_eof_uncompressed)
+	{
+		elog(ERROR, "Unexpected EOF for yeneid relation segment file %d."
+			 "EOF " INT64_FORMAT " to be updated cannot be smaller than current EOF " INT64_FORMAT " in pg_aoseg",
+			 segno, eof_uncompressed, old_eof_uncompressed);
+	}
+
+	/* get the current tuple count so we can add to it */
+	filetupcount = fsInfo->total_tupcount;
+
+	/* calculate the new tuple count */
+	new_tuple_count = filetupcount + tuples_added;
+	Assert(new_tuple_count >= 0);
+
+	/* get the current varblock count so we can add to it */
+	filevarblockcount = fsInfo->varblockcount;
+
+	/* calculate the new tuple count */
+	new_varblock_count = filevarblockcount + varblocks_added;
+	Assert(new_varblock_count >= 0);
+
+	/* get the current modcount so we can add to it */
+	old_modcount = fsInfo->modcount;
+
+	/* calculate the new mod count */
+	new_modcount = old_modcount + modcount_added;
+	Assert(new_modcount >= 0);
+
+	/*
+	 * Build a tuple to update
+	 */
+	new_record[Anum_pg_aoseg_eof - 1] = Int64GetDatum(eof);
+	new_record_repl[Anum_pg_aoseg_eof - 1] = true;
+
+	new_record[Anum_pg_aoseg_tupcount - 1] = Int64GetDatum(new_tuple_count);
+	new_record_repl[Anum_pg_aoseg_tupcount - 1] = true;
+
+	new_record[Anum_pg_aoseg_varblockcount - 1] = Int64GetDatum(new_varblock_count);
+	new_record_repl[Anum_pg_aoseg_varblockcount - 1] = true;
+
+	new_record[Anum_pg_aoseg_modcount - 1] = Int64GetDatum(new_modcount);
+	new_record_repl[Anum_pg_aoseg_modcount - 1] = true;
+
+	new_record[Anum_pg_aoseg_eofuncompressed - 1] = Int64GetDatum(eof_uncompressed);
+	new_record_repl[Anum_pg_aoseg_eofuncompressed - 1] = true;
+
+	if (newState > 0)
+	{
+		new_record[Anum_pg_aoseg_state - 1] = Int16GetDatum(newState);
+		new_record_repl[Anum_pg_aoseg_state - 1] = true;
+	}
+
+	/* build tupdesc for result tuples */
+	tupdesc = CreateTemplateTupleDesc(Natts_pg_aoseg);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_segno, "segno",
+					INT4OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_eof, "eof",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_tupcount, "tupcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_varblockcount, "varblockcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_eofuncompressed, "eof_uncompressed",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_modcount, "modcount",
+					INT8OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_formatversion, "formatversion",
+					INT2OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_state, "state",
+					INT2OID, -1, 0);
+
+
+	mt_bind = create_memtuple_binding(tupdesc, Natts_pg_aoseg);
+
+
+	memtup = memtuple_form(mt_bind, new_record, new_record_nulls);
+
+	/*
+	* get space to insert our next item (tuple)
+	*/
+	int itemLen = memtuple_get_size(memtup);
+
+
+	pq_beginmessage(&buf, '4');
+	pq_sendint(&buf, segrelid, 4);
+	pq_sendint(&buf, segno, 4);
+	pq_sendint(&buf, 2 /* update */, 4);
+	pq_sendint(&buf, itemLen, sizeof(itemLen));
+	pq_sendbytes(&buf, (const char*) memtup, itemLen);
+	pq_endmessage(&buf);
+
+	pfree(new_record);
+	pfree(new_record_nulls);
+	pfree(new_record_repl);
+}
+
+
 /*
  * Update the eof and filetupcount of an append only table.
  *
@@ -781,6 +1026,7 @@ UpdateFileSegInfo_internal(Relation parentrel,
 	MemTuple memtup;
 
 	Assert(RelationStorageIsAoRows(parentrel));
+	Assert(parentrel->rd_yezzey_distribution == NULL);
 	GetAppendOnlyEntryAuxOids(parentrel, &segrelid, NULL, NULL);
 
 	Assert(newState >= AOSEG_STATE_USECURRENT && newState <= AOSEG_STATE_AWAITING_DROP);
@@ -948,26 +1194,6 @@ UpdateFileSegInfo_internal(Relation parentrel,
 								  new_record_nulls, new_record_repl);
 
 	simple_heap_update(pg_aoseg_rel, &tuple->t_self, new_tuple);
-
-	mt_bind = create_memtuple_binding(
-      RelationGetDescr(pg_aoseg_rel), RelationGetNumberOfAttributes(pg_aoseg_rel));
-
-
-	memtup = memtuple_form(mt_bind, new_record, new_record_nulls);
-
-	/*
-	* get space to insert our next item (tuple)
-	*/
-  	int itemLen = memtuple_get_size(memtup);
-
-
-	pq_beginmessage(&buf, '4');
-	pq_sendint(&buf, segrelid, 4);
-	pq_sendint(&buf, segno, 4);
-	pq_sendint(&buf, 2 /* update */, 4);
-	pq_sendint(&buf, itemLen, sizeof(itemLen));
-	pq_sendbytes(&buf, (const char*) memtup, itemLen);
-	pq_endmessage(&buf);
 
 	heap_freetuple(new_tuple);
 

@@ -841,7 +841,7 @@ AppendOnlyCompact(Relation aorel,
 			 * Note: since we don't know how many rows will actually be inserted,
 			 * we provide the default number of rows to bump gp_fastsequence by.
 			 */
-			insertDesc = appendonly_insert_init(aorel, *insert_segno, NUM_FAST_SEQUENCES);
+			insertDesc = appendonly_insert_init(aorel, *insert_segno, NUM_FAST_SEQUENCES, NULL);
 			AppendOnlySegmentFileFullCompaction(aorel,
 												insertDesc,
 												fsinfo,

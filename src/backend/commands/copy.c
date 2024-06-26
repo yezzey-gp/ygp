@@ -4324,7 +4324,7 @@ CopyFrom(CopyState cstate)
 	CopyInitDataParser(cstate);
 
 	if (resultRelInfo->ri_RelationDesc->rd_tableam)
-		table_dml_init(resultRelInfo->ri_RelationDesc);
+		table_dml_init(resultRelInfo->ri_RelationDesc, 0, NULL);
 
 	for (;;)
 	{

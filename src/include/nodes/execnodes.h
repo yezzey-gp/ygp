@@ -1304,6 +1304,9 @@ typedef struct ModifyTableState
 
 	/* Per plan map for tuple conversion from child to root */
 	TupleConversionMap **mt_per_subplan_tupconv_maps;
+
+	int segfile_count;
+	FileSegInfo **seginfo;
 } ModifyTableState;
 
 /* ----------------

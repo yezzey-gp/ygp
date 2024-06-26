@@ -498,10 +498,10 @@ extern bool appendonly_index_only_check(AppendOnlyIndexOnlyDesc indexonlydesc,
 										AOTupleId *aotid,
 										Snapshot snapshot);
 extern void appendonly_index_only_finish(AppendOnlyIndexOnlyDesc indexonlydesc);
-extern void appendonly_dml_init(Relation relation);
+extern void appendonly_dml_init(Relation relation, int segfile_count, FileSegInfo **seginfo);
 extern AppendOnlyInsertDesc appendonly_insert_init(Relation rel,
 												   int segno,
-												   int64 num_rows);
+												   int64 num_rows, FileSegInfo*seginfo);
 extern void appendonly_insert(
 		AppendOnlyInsertDesc aoInsertDesc, 
 		MemTuple instup, 

@@ -73,7 +73,7 @@ typedef enum
  * local functions
  */
 static int choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode);
-static int prepare_logical_segno_internal(Relation rel, int blkno, choose_segno_mode mode);
+static int prepare_logical_segno_internal(Relation rel, int blkno, choose_segno_mode mode, FileSegInfo *fsInfo);
 static int choose_new_segfile(Relation rel, bool *used, List *avoid_segnos);
 static void get_aoseg_fields(Relation rel, Relation pg_aoseg_rel, HeapTuple tuple,
 							 int32 *segno, int64 *tupcount, int16 *state, int16 *formatversion);
@@ -226,7 +226,9 @@ LockSegnoForWrite(Relation rel, int segno)
 	if (!found)
 	{
 		/* create it! */
-		if (RelationIsAoRows(rel))
+		if (RelationIsYeneid(rel))
+			InsertInitialYeneidSegnoEntry(rel, segno, NULL);
+		else if (RelationIsAoRows(rel))
 			InsertInitialSegnoEntry(rel, segno);
 		else
 			InsertInitialAOCSFileSegInfo(rel, segno,
@@ -298,14 +300,14 @@ ChooseSegnoForWrite(Relation rel)
 
 
 int
-PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno)
+PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno, FileSegInfo *fsInfo)
 {
 	if (Debug_appendonly_print_segfile_choice)
 		ereport(LOG,
 				(errmsg("PrepareLogicalSegnoForWrite: Choosing a segfile for relation \"%s\"",
 						RelationGetRelationName(rel))));
 
-	prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE);
+	prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE, fsInfo);
 
 	return 0;
 }
@@ -620,7 +622,7 @@ choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode)
 }
 
 static int
-choose_new_logical_yezzey_segno(Relation rel, int chosen_segno)
+choose_new_logical_yezzey_segno(Relation rel, int chosen_segno, FileSegInfo *fsInfo)
 {
 	Assert(RelationStorageIsAO(rel));
 
@@ -632,7 +634,7 @@ choose_new_logical_yezzey_segno(Relation rel, int chosen_segno)
 				 chosen_segno);
 
 		if (RelationIsAoRows(rel))
-			InsertInitialSegnoEntry(rel, chosen_segno);
+			InsertInitialYeneidSegnoEntry(rel, chosen_segno, fsInfo);
 		else
 		{
 			Oid segrelid;
@@ -658,7 +660,7 @@ choose_new_logical_yezzey_segno(Relation rel, int chosen_segno)
 
 
 static int
-prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mode mode)
+prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mode mode, FileSegInfo *fsInfo)
 {
 	Relation	pg_aoseg_rel;
 	TupleDesc	pg_aoseg_dsc;
@@ -839,9 +841,7 @@ prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mod
 		mode != CHOOSE_MODE_COMPACTION_TARGET &&
 		!tried_creating_new_segfile)
 	{
-		int chosen_segno = -1;
-
-		choose_new_logical_yezzey_segno(rel, logical_blkno);
+		choose_new_logical_yezzey_segno(rel, logical_blkno, fsInfo);
 	}
 
 	UnlockRelationForExtension(rel, ExclusiveLock);

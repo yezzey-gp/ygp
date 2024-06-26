@@ -415,6 +415,9 @@ typedef struct ModifyTable
 
 	int numYezzeyKeyRanges;
 	int *yezzeyKeyRanges; /* yezzey */
+
+	int           segfile_count;
+	FileSegInfo** seginfo;
 } ModifyTable;
 
 struct PartitionPruneInfo;		/* forward reference to struct below */

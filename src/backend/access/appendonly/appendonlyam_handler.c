@@ -66,6 +66,9 @@ typedef struct AppendOnlyDMLState
 	AppendOnlyInsertDesc	*insertDesc;
 	AppendOnlyDeleteDesc	deleteDesc;
 	AppendOnlyUniqueCheckDesc uniqueCheckDesc;
+
+	int				segfile_count;
+	FileSegInfo** 	seginfo;
 } AppendOnlyDMLState;
 
 
@@ -134,7 +137,7 @@ init_appendonly_dml_states()
  * Should be called exactly once per relation.
  */
 static inline void
-init_dml_state(const Oid relationOid)
+init_dml_state(const Oid relationOid, int segfile_count, FileSegInfo** seginfo)
 {
 	AppendOnlyDMLState *state;
 	bool				found;
@@ -151,6 +154,9 @@ init_dml_state(const Oid relationOid)
 	state->insertDesc = NULL;
 	state->deleteDesc = NULL;
 	state->uniqueCheckDesc = NULL;
+
+	state->segfile_count = segfile_count;
+	state->seginfo = seginfo;
 
 	appendOnlyDMLStates.last_used_state = state;
 }
@@ -211,7 +217,7 @@ remove_dml_state(const Oid relationOid)
  * the course of the current DML or DML-like command, for the given relation.
  */
 void
-appendonly_dml_init(Relation relation)
+appendonly_dml_init(Relation relation, int segfile_count, FileSegInfo** seginfo)
 {
 	/*
 	 * Initialize the repository of per-relation states, if not done already for
@@ -219,7 +225,7 @@ appendonly_dml_init(Relation relation)
 	 */
 	init_appendonly_dml_states();
 	/* initialize the per-relation state */
-	init_dml_state(RelationGetRelid(relation));
+	init_dml_state(RelationGetRelid(relation), segfile_count, seginfo);
 }
 
 /*
@@ -345,12 +351,13 @@ get_or_create_ao_insert_descriptor(const Relation relation, int64 num_rows)
 
 			for (int i = 0 ; i < distribution->dim1 ; ++ i) {
 				if (distribution->values[i] ==  GpIdentity.segindex) {
+
 					// init blkno for write operation
-					PrepareLogicalSegnoForWrite(relation, i);
+					PrepareLogicalSegnoForWrite(relation, i, state->seginfo[i]);
 
 					insertDesc[i] = appendonly_insert_init(relation,
 											i,
-											num_rows);
+											num_rows, state->seginfo[i]);
 				} else {
 					insertDesc[i] = NULL;
 				}
@@ -362,7 +369,7 @@ get_or_create_ao_insert_descriptor(const Relation relation, int64 num_rows)
 
 			insertDesc[0] = appendonly_insert_init(relation,
 											segno,
-											num_rows);
+											num_rows, NULL);
 			state->nInsertDesc = 1;
 		}
 
@@ -1390,7 +1397,7 @@ appendonly_relation_cluster_internals(Relation OldHeap, Relation NewHeap,
 	SIMPLE_FAULT_INJECTOR("cluster_ao_write_begin");
 	write_seg_no = ChooseSegnoForWrite(NewHeap);
 
-	aoInsertDesc = appendonly_insert_init(NewHeap, write_seg_no, (int64) *num_tuples);
+	aoInsertDesc = appendonly_insert_init(NewHeap, write_seg_no, (int64) *num_tuples, NULL);
 
 	/* Insert sorted heap tuples into new storage */
 	for (;;)

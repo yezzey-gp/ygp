@@ -380,10 +380,14 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 	 * Now, get the information for the file segment we are going to append
 	 * to.
 	 */
-	aoInsertDesc->fsInfo = GetFileSegInfo(aoInsertDesc->aoi_rel,
-										  aoInsertDesc->appendOnlyMetaDataSnapshot,
-										  aoInsertDesc->cur_segno,
-										  true);
+
+	/* In yezzey case we have already set fsInfo */
+	if (aoInsertDesc->fsInfo == NULL) {
+		aoInsertDesc->fsInfo = GetFileSegInfo(aoInsertDesc->aoi_rel,
+											aoInsertDesc->appendOnlyMetaDataSnapshot,
+											aoInsertDesc->cur_segno,
+											true);
+	}
 
 	/* Never insert into a segment that is awaiting a drop */
 	if (aoInsertDesc->fsInfo->state == AOSEG_STATE_AWAITING_DROP)
@@ -459,14 +463,26 @@ CloseWritableFileSeg(AppendOnlyInsertDesc aoInsertDesc)
 	/*
 	 * Update the AO segment info table with our new eof
 	 */
-	UpdateFileSegInfo(aoInsertDesc->aoi_rel,
-					  aoInsertDesc->cur_segno,
-					  fileLen,
-					  fileLen_uncompressed,
-					  aoInsertDesc->insertCount,
-					  aoInsertDesc->varblockCount,
-					  (aoInsertDesc->skipModCountIncrement ? 0 : 1),
-					  AOSEG_STATE_USECURRENT);
+	if (RelationIsYeneid(aoInsertDesc->aoi_rel)) {
+		UpdateYeneidFileSegInfo(aoInsertDesc->aoi_rel,
+						aoInsertDesc->fsInfo,
+						aoInsertDesc->cur_segno,
+						fileLen,
+						fileLen_uncompressed,
+						aoInsertDesc->insertCount,
+						aoInsertDesc->varblockCount,
+						(aoInsertDesc->skipModCountIncrement ? 0 : 1),
+						AOSEG_STATE_USECURRENT);
+	} else {
+		UpdateFileSegInfo(aoInsertDesc->aoi_rel,
+						aoInsertDesc->cur_segno,
+						fileLen,
+						fileLen_uncompressed,
+						aoInsertDesc->insertCount,
+						aoInsertDesc->varblockCount,
+						(aoInsertDesc->skipModCountIncrement ? 0 : 1),
+						AOSEG_STATE_USECURRENT);
+	}
 
 	pfree(aoInsertDesc->fsInfo);
 	aoInsertDesc->fsInfo = NULL;
@@ -3064,7 +3080,7 @@ appendonly_delete(AppendOnlyDeleteDesc aoDeleteDesc,
  * append only tables.
  */
 AppendOnlyInsertDesc
-appendonly_insert_init(Relation rel, int segno, int64 num_rows)
+appendonly_insert_init(Relation rel, int segno, int64 num_rows, FileSegInfo * seginfo)
 {
 	AppendOnlyInsertDesc aoInsertDesc;
 	int			maxtupsize;
@@ -3265,6 +3281,9 @@ appendonly_insert_init(Relation rel, int segno, int64 num_rows)
 	aoInsertDesc->toast_tuple_target = maxtupsize / 4;
 
 	/* open our current relation file segment for write */
+	if (seginfo != NULL) {
+		aoInsertDesc->fsInfo = seginfo;
+	}
 	SetCurrentFileSegForWrite(aoInsertDesc);
 
 	Assert(aoInsertDesc->tempSpaceLen > 0);

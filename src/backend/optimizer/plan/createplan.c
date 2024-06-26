@@ -2955,6 +2955,22 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 			int        *yezzeyKeyRanges;
 			int i;
 
+			FileSegInfo ** seginfo;
+			int segfile_count;
+			Relation parentrel;
+
+			parentrel = relation_open(reloid, AccessShareLock);
+
+			if (parentrel->rd_yezzey_distribution) {
+				seginfo = GetAllFileSegInfo(parentrel,
+											SnapshotSelf, &segfile_count, NULL);
+
+				plan->segfile_count = segfile_count;
+				plan->seginfo = seginfo;
+			}
+
+			relation_close(parentrel, AccessShareLock);
+
 			yezzey_key_ranges = RelationGetYezzeyKeyByRelid(reloid);
 			if (yezzey_key_ranges != NULL) {
 				plan->numYezzeyKeyRanges = yezzey_key_ranges->dim1;

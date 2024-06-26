@@ -615,10 +615,22 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_NODE_FIELD(isSplitUpdates);
 	WRITE_BOOL_FIELD(forceTupleRouting);
 
-
 	WRITE_INT_FIELD(numYezzeyKeyRanges);
 
 	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
+
+	WRITE_UINT_FIELD(segfile_count);
+
+	for (int i = 0; i < node->segfile_count; ++ i) {
+		WRITE_UINT64_FIELD(seginfo[i]->segno);
+		WRITE_UINT64_FIELD(seginfo[i]->total_tupcount);
+		WRITE_UINT64_FIELD(seginfo[i]->varblockcount);
+		WRITE_UINT64_FIELD(seginfo[i]->modcount);
+		WRITE_UINT64_FIELD(seginfo[i]->eof);
+		WRITE_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		WRITE_INT_FIELD(seginfo[i]->formatversion);
+		WRITE_INT_FIELD(seginfo[i]->state);
+	}
 }
 
 static void

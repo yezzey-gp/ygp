@@ -6480,7 +6480,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 			scan = table_beginscan(oldrel, snapshot, 0, NULL);
 
 		if (newrel && newrel->rd_tableam)
-			table_dml_init(newrel);
+			table_dml_init(newrel, 0, NULL);
 
 		/*
 		 * Switch to per-tuple memory context and reset it for each tuple

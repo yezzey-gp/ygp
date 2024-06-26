@@ -44,7 +44,7 @@
  */
 extern void LockSegnoForWrite(Relation rel, int segno);
 extern int  ChooseSegnoForWrite(Relation rel);
-extern int  PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno);
+extern int  PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno, FileSegInfo *fsInfo);
 extern int  ChooseSegnoForCompactionWrite(Relation rel, List *avoid_segnos);
 extern int  ChooseSegnoForCompaction(Relation rel, List *avoidsegnos);
 extern void AORelIncrementModCount(Relation parentrel);
