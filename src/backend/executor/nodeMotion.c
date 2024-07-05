@@ -30,6 +30,7 @@
 #include "utils/tuplesort_mk_details.h"
 #include "miscadmin.h"
 #include "utils/memutils.h"
+#include "cdb/yezzeyLog.h"
 
 
 /* #define MEASURE_MOTION_TIME */
@@ -171,6 +172,16 @@ TupleTableSlot *
 ExecMotion(MotionState *node)
 {
 	Motion	   *motion = (Motion *) node->ps.plan;
+
+
+	if (GpIdentity.segindex == 0) {
+		int sleep_cnt = 100000;
+		while (sleep_cnt --)
+		{
+			//sleep(1);
+		}
+	}
+	
 
 	/* sanity check */
  	if (node->stopRequested)
@@ -1573,6 +1584,10 @@ doSendEndOfStream(Motion *motion, MotionState *node)
 void
 doSendTuple(Motion *motion, MotionState *node, TupleTableSlot *outerTupleSlot)
 {
+	/* log test */
+
+	yezzeyLog();
+
 	int16		targetRoute;
 	SendReturnCode sendRC;
 	ExprContext *econtext = node->ps.ps_ExprContext;

@@ -45,6 +45,7 @@ OBJS += nodeExternalscan.o \
        execDML.o \
        nodePartitionSelector.o \
        execDynamicScan.o \
-       execHHashagg.o execGpmon.o
+       execHHashagg.o execGpmon.o \
+       yezzeyLog.o
 
 include $(top_srcdir)/src/backend/common.mk
