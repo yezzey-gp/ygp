@@ -253,9 +253,9 @@ ExecInitShareInputScan(ShareInputScan *node, EState *estate, int eflags)
 	Assert(node->scan.plan.qual == NULL);
 	sisstate->ss.ps.qual = NULL;
 
-	/* Misc initialization 
-	 * 
-	 * Create expression context 
+	/* Misc initialization
+	 *
+	 * Create expression context
 	 */
 	ExecAssignExprContext(estate, &sisstate->ss.ps);
 
@@ -654,11 +654,12 @@ shareinput_reader_waitready(void *ctxt, int share_id, PlanGenerator planGen)
 	// is not very big, so only using a smaller value instead.
 	// const int num = 70000;
 	const int num = 40000;
-	int tmp_fds[num];
-	memset(tmp_fds, 0, sizeof(tmp_fds));
+	int *tmp_fds = NULL;
 	char tmpfile_prefix[] = "/tmp/_gpdb_fault_inject_tmp_dir/"; // need create the dir first
-	if (SIMPLE_FAULT_INJECTOR("inject_many_fds_for_shareinputscan") == FaultInjectorTypeSkip)
+	if (SIMPLE_FAULT_INJECTOR("inject_many_fds_for_shareinputscan") == FaultInjectorTypeSkip) {
+		tmp_fds = palloc0(sizeof(int) * num);
 		fi_create_many_fds(tmp_fds, tmpfile_prefix, num);
+	}
 #endif
 
 	create_tmp_fifo(pctxt->lkname_ready);
@@ -673,7 +674,10 @@ shareinput_reader_waitready(void *ctxt, int share_id, PlanGenerator planGen)
 
 #ifdef FAULT_INJECTOR
 	/* close opened fds */
-	fi_close_created_fds(tmp_fds, tmpfile_prefix, num);
+	if (tmp_fds != NULL) {
+		fi_close_created_fds(tmp_fds, tmpfile_prefix, num);
+		pfree(tmp_fds);
+	}
 #endif
 
 	fds[0].fd = pctxt->readyfd;
