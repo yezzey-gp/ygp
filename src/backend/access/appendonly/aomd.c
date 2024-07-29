@@ -51,8 +51,6 @@
 
 static void mdunlink_ao_base_relfile(void *ctx);
 static bool mdunlink_ao_perFile(const int segno, void *ctx);
-static bool
-mdunlink_ao_yezzey(const int segno, void *ctx);
 static bool copy_append_only_data_perFile(const int segno, void *ctx);
 static bool truncate_ao_perFile(const int segno, void *ctx);
 static uint64 ao_segfile_get_physical_size(Relation aorel, int segno, FileNumber filenum);
