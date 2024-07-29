@@ -143,7 +143,7 @@ typedef struct f_smgr_ao {
 		int fileFlags,
 		int64 modcount);
 	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);
-	int			(*smgr_FileDiskSize) (SMGRFile file);
+	int64			(*smgr_FileDiskSize) (SMGRFile file);
 } f_smgr_ao;
 
 
