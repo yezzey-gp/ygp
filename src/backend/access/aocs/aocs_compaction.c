@@ -74,8 +74,6 @@ AOCSCompaction_DropSegmentFile(Relation aorel, int segno)
 		char * relname;
 		char *nspname;
 
-		/* Filenum for the col */
-		FileNumber  filenum = GetFilenumForAttribute(RelationGetRelid(aorel), col + 1);
 
 		/* Open and truncate the relation segfile */
 		MakeAOSegmentFileName(aorel, segno, col, &pseudoSegNo, filenamepath);
@@ -94,7 +92,7 @@ AOCSCompaction_DropSegmentFile(Relation aorel, int segno)
 		pfree(nspname);
 		if (fd >= 0)
 		{
-			TruncateAOSegmentFile(fd, aorel, pseudoSegNo, 0, vacrelstats);
+			TruncateAOSegmentFile(fd, aorel, pseudoSegNo, 0);
 			CloseAOSegmentFile(aorel, fd);
 		}
 		else
@@ -139,9 +137,6 @@ AOCSSegmentFileTruncateToEOF(Relation aorel, int segno, AOCSVPInfo *vpinfo)
 		int32		fileSegNo;
 		char 		*nspname;
 
-		/* Filenum for the column */
-		FileNumber  filenum = GetFilenumForAttribute(RelationGetRelid(aorel), j + 1);
- 
 		entry = &vpinfo->entry[j];
 		segeof = entry->eof;
 
@@ -167,11 +162,11 @@ AOCSSegmentFileTruncateToEOF(Relation aorel, int segno, AOCSVPInfo *vpinfo)
 		fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1);
 		if (fd >= 0)
 		{
-			TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof, vacrelstats);
+			TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof);
 			CloseAOSegmentFile(aorel, fd);
 
 			elogif(Debug_appendonly_print_compaction, LOG,
-				   "Successfully truncated AO COL relation \"%s.%s\", relation id %u, relfilenode %u column #%d, logical segment #%d (physical segment file #%d, logical EOF " INT64_FORMAT ")",
+				   "Successfully truncated AO COL relation \"%s.%s\", relation id %u, relfilenode %lu column #%d, logical segment #%d (physical segment file #%d, logical EOF " INT64_FORMAT ")",
 				   nspname,
 				   relname,
 				   aorel->rd_id,

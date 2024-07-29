@@ -305,6 +305,7 @@ open_ds_read(Relation rel, DatumStreamRead **ds, TupleDesc relationTupleDesc,
 										   nspname,
 										   RelationGetRelationName(rel),
 										   rel->rd_id,
+									   	   &rel->rd_node,
 										    /* title */ titleBuf.data);
 
 		pfree(nspname);
@@ -1622,6 +1623,7 @@ aocs_fetch_init(Relation relation,
 									   RelationGetRelationName(relation),
 									   nspname,
 									   RelationGetRelid(relation),
+									   &relation->rd_node,
 									    /* title */ titleBuf.data);
 
 
@@ -2142,12 +2144,11 @@ aocs_addcol_init(Relation rel,
 			elog(ERROR, "yezzey: failed to get namescape name of relation %s", rel->rd_rel->relname.data);
 		}
 
-
-		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz,/* safeFSWriteSize, */
+		desc->dsw[i] = create_datumstreamwrite(ct, clvl, checksum, blksz, 0,
 											   attr, nspname, RelationGetRelationName(rel),
 											   RelationGetRelid(rel),
 											   titleBuf.data,
-											   XLogIsNeeded() && RelationNeedsWAL(rel));
+											   XLogIsNeeded() && RelationNeedsWAL(rel), &rnode);
 
 
 		pfree(nspname);

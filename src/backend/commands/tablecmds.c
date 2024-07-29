@@ -16104,6 +16104,7 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 	Oid         relaovisimapidxid = InvalidOid;
 	Oid			relbmrelid = InvalidOid;
 	Oid			relbmidxid = InvalidOid;
+	Oid         oldTableSpace;
 	RelFileNodeId newrelfilenode;
 	RelFileNode newrnode;
 	List	   *reltoastidxids = NIL;
@@ -16113,6 +16114,8 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 	 * Need lock here in case we are recursing to toast table or index
 	 */
 	rel = relation_open(tableOid, lockmode);
+
+	oldTableSpace = rel->rd_rel->reltablespace;
 
 	/* Check first if relation can be moved to new tablespace */
 	if (!CheckRelationTableSpaceMove(rel, newTableSpace))

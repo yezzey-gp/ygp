@@ -199,21 +199,21 @@ GetRelationPath(Oid dbNode, Oid spcNode, RelFileNodeId relNode,
 		if (backendId == InvalidBackendId)
 		{
 			if (forkNumber != MAIN_FORKNUM)
-				path = psprintf("yezzey/%u/%u_%s",
+				path = psprintf("yezzey/%u/%lu_%s",
 								dbNode, relNode,
 								forkNames[forkNumber]);
 			else
-				path = psprintf("yezzey/%u/%u",
+				path = psprintf("yezzey/%u/%lu",
 								dbNode, relNode);
 		}
 		else
 		{
 			if (forkNumber != MAIN_FORKNUM)
-				path = psprintf("yezzey/%u/t_%u_%s",
+				path = psprintf("yezzey/%u/t_%lu_%s",
 								dbNode, relNode,
 								forkNames[forkNumber]);
 			else
-				path = psprintf("yezzey/%u/t_%u",
+				path = psprintf("yezzey/%u/t_%lu",
 								dbNode, relNode);
 		}
 	}

@@ -72,9 +72,6 @@ typedef struct SMgrRelationData
 
 	/* copy of pg_class.relpersistence, or 0 if not known */
 	char				smgr_relpersistence;
-	/* pointer to storage manager */
-	const struct f_smgr *smgr;
-
 	/*
 	 * Fields below here are intended to be private to smgr.c and its
 	 * submodules.  Do not touch them from elsewhere.
@@ -136,7 +133,7 @@ typedef struct f_smgr
 } f_smgr;
 
 typedef void (*smgr_init_hook_type) (void);
-typedef void (*smgr_hook_type) (SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
+typedef const f_smgr * (*smgr_hook_type) (SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
 typedef void (*smgr_shutdown_hook_type) (void);
 #define SmgrIsTemp(smgr) \
 	RelFileNodeBackendIsTemp((smgr)->smgr_rnode)
@@ -157,7 +154,7 @@ typedef struct f_smgr_ao {
 		int fileFlags,
 		int64 modcount);
 	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);
-	int			(*smgr_FileDiskSize) (SMGRFile file);
+	int64		(*smgr_FileDiskSize) (SMGRFile file);
 } f_smgr_ao;
 
 
@@ -177,6 +174,14 @@ extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern bool smgr_is_heap_relation(SMgrRelation reln);
 
 /* Yezzey path begin */
+
+
+extern const f_smgr *smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which);
+extern const f_smgr_ao *smgrao_standard(void);
+
+extern const f_smgr *smgr(SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
+
+
 typedef const f_smgr_ao *(*smgrao_hook_type)();
 extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
 extern const f_smgr_ao *smgrao(void);
@@ -192,7 +197,7 @@ extern void smgrclose(SMgrRelation reln);
 extern void smgrcloseall(void);
 extern void smgrclosenode(RelFileNodeBackend rnode);
 extern void smgrcreate(SMgrRelation reln, ForkNumber forknum, bool isRedo);
-extern void smgrcreate_ao(RelFileNodeBackend rnode, int32 segmentFileNum, bool isRedo);
+extern void smgrcreate_ao(SMgrRelation reln, int32 segmentFileNum, bool isRedo);
 extern void smgrdosyncall(SMgrRelation *rels, int nrels);
 extern void smgrdounlinkall(SMgrRelation *rels, int nrels, bool isRedo);
 extern void smgrextend(SMgrRelation reln, ForkNumber forknum,

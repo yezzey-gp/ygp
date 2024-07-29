@@ -40,6 +40,9 @@
 #include "utils/inval.h"
 #include "utils/relfilenodemap.h"
 
+
+SMGRFile AORelOpenSegFile(Oid reloid, const char * nspname, const char * relname, const char * fileName, int fileFlags, int64 modcount);
+
 /*
  * Hook for plugins to collect statistics from storage functions
  * For example, disk quota extension will use these hooks to
@@ -49,11 +52,6 @@ file_create_hook_type file_create_hook = NULL;
 file_extend_hook_type file_extend_hook = NULL;
 file_truncate_hook_type file_truncate_hook = NULL;
 file_unlink_hook_type file_unlink_hook = NULL;
-
-/* Hook for plugins to get control in smgr */
-smgr_init_hook_type smgr_init_hook = NULL;
-smgr_hook_type smgr_hook = NULL;
-smgr_shutdown_hook_type smgr_shutdown_hook = NULL;
 
 static const f_smgr smgrsw[] = {
 	/* magnetic disk */
@@ -161,7 +159,7 @@ smgrinit(void)
  * on_proc_exit hook for smgr cleanup during backend shutdown
  */
 static void
-smgrshutdown(int code, Datum arg)
+smgr_shutdown_standard()
 {
 	int			i;
 
@@ -197,23 +195,23 @@ smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which)
 
 
 const f_smgr_ao *
-smgrao_standard()
+smgrao_standard(void)
 {
 	// for md.c 
 	return &smgrswao[0];
 }
 
 const f_smgr *
-smgr(BackendId backend, RelFileNode rnode, SMgrImpl which)
+smgr(SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel)
 {
 	const f_smgr *result;
 
 	if (smgr_hook)
  	{
-		result = (*smgr_hook)(backend, rnode, which);
+		result = (*smgr_hook)(reln, backend, which, rel);
  	}
 	else
-		result = smgr_standard(backend, rnode, which);
+		result = smgr_standard(backend, rel->rd_node, which);
 
 	return result;
 }
@@ -275,15 +273,14 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which, Relation rel)
 	/* Initialize it if not present before */
 	if (!found)
 	{
+		int forknum;
 		/* hash_search already filled in the lookup key */
 		reln->smgr_owner = NULL;
 		reln->smgr_targblock = InvalidBlockNumber;
 		for (int i = 0; i <= MAX_FORKNUM; ++i)
 			reln->smgr_cached_nblocks[i] = InvalidBlockNumber;
-		reln->smgr_fsm_nblocks = InvalidBlockNumber;
-		reln->smgr_vm_nblocks = InvalidBlockNumber;
 		reln->smgr_which = which;
-		reln->storageManager = smgr(backend, rnode, which);
+		reln->storageManager = smgr(reln, backend, which, rel);
 		reln->storageManagerAO = smgrao();
 
 		/* mark it not open */
@@ -292,17 +289,8 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which, Relation rel)
 
 		/* it has no owner yet */
 		dlist_push_tail(&unowned_relns, &reln->node);
-		reln->smgr = &smgrsw[reln->smgr_which];
 
-		/*
-		 * hook for other storage managers.
-		 */
-		if (smgr_hook)
-			(*smgr_hook) (reln, backend, which, rel);
-
-		Assert(reln->smgr);
-
-		(*reln->smgr).smgr_open(reln);
+		// (*reln->smgr).smgr_open(reln);
 	}
 
 	return reln;
@@ -366,7 +354,7 @@ smgrclearowner(SMgrRelation *owner, SMgrRelation reln)
 bool
 smgrexists(SMgrRelation reln, ForkNumber forknum)
 {
-	return (*reln->smgr).smgr_exists(reln, forknum);
+	return (*reln->storageManager).smgr_exists(reln, forknum);
 }
 
 /*
@@ -379,7 +367,7 @@ smgrclose(SMgrRelation reln)
 	ForkNumber	forknum;
 
 	for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
-		(*reln->smgr).smgr_close(reln, forknum);
+		(*reln->storageManager).smgr_close(reln, forknum);
 
 	owner = reln->smgr_owner;
 
@@ -452,7 +440,7 @@ smgrclosenode(RelFileNodeBackend rnode)
 void
 smgrcreate(SMgrRelation reln, ForkNumber forknum, bool isRedo)
 {
-	(*reln->smgr).smgr_create(reln, forknum, isRedo);
+	(*reln->storageManager).smgr_create(reln, forknum, isRedo);
 
 	if (file_create_hook)
 		(*file_create_hook)(reln->smgr_rnode);
@@ -502,8 +490,8 @@ smgrdosyncall(SMgrRelation *rels, int nrels)
 	{
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
 		{
-			if ((*rels[i]->smgr).smgr_exists(rels[i], forknum))
-				(*rels[i]->smgr).smgr_immedsync(rels[i], forknum);
+			if ((*rels[i]->storageManager).smgr_exists(rels[i], forknum))
+				(*rels[i]->storageManager).smgr_immedsync(rels[i], forknum);
 		}
 	}
 }
@@ -546,7 +534,7 @@ smgrdounlinkall(SMgrRelation *rels, int nrels, bool isRedo)
 		rnodes[i] = rnode;
 		/* Close the forks at smgr level */
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
-			(*rels[i]->smgr).smgr_close(rels[i], forknum);
+			(*rels[i]->storageManager).smgr_close(rels[i], forknum);
 	}
 
 	/*
@@ -576,7 +564,7 @@ smgrdounlinkall(SMgrRelation *rels, int nrels, bool isRedo)
 	for (i = 0; i < nrels; i++)
 	{
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
-			(*rels[i]->smgr).smgr_unlink(rnodes[i], forknum, isRedo);
+			(*rels[i]->storageManager).smgr_unlink(rnodes[i], forknum, isRedo);
 	}
 
 	if (file_unlink_hook)
@@ -601,7 +589,7 @@ void
 smgrextend(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 		   char *buffer, bool skipFsync)
 {
-	(*reln->smgr).smgr_extend(reln, forknum, blocknum,
+	(*reln->storageManager).smgr_extend(reln, forknum, blocknum,
 										 buffer, skipFsync);
 
 	/*
@@ -628,7 +616,7 @@ smgrextend(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 bool
 smgrprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
 {
-	return (*reln->smgr).smgr_prefetch(reln, forknum, blocknum);
+	return (*reln->storageManager).smgr_prefetch(reln, forknum, blocknum);
 }
 
 /*
@@ -643,7 +631,7 @@ void
 smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 		 char *buffer)
 {
-	(*reln->smgr).smgr_read(reln, forknum, blocknum, buffer);
+	(*reln->storageManager).smgr_read(reln, forknum, blocknum, buffer);
 }
 
 /*
@@ -665,7 +653,7 @@ void
 smgrwrite(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 		  char *buffer, bool skipFsync)
 {
-	(*reln->smgr).smgr_write(reln, forknum, blocknum,
+	(*reln->storageManager).smgr_write(reln, forknum, blocknum,
 										buffer, skipFsync);
 }
 
@@ -678,7 +666,7 @@ void
 smgrwriteback(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 			  BlockNumber nblocks)
 {
-	(*reln->smgr).smgr_writeback(reln, forknum, blocknum,
+	(*reln->storageManager).smgr_writeback(reln, forknum, blocknum,
 											nblocks);
 }
 
@@ -696,7 +684,7 @@ smgrnblocks(SMgrRelation reln, ForkNumber forknum)
 	if (result != InvalidBlockNumber)
 		return result;
 
-	result = (*reln->smgr).smgr_nblocks(reln, forknum);
+	result = (*reln->storageManager).smgr_nblocks(reln, forknum);
 
 	reln->smgr_cached_nblocks[forknum] = result;
 
@@ -762,7 +750,7 @@ smgrtruncate(SMgrRelation reln, ForkNumber *forknum, int nforks, BlockNumber *nb
 		/* Make the cached size is invalid if we encounter an error. */
 		reln->smgr_cached_nblocks[forknum[i]] = InvalidBlockNumber;
 
-		(*reln->smgr).smgr_truncate(reln, forknum[i], nblocks[i]);
+		(*reln->storageManager).smgr_truncate(reln, forknum[i], nblocks[i]);
 
 		/*
 		 * We might as well update the local smgr_cached_nblocks values. The
@@ -803,7 +791,7 @@ smgrtruncate(SMgrRelation reln, ForkNumber *forknum, int nforks, BlockNumber *nb
 void
 smgrimmedsync(SMgrRelation reln, ForkNumber forknum)
 {
-	(*reln->smgr).smgr_immedsync(reln, forknum);
+	(*reln->storageManager).smgr_immedsync(reln, forknum);
 }
 /*
  * is the relation heap relation?
@@ -811,7 +799,7 @@ smgrimmedsync(SMgrRelation reln, ForkNumber forknum)
 bool
 smgr_is_heap_relation(SMgrRelation reln)
 {
-    return (reln->smgr == &smgrsw[SMGR_MD]);
+    return (reln->storageManager == &smgrsw[SMGR_MD]);
 }
 
 /*

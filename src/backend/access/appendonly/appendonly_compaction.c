@@ -101,7 +101,7 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno)
 	pfree(nspname);
 	if (fd >= 0)
 	{
-		TruncateAOSegmentFile(fd, aorel, fileSegNo, 0, vacrelstats);
+		TruncateAOSegmentFile(fd, aorel, fileSegNo, 0);
 		CloseAOSegmentFile(aorel, fd);
 	}
 	else
@@ -273,11 +273,11 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel, int segno, int64 segeof)
 	fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1);
 	if (fd >= 0)
 	{
-		TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof, vacrelstats);
+		TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof);
 		CloseAOSegmentFile(aorel, fd);
 
 		elogif(Debug_appendonly_print_compaction, LOG,
-			   "Successfully truncated AO ROW relation \"%s.%s\", relation id %u, relfilenode %u (physical segment file #%d, logical EOF " INT64_FORMAT ")",
+			   "Successfully truncated AO ROW relation \"%s.%s\", relation id %u, relfilenode %lu (physical segment file #%d, logical EOF " INT64_FORMAT ")",
 			   nspname,
 			   relname,
 			   aorel->rd_id,

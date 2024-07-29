@@ -45,8 +45,6 @@
 
 static void mdunlink_ao_base_relfile(void *ctx);
 static bool mdunlink_ao_perFile(const int segno, void *ctx);
-static bool
-mdunlink_ao_yezzey(const int segno, void *ctx);
 static bool copy_append_only_data_perFile(const int segno, void *ctx);
 static bool truncate_ao_perFile(const int segno, void *ctx);
 
@@ -151,7 +149,7 @@ OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64
 
 	errno = 0;
 
-	fd = aorel->rd_smgr->storageManagerAO->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, modcount);
+	fd = aorel->rd_smgr->storageManagerAO->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, fileFlags, modcount);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -391,8 +389,8 @@ copy_file(char *srcsegpath, char *dstsegpath,
 {
 	File		srcFile;
 	File		dstFile;
-	struct f_smgr_ao *srcSmgr;
-	struct f_smgr_ao *dstSmgr;
+	const struct f_smgr_ao *srcSmgr;
+	const struct f_smgr_ao *dstSmgr;
 	int64		left;
 	off_t		offset;
 	char       *buffer = palloc(BLCKSZ);
@@ -615,7 +613,7 @@ truncate_ao_perFile(const int segno, void *ctx)
 
 	if (fd >= 0)
 	{
-		TruncateAOSegmentFile(fd, aorel, segno, 0, NULL);
+		TruncateAOSegmentFile(fd, aorel, segno, 0);
 		CloseAOSegmentFile(aorel, fd);
 	}
 	else
