@@ -132,9 +132,6 @@ typedef struct f_smgr
 	void		(*smgr_immedsync) (SMgrRelation reln, ForkNumber forknum);
 } f_smgr;
 
-typedef void (*smgr_init_hook_type) (void);
-typedef const f_smgr * (*smgr_hook_type) (SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
-typedef void (*smgr_shutdown_hook_type) (void);
 #define SmgrIsTemp(smgr) \
 	RelFileNodeBackendIsTemp((smgr)->smgr_rnode)
 /* Yezzey path */
@@ -162,28 +159,33 @@ typedef struct f_smgr_ao {
 
 
 typedef void (*smgr_init_hook_type) (void);
-typedef void (*smgrao_init_hook_type) (void);
+typedef const f_smgr * (*smgr_hook_type) (SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
 typedef void (*smgr_shutdown_hook_type) (void);
-typedef void (*smgrao_shutdown_hook_type) (void);
 
-extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
+typedef void (*smgrao_init_hook_type) (void);
+typedef void (*smgrao_shutdown_hook_type) (void);
+typedef const f_smgr_ao *(*smgrao_hook_type)(void);
+
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_hook_type smgr_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
+
+extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
+extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
+extern PGDLLIMPORT smgrao_shutdown_hook_type smgrao_shutdown_hook;
+
 
 extern bool smgr_is_heap_relation(SMgrRelation reln);
 
 /* Yezzey path begin */
 
-
+extern void smgr_init_standard(void);
 extern const f_smgr *smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which);
 extern const f_smgr_ao *smgrao_standard(void);
 
 extern const f_smgr *smgr(SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel);
 
 
-typedef const f_smgr_ao *(*smgrao_hook_type)();
-extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
 extern const f_smgr_ao *smgrao(void);
 /* Yezzey path end */
 

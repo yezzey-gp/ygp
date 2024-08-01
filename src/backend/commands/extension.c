@@ -840,7 +840,8 @@ is_begin_state(const Node *stmt)
 #endif
 
 /*
- * Execute the appropriate script file for installing or updating the extension
+ * Policy function: is the given extension trusted for installation by a
+ * non-superuser?
  *
  * (Update the errhint logic below if you change this.)
  */
@@ -2398,6 +2399,64 @@ get_available_versions_for_extension(ExtensionControlFile *pcontrol,
 			}
 		}
 	}
+}
+
+/*
+ * Test whether the given extension exists (not whether it's installed)
+ *
+ * This checks for the existence of a matching control file in the extension
+ * directory.  That's not a bulletproof check, since the file might be
+ * invalid, but this is only used for hints so it doesn't have to be 100%
+ * right.
+ */
+bool
+extension_file_exists(const char *extensionName)
+{
+	bool		result = false;
+	char	   *location;
+	DIR		   *dir;
+	struct dirent *de;
+
+	location = get_extension_control_directory();
+	dir = AllocateDir(location);
+
+	/*
+	 * If the control directory doesn't exist, we want to silently return
+	 * false.  Any other error will be reported by ReadDir.
+	 */
+	if (dir == NULL && errno == ENOENT)
+	{
+		/* do nothing */
+	}
+	else
+	{
+		while ((de = ReadDir(dir, location)) != NULL)
+		{
+			char	   *extname;
+
+			if (!is_extension_control_filename(de->d_name))
+				continue;
+
+			/* extract extension name from 'name.control' filename */
+			extname = pstrdup(de->d_name);
+			*strrchr(extname, '.') = '\0';
+
+			/* ignore it if it's an auxiliary control file */
+			if (strstr(extname, "--"))
+				continue;
+
+			/* done if it matches request */
+			if (strcmp(extname, extensionName) == 0)
+			{
+				result = true;
+				break;
+			}
+		}
+
+		FreeDir(dir);
+	}
+
+	return result;
 }
 
 /*

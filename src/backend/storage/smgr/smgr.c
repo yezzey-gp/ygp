@@ -129,6 +129,17 @@ static dlist_head unowned_relns;
 static void smgrshutdown(int code, Datum arg);
 
 
+void
+smgr_init_standard(void)
+{
+	int i;
+	for (i = 0; i < NSmgr; i++)
+	{
+		if (smgrsw[i].smgr_init)
+			smgrsw[i].smgr_init();
+	}
+}
+
 /*
  *	smgrinit(), smgrshutdown() -- Initialize or shut down storage
  *								  managers.
@@ -140,13 +151,7 @@ static void smgrshutdown(int code, Datum arg);
 void
 smgrinit(void)
 {
-	int			i;
-
-	for (i = 0; i < NSmgr; i++)
-	{
-		if (smgrsw[i].smgr_init)
-			smgrsw[i].smgr_init();
-	}
+	smgr_init_standard();
 
 	if (smgr_init_hook)
 		(*smgr_init_hook)();
@@ -180,11 +185,13 @@ smgrshutdown(int code, Datum arg)
 }
 
 /* Hooks for plugins to get control in smgr */
-smgr_hook_type smgr_hook = NULL;
-smgrao_hook_type smgrao_hook = NULL;
 smgr_init_hook_type smgr_init_hook = NULL;
-smgrao_init_hook_type smgrao_init_hook = NULL;
+smgr_hook_type smgr_hook = NULL;
 smgr_shutdown_hook_type smgr_shutdown_hook = NULL;
+
+smgrao_init_hook_type smgrao_init_hook = NULL;
+smgrao_hook_type smgrao_hook = NULL;
+smgrao_shutdown_hook_type smgrao_shutdown_hook = NULL;
 
 const f_smgr *
 smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which)
@@ -211,7 +218,7 @@ smgr(SMgrRelation reln, BackendId backend, SMgrImpl which, Relation rel)
 		result = (*smgr_hook)(reln, backend, which, rel);
  	}
 	else
-		result = smgr_standard(backend, rel->rd_node, which);
+		result = smgr_standard(backend, reln->smgr_rnode.node, which);
 
 	return result;
 }
@@ -458,6 +465,7 @@ void
 smgrcreate_ao(SMgrRelation reln, int32 segmentFileNum, bool isRedo)
 {
 	RelFileNodeBackend rnode = reln->smgr_rnode;
+	Assert(reln->storageManager->smgr_create_ao != NULL);
 	(*(*reln->storageManager).smgr_create_ao) (rnode, segmentFileNum, isRedo);
 	if (file_create_hook)
 		(*file_create_hook)(rnode);

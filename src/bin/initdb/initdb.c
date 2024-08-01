@@ -574,7 +574,7 @@ cleanup_directories_atexit(void)
 
 	if (!noclean)
 	{
-		if (made_new_pgdata)
+		if (made_new_pgdata && false)
 		{
 			pg_log_info("removing data directory \"%s\"", pg_data);
 			if (!rmtree(pg_data, true))
@@ -1484,6 +1484,8 @@ bootstrap_template1(void)
 			 term_fd_opt ? term_fd_opt : "",
 			 debug ? "-d 5" : "");
 
+	printf("%s", cmd);
+	fflush(stdout);
 
 	PG_CMD_OPEN;
 
