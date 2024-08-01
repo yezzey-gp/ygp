@@ -255,6 +255,7 @@ RelationDropStoragePure(Relation rel)
 	pending->relnode.smgr_which =
 		RelationIsAppendOptimized(rel) ? SMGR_AO : SMGR_MD;
 	pending->next = pendingDeletes;
+	pending->action = &storage_pending_rel_deletes_action;
 	pendingDeletes = pending;
 
 	/*
