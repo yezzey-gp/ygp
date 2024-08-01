@@ -1701,6 +1701,7 @@ class gpexpand:
                AND n.nspname != 'gpexpand'
                AND n.nspname != 'pg_bitmapindex'
                AND c.relpersistence != 't'
+               AND c.relpersistence != 'u'
                   """ % undone_status
 
         if not self.options.simple_progress:
