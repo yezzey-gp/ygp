@@ -1369,7 +1369,7 @@ pg_event_trigger_dropped_objects(PG_FUNCTION_ARGS)
 	if (!currentEventTriggerState ||
 		!currentEventTriggerState->in_sql_drop)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(ERRCODE_E_R_I_E_EVENT_TRIGGER_PROTOCOL_VIOLATED),
 		 errmsg("%s can only be called in a sql_drop event trigger function",
 				"pg_event_trigger_dropped_objects()")));
 
@@ -1464,7 +1464,7 @@ pg_event_trigger_table_rewrite_oid(PG_FUNCTION_ARGS)
 	if (!currentEventTriggerState ||
 		currentEventTriggerState->table_rewrite_oid == InvalidOid)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(ERRCODE_E_R_I_E_EVENT_TRIGGER_PROTOCOL_VIOLATED),
 		 errmsg("%s can only be called in a table_rewrite event trigger function",
 				"pg_event_trigger_table_rewrite_oid()")));
 
@@ -1485,7 +1485,7 @@ pg_event_trigger_table_rewrite_reason(PG_FUNCTION_ARGS)
 	if (!currentEventTriggerState ||
 		currentEventTriggerState->table_rewrite_reason == 0)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(ERRCODE_E_R_I_E_EVENT_TRIGGER_PROTOCOL_VIOLATED),
 		 errmsg("%s can only be called in a table_rewrite event trigger function",
 				"pg_event_trigger_table_rewrite_reason()")));
 
