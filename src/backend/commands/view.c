@@ -620,8 +620,6 @@ DefineView(ViewStmt *stmt, const char *queryString)
 	 */
 	CommandCounterIncrement();
 
-	StoreViewQuery(address.objectId, viewParse, stmt->replace);
-
 	return address;
 }
 
