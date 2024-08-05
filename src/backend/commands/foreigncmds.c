@@ -293,12 +293,13 @@ AlterForeignDataWrapperOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerI
  *
  * Note restrictions in the "_internal" function, above.
  */
-Oid
+ObjectAddress
 AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId)
 {
 	Oid			fdwId;
 	HeapTuple	tup;
 	Relation	rel;
+	ObjectAddress address;
 
 	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
 
@@ -313,11 +314,13 @@ AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId)
 
 	AlterForeignDataWrapperOwner_internal(rel, tup, newOwnerId);
 
+	ObjectAddressSet(address, ForeignDataWrapperRelationId, fdwId);
+
 	heap_freetuple(tup);
 
 	heap_close(rel, RowExclusiveLock);
 
-	return fdwId;
+	return address;
 }
 
 /*
@@ -428,12 +431,13 @@ AlterForeignServerOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId)
 /*
  * Change foreign server owner -- by name
  */
-Oid
+ObjectAddress
 AlterForeignServerOwner(const char *name, Oid newOwnerId)
 {
 	Oid			servOid;
 	HeapTuple	tup;
 	Relation	rel;
+	ObjectAddress address;
 
 	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
 
@@ -448,11 +452,13 @@ AlterForeignServerOwner(const char *name, Oid newOwnerId)
 
 	AlterForeignServerOwner_internal(rel, tup, newOwnerId);
 
+	ObjectAddressSet(address, ForeignServerRelationId, servOid);
+
 	heap_freetuple(tup);
 
 	heap_close(rel, RowExclusiveLock);
 
-	return servOid;
+	return address;
 }
 
 /*
@@ -570,7 +576,7 @@ parse_func_options(List *func_options,
 /*
  * Create a foreign-data wrapper
  */
-Oid
+ObjectAddress
 CreateForeignDataWrapper(CreateFdwStmt *stmt)
 {
 	Relation	rel;
@@ -685,14 +691,14 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return fdwId;
+	return myself;
 }
 
 
 /*
  * Alter foreign-data wrapper
  */
-Oid
+ObjectAddress
 AlterForeignDataWrapper(AlterFdwStmt *stmt)
 {
 	Relation	rel;
@@ -708,6 +714,7 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 	bool		validator_given;
 	Oid			fdwhandler;
 	Oid			fdwvalidator;
+	ObjectAddress myself;
 
 	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
 
@@ -810,10 +817,11 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 
 	heap_freetuple(tp);
 
+	ObjectAddressSet(myself, ForeignDataWrapperRelationId, fdwId);
+
 	/* Update function dependencies if we changed them */
 	if (handler_given || validator_given)
 	{
-		ObjectAddress myself;
 		ObjectAddress referenced;
 
 		/*
@@ -826,9 +834,6 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 										DEPENDENCY_NORMAL);
 
 		/* And build new ones. */
-		myself.classId = ForeignDataWrapperRelationId;
-		myself.objectId = fdwId;
-		myself.objectSubId = 0;
 
 		if (OidIsValid(fdwhandler))
 		{
@@ -858,7 +863,7 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return fdwId;
+	return myself;
 }
 
 
@@ -889,7 +894,7 @@ RemoveForeignDataWrapperById(Oid fdwId)
 /*
  * Create a foreign server
  */
-Oid
+ObjectAddress
 CreateForeignServer(CreateForeignServerStmt *stmt)
 {
 	Relation	rel;
@@ -1003,14 +1008,14 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return srvId;
+	return myself;
 }
 
 
 /*
  * Alter foreign server
  */
-Oid
+ObjectAddress
 AlterForeignServer(AlterForeignServerStmt *stmt)
 {
 	Relation	rel;
@@ -1020,6 +1025,7 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 	bool		repl_repl[Natts_pg_foreign_server];
 	Oid			srvId;
 	Form_pg_foreign_server srvForm;
+	ObjectAddress address;
 
 	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
 
@@ -1096,6 +1102,8 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 
 	InvokeObjectPostAlterHook(ForeignServerRelationId, srvId, 0);
 
+	ObjectAddressSet(address, ForeignServerRelationId, srvId);
+
 	heap_freetuple(tp);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -1108,7 +1116,7 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return srvId;
+	return address;
 }
 
 
@@ -1166,7 +1174,7 @@ user_mapping_ddl_aclcheck(Oid umuserid, Oid serverid, const char *servername)
 /*
  * Create user mapping
  */
-Oid
+ObjectAddress
 CreateUserMapping(CreateUserMappingStmt *stmt)
 {
 	Relation	rel;
@@ -1269,14 +1277,14 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return umId;
+	return myself;
 }
 
 
 /*
  * Alter user mapping
  */
-Oid
+ObjectAddress
 AlterUserMapping(AlterUserMappingStmt *stmt)
 {
 	Relation	rel;
@@ -1287,6 +1295,7 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 	Oid			useId;
 	Oid			umId;
 	ForeignServer *srv;
+	ObjectAddress address;
 
 	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
 
@@ -1353,6 +1362,8 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 	simple_heap_update(rel, &tp->t_self, tp);
 	CatalogUpdateIndexes(rel, tp);
 
+	ObjectAddressSet(address, UserMappingRelationId, umId);
+
 	heap_freetuple(tp);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -1365,7 +1376,7 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 
 	heap_close(rel, RowExclusiveLock);
 
-	return umId;
+	return address;
 }
 
 

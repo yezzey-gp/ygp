@@ -371,8 +371,8 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 * QEs.
 	 */
 	if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
-		reloid = DefineRelation(createStmt, RELKIND_RELATION, InvalidOid,
-								RELSTORAGE_EXTERNAL, true, true, NULL);
+		reloid = DefineRelation(createStmt, RELKIND_RELATION, InvalidOid, NULL,
+								RELSTORAGE_EXTERNAL, true, true, NULL).objectId;
 
 	/*
 	 * Now we take care of pg_exttable.

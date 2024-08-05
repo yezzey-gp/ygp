@@ -1654,7 +1654,7 @@ DropRole(DropRoleStmt *stmt)
 /*
  * Rename role
  */
-Oid
+ObjectAddress
 RenameRole(const char *oldname, const char *newname)
 {
 	HeapTuple	oldtuple,
@@ -1668,6 +1668,7 @@ RenameRole(const char *oldname, const char *newname)
 	bool		repl_repl[Natts_pg_authid];
 	int			i;
 	Oid			roleid;
+	ObjectAddress address;
 
 	rel = heap_open(AuthIdRelationId, RowExclusiveLock);
 	dsc = RelationGetDescr(rel);
@@ -1757,6 +1758,8 @@ RenameRole(const char *oldname, const char *newname)
 
 	InvokeObjectPostAlterHook(AuthIdRelationId, roleid, 0);
 
+	ObjectAddressSet(address, AuthIdRelationId, roleid);
+
 	ReleaseSysCache(oldtuple);
 
 	/*
@@ -1772,7 +1775,7 @@ RenameRole(const char *oldname, const char *newname)
 						   "ALTER", "RENAME"
 				);
 
-	return roleid;
+	return address;
 }
 
 /*

@@ -17,7 +17,7 @@
 #include "pg_backup_utils.h"
 
 #include <ctype.h>
-
+#include "postgres.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_extension.h"

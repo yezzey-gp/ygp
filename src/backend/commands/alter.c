@@ -306,8 +306,10 @@ AlterObjectRename_internal(Relation rel, Oid objectId, const char *new_name)
 /*
  * Executes an ALTER OBJECT / RENAME TO statement.  Based on the object
  * type, the function appropriate to that type is executed.
+ *
+ * Return value is the address of the renamed object.
  */
-static Oid
+static ObjectAddress
 ExecRenameStmt_internal(RenameStmt *stmt)
 {
 	switch (stmt->renameType)
@@ -382,20 +384,26 @@ ExecRenameStmt_internal(RenameStmt *stmt)
 										   stmt->newname);
 				heap_close(catalog, RowExclusiveLock);
 
-				return address.objectId;
+				return address;
 			}
 
 		default:
 			elog(ERROR, "unrecognized rename stmt type: %d",
 				 (int) stmt->renameType);
-			return InvalidOid;	/* keep compiler happy */
+			return InvalidObjectAddress;		/* keep compiler happy */
 	}
 }
 
-Oid
+/*
+ * Executes an ALTER OBJECT / RENAME TO statement.  Based on the object
+ * type, the function appropriate to that type is executed.
+ *
+ * Return value is the address of the renamed object.
+ */
+ObjectAddress
 ExecRenameStmt(RenameStmt *stmt)
 {
-	Oid			result;
+	ObjectAddress			result;
 
 	result = ExecRenameStmt_internal(stmt);
 
@@ -419,26 +427,41 @@ ExecRenameStmt(RenameStmt *stmt)
 /*
  * Executes an ALTER OBJECT / SET SCHEMA statement.  Based on the object
  * type, the function appropriate to that type is executed.
+ *
+ * Return value is that of the altered object.
+ *
+ * oldSchemaAddr is an output argument which, if not NULL, is set to the object
+ * address of the original schema.
  */
-static Oid
-ExecAlterObjectSchemaStmt_internal(AlterObjectSchemaStmt *stmt)
+static ObjectAddress
+ExecAlterObjectSchemaStmt_internal(AlterObjectSchemaStmt *stmt,
+						  ObjectAddress *oldSchemaAddr)
 {
+	ObjectAddress address;
+	Oid			oldNspOid;
+
 	switch (stmt->objectType)
 	{
 		case OBJECT_EXTENSION:
-			return AlterExtensionNamespace(stmt->object, stmt->newschema);
+			address = AlterExtensionNamespace(stmt->object, stmt->newschema,
+										  oldSchemaAddr ? &oldNspOid : NULL);
+			break;
 
 		case OBJECT_FOREIGN_TABLE:
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
-			return AlterTableNamespace(stmt);
+			address = AlterTableNamespace(stmt,
+										  oldSchemaAddr ? &oldNspOid : NULL);
+			break;
 
 		case OBJECT_DOMAIN:
 		case OBJECT_TYPE:
-			return AlterTypeNamespace(stmt->object, stmt->newschema,
-									  stmt->objectType);
+			address = AlterTypeNamespace(stmt->object, stmt->newschema,
+										 stmt->objectType,
+										 oldSchemaAddr ? &oldNspOid : NULL);
+			break;
 
 			/* generic code path */
 		case OBJECT_AGGREGATE:
@@ -470,26 +493,30 @@ ExecAlterObjectSchemaStmt_internal(AlterObjectSchemaStmt *stmt)
 				catalog = heap_open(classId, RowExclusiveLock);
 				nspOid = LookupCreationNamespace(stmt->newschema);
 
-				AlterObjectNamespace_internal(catalog, address.objectId,
-											  nspOid);
+				oldNspOid = AlterObjectNamespace_internal(catalog, address.objectId,
+														  nspOid);
 				heap_close(catalog, RowExclusiveLock);
-
-				return address.objectId;
 			}
 			break;
 
 		default:
 			elog(ERROR, "unrecognized AlterObjectSchemaStmt type: %d",
 				 (int) stmt->objectType);
-			return InvalidOid;	/* keep compiler happy */
+			return InvalidObjectAddress;		/* keep compiler happy */
 	}
-}
-Oid
-ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
-{
-	Oid			result;
 
-	result = ExecAlterObjectSchemaStmt_internal(stmt);
+	if (oldSchemaAddr)
+		ObjectAddressSet(*oldSchemaAddr, NamespaceRelationId, oldNspOid);
+
+	return address;
+}
+
+ObjectAddress
+ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt, ObjectAddress *oldSchemaAddr)
+{
+	ObjectAddress			result;
+
+	result = ExecAlterObjectSchemaStmt_internal(stmt, oldSchemaAddr);
 
 	/*
 	 * Dispatch to the segments. Except for event triggers, they're only stored
@@ -728,7 +755,7 @@ AlterObjectNamespace_internal(Relation rel, Oid objid, Oid nspOid)
  * Executes an ALTER OBJECT / OWNER TO statement.  Based on the object
  * type, the function appropriate to that type is executed.
  */
-static Oid
+static ObjectAddress
 ExecAlterOwnerStmt_internal(AlterOwnerStmt *stmt)
 {
 	Oid			newowner = get_role_oid(stmt->newowner, false);
@@ -800,22 +827,21 @@ ExecAlterOwnerStmt_internal(AlterOwnerStmt *stmt)
 				AlterObjectOwner_internal(catalog, address.objectId, newowner);
 				heap_close(catalog, RowExclusiveLock);
 
-				return address.objectId;
+				return address;
 			}
 			break;
 
 		default:
 			elog(ERROR, "unrecognized AlterOwnerStmt type: %d",
 				 (int) stmt->objectType);
-
-			return InvalidOid;	/* keep compiler happy */
+			return InvalidObjectAddress;		/* keep compiler happy */
 	}
 }
 
-Oid
+ObjectAddress
 ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 {
-	Oid			result;
+	ObjectAddress			result;
 
 	result = ExecAlterOwnerStmt_internal(stmt);
 

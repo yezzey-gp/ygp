@@ -60,6 +60,8 @@
 #include "cdb/memquota.h"
 #include "utils/metrics_utils.h"
 
+#include "catalog/namespace.h"
+
 typedef struct
 {
 	DestReceiver pub;			/* publicly-known function pointers */
@@ -76,9 +78,12 @@ typedef struct
 
 static void intorel_startup_dummy(DestReceiver *self, int operation, TupleDesc typeinfo);
 /* utility functions for CTAS definition creation */
-static Oid	create_ctas_internal(List *attrList, IntoClause *into,
+static ObjectAddress	create_ctas_internal(List *attrList, IntoClause *into,
 							     QueryDesc *queryDesc, bool dispatch);
-static Oid	create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc);
+static ObjectAddress	create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc);
+/* the address of the created table, for ExecCreateTableAs consumption */
+static ObjectAddress CreateAsReladdr = {InvalidOid, InvalidOid, 0};
+
 static void intorel_receive(TupleTableSlot *slot, DestReceiver *self);
 static void intorel_shutdown(DestReceiver *self);
 static void intorel_destroy(DestReceiver *self);
@@ -91,7 +96,7 @@ static void intorel_destroy(DestReceiver *self);
  * created via CREATE TABLE AS or a materialized view.  Caller needs to
  * provide a list of attributes (ColumnDef nodes).
  */
-static Oid
+static ObjectAddress
 create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, bool dispatch)
 {
 	CreateStmt *create = makeNode(CreateStmt);
@@ -99,6 +104,7 @@ create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, boo
 	char		relkind;
 	Datum		toast_options;
 	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
+	ObjectAddress intoRelationAddr;
 	Oid			intoRelationId;
 
 	Datum       reloptions;
@@ -187,13 +193,16 @@ create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, boo
 	 *
 	 * Pass the policy that was computed by the planner.
 	 */
-	intoRelationId = DefineRelation(create,
+	intoRelationAddr = DefineRelation(create,
 									relkind,
 									InvalidOid,
+									NULL,
 									relstorage,
 									false,
 									queryDesc->ddesc ? queryDesc->ddesc->useChangedAOOpts : true,
 									queryDesc->plannedstmt->intoPolicy);
+
+	intoRelationId = intoRelationAddr.objectId;
 
 	/*
 	 * If necessary, create a TOAST table for the target table.  Note that
@@ -232,7 +241,7 @@ create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, boo
 									DF_WITH_SNAPSHOT,
 									GetAssignedOidsForDispatch(),
 									NULL);
-	return intoRelationId;
+	return intoRelationAddr;
 }
 
 
@@ -242,13 +251,13 @@ create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, boo
  * Create CTAS or materialized view when WITH NO DATA is used, starting from
  * the targetlist of the SELECT or view definition.
  */
-static Oid
+static ObjectAddress
 create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc)
 {
 	List	   *attrList;
 	ListCell   *t,
 			   *lc;
-	Oid			intoRelationOid;
+	ObjectAddress intoRelationAddr;
 
 	/*
 	 * Build list of ColumnDefs from non-junk elements of the tlist.  If a
@@ -304,21 +313,21 @@ create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc)
 				 errmsg("too many column names were specified")));
 
 	/* Create the relation definition using the ColumnDef list */
-	intoRelationOid = create_ctas_internal(attrList, into, queryDesc, true);
+	intoRelationAddr = create_ctas_internal(attrList, into, queryDesc, true);
 
 	/* Add column encoding entries based on the WITH clause */
-	Relation rel = heap_open(intoRelationOid, AccessExclusiveLock);
+	Relation rel = heap_open(intoRelationAddr.objectId, AccessExclusiveLock);
 	/* Noop for non-AOCS */
 	AddDefaultRelationAttributeOptions(rel, into->options);
 	heap_close(rel, NoLock);
-	return intoRelationOid;
+	return intoRelationAddr;
 }
 
 
 /*
  * ExecCreateTableAs -- execute a CREATE TABLE AS command
  */
-void
+ObjectAddress
 ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 				  ParamListInfo params, char *completionTag)
 {
@@ -329,6 +338,7 @@ ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 	Oid			save_userid = InvalidOid;
 	int			save_sec_context = 0;
 	int			save_nestlevel = 0;
+	ObjectAddress address;
 	List	   *rewritten;
 	PlannedStmt *plan;
 	QueryDesc  *queryDesc = NULL;
@@ -355,7 +365,9 @@ ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 		Assert(!is_matview);	/* excluded by syntax */
 		ExecuteQuery(estmt, into, queryString, params, dest, completionTag);
 
-		return;
+		address = CreateAsReladdr;
+		CreateAsReladdr = InvalidObjectAddress;
+		return address;
 	}
 	Assert(query->commandType == CMD_SELECT);
 
@@ -476,6 +488,11 @@ ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 		/* Restore userid and security context */
 		SetUserIdAndSecContext(save_userid, save_sec_context);
 	}
+
+	address = CreateAsReladdr;
+	CreateAsReladdr = InvalidObjectAddress;
+
+	return address;
 }
 
 /*
@@ -564,7 +581,8 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	bool		is_matview;
 	char		relkind;
 	List	   *attrList;
-	Oid			intoRelationId;
+	CreateStmt *create;
+	ObjectAddress intoRelationAddr;
 	Relation	intoRelationDesc;
 	RangeTblEntry *rte;
 	ListCell   *lc;
@@ -637,13 +655,13 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	 * is created in the initialization of the plan in QEs, but with NO DATA, we
 	 * don't need to dispatch the plan during ExecutorStart().
 	 */
-	intoRelationId = create_ctas_internal(attrList, into, queryDesc,
+	(void) create_ctas_internal(attrList, into, queryDesc,
 										  into->skipData ? true : false);
 
 	/*
 	 * Finally we can open the target table
 	 */
-	intoRelationDesc = heap_open(intoRelationId, AccessExclusiveLock);
+	intoRelationDesc = heap_open(intoRelationAddr.objectId, AccessExclusiveLock);
 
 	/*
 	 * Add column encoding entries based on the WITH clause.
@@ -666,7 +684,7 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	 */
 	rte = makeNode(RangeTblEntry);
 	rte->rtekind = RTE_RELATION;
-	rte->relid = intoRelationId;
+	rte->relid = intoRelationAddr.objectId;
 	rte->relkind = relkind;
 	rte->requiredPerms = ACL_INSERT;
 
@@ -692,6 +710,9 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	myState = (DR_intorel *) queryDesc->dest;
 	myState->rel = intoRelationDesc;
 	myState->output_cid = GetCurrentCommandId(true);
+
+	/* and remember the new relation's address for ExecCreateTableAs */
+	CreateAsReladdr = intoRelationAddr;
 
 	/*
 	 * We can skip WAL-logging the insertions, unless PITR or streaming

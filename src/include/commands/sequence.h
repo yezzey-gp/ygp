@@ -16,6 +16,8 @@
 #define SEQUENCE_H
 
 #include "access/xlog.h"
+#include "access/xlogreader.h"
+#include "catalog/objectaddress.h"
 #include "fmgr.h"
 #include "nodes/parsenodes.h"
 #include "storage/relfilenode.h"
@@ -79,8 +81,8 @@ extern Datum lastval(PG_FUNCTION_ARGS);
 
 extern Datum pg_sequence_parameters(PG_FUNCTION_ARGS);
 
-extern Oid	DefineSequence(CreateSeqStmt *stmt);
-extern Oid	AlterSequence(AlterSeqStmt *stmt);
+extern ObjectAddress DefineSequence(CreateSeqStmt *stmt);
+extern ObjectAddress AlterSequence(AlterSeqStmt *stmt);
 extern void ResetSequence(Oid seq_relid);
 extern void ResetSequenceCaches(void);
 

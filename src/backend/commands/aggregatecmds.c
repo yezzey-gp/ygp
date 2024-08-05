@@ -54,7 +54,7 @@
  * isn't an ordered-set aggregate.
  * "parameters" is a list of DefElem representing the agg's definition clauses.
  */
-Oid
+ObjectAddress
 DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 				const char *queryString)
 {
@@ -416,8 +416,8 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	/*
 	 * Most of the argument-checking is done inside of AggregateCreate
 	 */
-	Oid			aOid;
-	aOid = AggregateCreate(aggName,				/* aggregate name */
+	ObjectAddress aAddr;
+	aAddr = AggregateCreate(aggName,				/* aggregate name */
 						   aggNamespace,		/* namespace */
 						   aggKind,
 						   numArgs,
@@ -462,5 +462,5 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 									NULL);
 	}
 
-	return aOid;
+	return aAddr;
 }

@@ -272,8 +272,10 @@ Boot_CreateStmt:
 													  false,
 													  /* valid_opts */ false,
 													  /* is_part_child */ false,
-													  /* is_part_parent */ false);
+													  /* is_part_parent */ false,
+													  NULL);
 						elog(DEBUG4, "relation created with oid %u", id);
+						elog(DEBUG4, "relation created with OID %u", id);
 					}
 					do_end();
 				}
