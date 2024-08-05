@@ -1205,10 +1205,10 @@ postgresPlanForeignModify(PlannerInfo *root,
 	}
 	else if (operation == CMD_UPDATE)
 	{
-		Bitmapset  *tmpset = bms_copy(rte->modifiedCols);
 		AttrNumber	col;
 
-		while ((col = bms_first_member(tmpset)) >= 0)
+		col = -1;
+		while ((col = bms_next_member(rte->updatedCols, col)) >= 0)
 		{
 			col += FirstLowInvalidHeapAttributeNumber;
 			if (col <= InvalidAttrNumber)		/* shouldn't happen */
