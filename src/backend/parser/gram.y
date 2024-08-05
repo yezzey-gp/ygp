@@ -11126,6 +11126,7 @@ AlterTSConfigurationStmt:
 			ALTER TEXT_P SEARCH CONFIGURATION any_name ADD_P MAPPING FOR name_list WITH any_name_list
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_ADD_MAPPING;
 					n->cfgname = $5;
 					n->tokentype = $9;
 					n->dicts = $11;
@@ -11136,6 +11137,7 @@ AlterTSConfigurationStmt:
 			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING FOR name_list WITH any_name_list
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_ALTER_MAPPING_FOR_TOKEN;
 					n->cfgname = $5;
 					n->tokentype = $9;
 					n->dicts = $11;
@@ -11146,6 +11148,7 @@ AlterTSConfigurationStmt:
 			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING REPLACE any_name WITH any_name
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_REPLACE_DICT;
 					n->cfgname = $5;
 					n->tokentype = NIL;
 					n->dicts = list_make2($9,$11);
@@ -11156,6 +11159,7 @@ AlterTSConfigurationStmt:
 			| ALTER TEXT_P SEARCH CONFIGURATION any_name ALTER MAPPING FOR name_list REPLACE any_name WITH any_name
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_REPLACE_DICT_FOR_TOKEN;
 					n->cfgname = $5;
 					n->tokentype = $9;
 					n->dicts = list_make2($11,$13);
@@ -11166,6 +11170,7 @@ AlterTSConfigurationStmt:
 			| ALTER TEXT_P SEARCH CONFIGURATION any_name DROP MAPPING FOR name_list
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_DROP_MAPPING;
 					n->cfgname = $5;
 					n->tokentype = $9;
 					n->missing_ok = false;
@@ -11174,6 +11179,7 @@ AlterTSConfigurationStmt:
 			| ALTER TEXT_P SEARCH CONFIGURATION any_name DROP MAPPING IF_P EXISTS FOR name_list
 				{
 					AlterTSConfigurationStmt *n = makeNode(AlterTSConfigurationStmt);
+					n->kind = ALTER_TSCONFIG_DROP_MAPPING;
 					n->cfgname = $5;
 					n->tokentype = $11;
 					n->missing_ok = true;

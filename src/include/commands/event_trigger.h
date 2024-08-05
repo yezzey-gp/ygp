@@ -17,6 +17,8 @@
 #include "catalog/objectaddress.h"
 #include "catalog/pg_event_trigger.h"
 #include "nodes/parsenodes.h"
+#include "utils/aclchk_internal.h"
+#include "tcop/deparse_utility.h"
 
 typedef struct EventTriggerData
 {
@@ -58,5 +60,29 @@ extern bool EventTriggerBeginCompleteQuery(void);
 extern void EventTriggerEndCompleteQuery(void);
 extern bool trackDroppedObjectsNeeded(void);
 extern void EventTriggerSQLDropAddObject(ObjectAddress *object);
+
+extern void EventTriggerInhibitCommandCollection(void);
+extern void EventTriggerUndoInhibitCommandCollection(void);
+
+extern void EventTriggerCollectSimpleCommand(ObjectAddress address,
+								 ObjectAddress secondaryObject,
+								 Node *parsetree);
+
+extern void EventTriggerAlterTableStart(Node *parsetree);
+extern void EventTriggerAlterTableRelid(Oid objectId);
+extern void EventTriggerCollectAlterTableSubcmd(Node *subcmd,
+								  ObjectAddress address);
+extern void EventTriggerAlterTableEnd(void);
+
+extern void EventTriggerCollectGrant(InternalGrant *istmt);
+extern void EventTriggerCollectAlterOpFam(AlterOpFamilyStmt *stmt,
+							  Oid opfamoid, List *operators,
+							  List *procedures);
+extern void EventTriggerCollectCreateOpClass(CreateOpClassStmt *stmt,
+								 Oid opcoid, List *operators,
+								 List *procedures);
+extern void EventTriggerCollectAlterTSConfig(AlterTSConfigurationStmt *stmt,
+								 Oid cfgId, Oid *dictIds, int ndicts);
+extern void EventTriggerCollectAlterDefPrivs(AlterDefaultPrivilegesStmt *stmt);
 
 #endif   /* EVENT_TRIGGER_H */
