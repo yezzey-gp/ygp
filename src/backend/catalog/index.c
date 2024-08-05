@@ -758,6 +758,8 @@ UpdateIndexRelation(Oid indexoid,
  *		will be marked "invalid" and the caller must take additional steps
  *		to fix it up.
  * is_internal: if true, post creation hook for new index
+ * if_not_exists: if true, do not throw an error if a relation with
+ *		the same name already exists.
  *
  * Returns the OID of the created index.
  */
@@ -1268,7 +1270,8 @@ index_create(Relation heapRelation,
 /*
  * index_constraint_create
  *
- * Set up a constraint associated with an index
+ * Set up a constraint associated with an index.  Return the new constraint's
+ * address.
  *
  * heapRelation: table owning the index (must be suitably locked by caller)
  * indexRelationId: OID of the index

@@ -38,6 +38,7 @@ typedef struct CookedConstraint
 	 */
 	NodeTag		type;
 	ConstrType	contype;		/* CONSTR_DEFAULT or CONSTR_CHECK */
+	Oid			conoid;			/* constr OID if created, otherwise Invalid */
 	char	   *name;			/* name, or NULL if none */
 	AttrNumber	attnum;			/* which attr (only for DEFAULT) */
 	Node	   *expr;			/* transformed default or check expr */
@@ -126,7 +127,7 @@ extern List *AddRelationConstraints(Relation rel,
 						  List *rawColDefaults,
 						  List *constraints);
 
-extern void StoreAttrDefault(Relation rel, AttrNumber attnum,
+extern Oid StoreAttrDefault(Relation rel, AttrNumber attnum,
 				 Node *expr, bool is_internal);
 
 extern Node *cookDefault(ParseState *pstate,
