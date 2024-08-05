@@ -621,14 +621,6 @@ standard_ProcessUtility(Node *parsetree,
 			ExecuteTruncate((TruncateStmt *) parsetree);
 			break;
 
-		case T_CommentStmt:
-			CommentObject((CommentStmt *) parsetree);
-			break;
-
-		case T_SecLabelStmt:
-			ExecSecLabelStmt((SecLabelStmt *) parsetree);
-			break;
-
 		case T_CopyStmt:
 			{
 				uint64		processed;
@@ -654,11 +646,6 @@ standard_ProcessUtility(Node *parsetree,
 		case T_DeallocateStmt:
 			CheckRestrictedOperation("DEALLOCATE");
 			DeallocateQuery((DeallocateStmt *) parsetree);
-			break;
-
-		case T_GrantStmt:
-			/* no event triggers for global objects */
-			ExecuteGrantStmt((GrantStmt *) parsetree);
 			break;
 
 		case T_GrantRoleStmt:
@@ -988,6 +975,19 @@ standard_ProcessUtility(Node *parsetree,
 			 * in some cases, so we "fast path" them in the other cases.
 			 */
 
+		case T_GrantStmt:
+			{
+				GrantStmt  *stmt = (GrantStmt *) parsetree;
+
+				if (EventTriggerSupportsGrantObjectType(stmt->objtype))
+					ProcessUtilitySlow(parsetree, queryString,
+									   context, params,
+									   dest, completionTag);
+				else
+					ExecuteGrantStmt((GrantStmt *) parsetree);
+			}
+			break;
+
 		case T_DropStmt:
 			{
 				DropStmt   *stmt = (DropStmt *) parsetree;
@@ -1043,6 +1043,31 @@ standard_ProcessUtility(Node *parsetree,
 		case T_RetrieveStmt:
 			ExecRetrieveStmt((RetrieveStmt *) parsetree, dest);
 			break;
+		case T_CommentStmt:
+			{
+				CommentStmt *stmt = (CommentStmt *) parsetree;
+
+				if (EventTriggerSupportsObjectType(stmt->objtype))
+					ProcessUtilitySlow(parsetree, queryString,
+									   context, params,
+									   dest, completionTag);
+				else
+					CommentObject((CommentStmt *) parsetree);
+				break;
+			}
+
+		case T_SecLabelStmt:
+			{
+				SecLabelStmt *stmt = (SecLabelStmt *) parsetree;
+
+				if (EventTriggerSupportsObjectType(stmt->objtype))
+					ProcessUtilitySlow(parsetree, queryString,
+									   context, params,
+									   dest, completionTag);
+				else
+					ExecSecLabelStmt(stmt);
+				break;
+			}
 
 		default:
 			/* All other statement types have event trigger support */
@@ -1743,12 +1768,24 @@ ProcessUtilitySlow(Node *parsetree,
 				ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
 				break;
 
+			case T_CommentStmt:
+				CommentObject((CommentStmt *) parsetree);
+				break;
+
+			case T_GrantStmt:
+				ExecuteGrantStmt((GrantStmt *) parsetree);
+				break;
+
 			case T_DropOwnedStmt:
 				DropOwnedObjects((DropOwnedStmt *) parsetree);
 				break;
 
 			case T_AlterDefaultPrivilegesStmt:
 				ExecAlterDefaultPrivilegesStmt((AlterDefaultPrivilegesStmt *) parsetree);
+				break;
+
+			case T_SecLabelStmt:
+				ExecSecLabelStmt((SecLabelStmt *) parsetree);
 				break;
 
 			default:
