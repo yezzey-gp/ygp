@@ -1648,7 +1648,7 @@ class gpexpand:
              select oid as table_oid,
                     pg_relation_size(oid) as size
              from gp_dist_random('pg_class')
-             where oid >= %d and relstorage <> '%s'
+             where oid >= %d and relstorage <> '%s' and relpersistence <> 'u'
            ) x(table_oid, size)
            group by table_oid
         )
