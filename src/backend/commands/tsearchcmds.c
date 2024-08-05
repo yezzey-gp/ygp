@@ -35,6 +35,7 @@
 #include "catalog/pg_type.h"
 #include "commands/alter.h"
 #include "commands/defrem.h"
+#include "commands/event_trigger.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_func.h"
@@ -1519,6 +1520,8 @@ MakeConfigurationMapping(AlterTSConfigurationStmt *stmt,
 			}
 		}
 	}
+
+	EventTriggerCollectAlterTSConfig(stmt, cfgId, dictIds, ndict);
 }
 
 /*
@@ -1586,6 +1589,8 @@ DropConfigurationMapping(AlterTSConfigurationStmt *stmt,
 
 		i++;
 	}
+
+	EventTriggerCollectAlterTSConfig(stmt, cfgId, NULL, 0);
 }
 
 
