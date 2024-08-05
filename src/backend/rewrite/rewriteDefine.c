@@ -202,7 +202,7 @@ DefineRule(RuleStmt *stmt, const char *queryString)
 	List	   *actions;
 	Node	   *whereClause;
 	Oid			relId;
-	Oid			result;
+	ObjectAddress			result;
 	RuleStmt   *copyStmt;
 
 	/* Parse analysis. */

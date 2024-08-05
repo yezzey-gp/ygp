@@ -1188,7 +1188,7 @@ DefineIndex(Oid relationId,
 			heap_close(rel, NoLock);
 		else
 			heap_close(rel, lockmode);
-		return indexRelationId;
+		return address;
 	}
 
 	/*

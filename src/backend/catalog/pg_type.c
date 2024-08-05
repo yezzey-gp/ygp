@@ -294,7 +294,6 @@ TypeCreateWithOptions(Oid newTypeOid,
 	Oid			typeObjectId;
 	bool		isDependentType;
 	bool		rebuildDeps = false;
-	Acl		   *typacl;
 	HeapTuple	tup;
 	bool		nulls[Natts_pg_type];
 	bool		replaces[Natts_pg_type];

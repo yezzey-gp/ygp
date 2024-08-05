@@ -60,6 +60,8 @@
 #include "cdb/memquota.h"
 #include "utils/metrics_utils.h"
 
+#include "catalog/namespace.h"
+
 typedef struct
 {
 	DestReceiver pub;			/* publicly-known function pointers */
@@ -78,11 +80,10 @@ static void intorel_startup_dummy(DestReceiver *self, int operation, TupleDesc t
 /* utility functions for CTAS definition creation */
 static ObjectAddress	create_ctas_internal(List *attrList, IntoClause *into,
 							     QueryDesc *queryDesc, bool dispatch);
-static Oid	create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc);
+static ObjectAddress	create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc);
 /* the address of the created table, for ExecCreateTableAs consumption */
 static ObjectAddress CreateAsReladdr = {InvalidOid, InvalidOid, 0};
 
-static void intorel_startup(DestReceiver *self, int operation, TupleDesc typeinfo);
 static void intorel_receive(TupleTableSlot *slot, DestReceiver *self);
 static void intorel_shutdown(DestReceiver *self);
 static void intorel_destroy(DestReceiver *self);
@@ -250,13 +251,13 @@ create_ctas_internal(List *attrList, IntoClause *into, QueryDesc *queryDesc, boo
  * Create CTAS or materialized view when WITH NO DATA is used, starting from
  * the targetlist of the SELECT or view definition.
  */
-static Oid
+static ObjectAddress
 create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc)
 {
 	List	   *attrList;
 	ListCell   *t,
 			   *lc;
-	Oid			intoRelationOid;
+	ObjectAddress intoRelationAddr;
 
 	/*
 	 * Build list of ColumnDefs from non-junk elements of the tlist.  If a
@@ -312,14 +313,14 @@ create_ctas_nodata(List *tlist, IntoClause *into, QueryDesc *queryDesc)
 				 errmsg("too many column names were specified")));
 
 	/* Create the relation definition using the ColumnDef list */
-	intoRelationOid = create_ctas_internal(attrList, into, queryDesc, true);
+	intoRelationAddr = create_ctas_internal(attrList, into, queryDesc, true);
 
 	/* Add column encoding entries based on the WITH clause */
-	Relation rel = heap_open(intoRelationOid, AccessExclusiveLock);
+	Relation rel = heap_open(intoRelationAddr.objectId, AccessExclusiveLock);
 	/* Noop for non-AOCS */
 	AddDefaultRelationAttributeOptions(rel, into->options);
 	heap_close(rel, NoLock);
-	return intoRelationOid;
+	return intoRelationAddr;
 }
 
 
@@ -345,21 +346,6 @@ ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 	AutoStatsCmdType cmdType = AUTOSTATS_CMDTYPE_SENTINEL;  /* command type */
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
-	if (stmt->if_not_exists)
-	{
-		Oid	nspid;
-
-		nspid = RangeVarGetCreationNamespace(stmt->into->rel);
-
-		if (get_relname_relid(stmt->into->rel->relname, nspid))
-		{
-			ereport(NOTICE,
-					(errcode(ERRCODE_DUPLICATE_TABLE),
-					 errmsg("relation \"%s\" already exists, skipping",
-							stmt->into->rel->relname)));
-			return InvalidObjectAddress;
-		}
-	}
 
 	/*
 	 * Create the tuple receiver object and insert info it will need
@@ -595,7 +581,6 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	bool		is_matview;
 	char		relkind;
 	List	   *attrList;
-	Oid			intoRelationId;
 	CreateStmt *create;
 	ObjectAddress intoRelationAddr;
 	Relation	intoRelationDesc;
@@ -670,7 +655,7 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	 * is created in the initialization of the plan in QEs, but with NO DATA, we
 	 * don't need to dispatch the plan during ExecutorStart().
 	 */
-	intoRelationId = create_ctas_internal(attrList, into, queryDesc,
+	(void) create_ctas_internal(attrList, into, queryDesc,
 										  into->skipData ? true : false);
 
 	/*

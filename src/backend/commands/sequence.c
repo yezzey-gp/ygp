@@ -159,23 +159,6 @@ DefineSequence(CreateSeqStmt *seq)
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("unlogged sequences are not supported")));
 
-	/*
-	 * If if_not_exists was given and a relation with the same name already
-	 * exists, bail out. (Note: we needn't check this when not if_not_exists,
-	 * because DefineRelation will complain anyway.)
-	 */
-	if (seq->if_not_exists)
-	{
-		RangeVarGetAndCheckCreationNamespace(seq->sequence, NoLock, &seqoid);
-		if (OidIsValid(seqoid))
-		{
-			ereport(NOTICE,
-					(errcode(ERRCODE_DUPLICATE_TABLE),
-					 errmsg("relation \"%s\" already exists, skipping",
-							seq->sequence->relname)));
-			return InvalidObjectAddress;
-		}
-	}
 
 	/* Check and set all option values */
 	init_params(seq->options, true, &new, &owned_by);

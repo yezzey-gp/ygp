@@ -1311,7 +1311,7 @@ CreateExtension(CreateExtensionStmt *stmt)
 		{
 			case CREATE_EXTENSION_INIT:
 				elog(ERROR, "invalid CREATE EXTENSION state");
-				return InvalidOid;
+				return InvalidObjectAddress;
 
 			case CREATE_EXTENSION_BEGIN:
 				break;
@@ -1319,7 +1319,9 @@ CreateExtension(CreateExtensionStmt *stmt)
 				Assert(segment_nestlevel > 0);
 				AtEOXact_GUC(true, segment_nestlevel);
 				ResetExtensionCreatingGlobalVarsOnQE();
-				return get_extension_oid(stmt->extname, true);
+				
+				ObjectAddressSet(address, ExtensionRelationId, get_extension_oid(stmt->extname, true));
+				return address;
 
 			default:
 				elog(ERROR, "unrecognized create_ext_state: %d",
@@ -2757,7 +2759,9 @@ ExecAlterExtensionStmt(AlterExtensionStmt *stmt)
 				Assert(segment_nestlevel > 0);
 				AtEOXact_GUC(true, segment_nestlevel);
 				ResetExtensionCreatingGlobalVarsOnQE();
-				return get_extension_oid(stmt->extname, true);
+
+				ObjectAddressSet(address, ExtensionRelationId, get_extension_oid(stmt->extname, true));
+				return address;
 
 			default:
 				elog(ERROR, "unrecognized update_ext_state: %d",

@@ -282,7 +282,7 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 		CommandCounterIncrement();
 
 		/* Store the query for the view */
-		StoreViewQuery(relid, viewParse, replace);
+		StoreViewQuery(address.objectId, viewParse, replace);
 
 		return address;
 	}

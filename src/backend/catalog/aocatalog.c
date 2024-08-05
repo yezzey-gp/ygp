@@ -152,7 +152,7 @@ CreateAOAuxiliaryTable(
 												 true,
 												 /* valid_opts */ false,
 												 /* is_part_child */ false,
-												 is_part_parent);
+												 is_part_parent, NULL);
 
 	/* Make this table visible, else index creation will fail */
 	CommandCounterIncrement();

@@ -179,6 +179,7 @@ DefineType(List *names, List *parameters)
 	List	   *encoding = NIL;
 	ListCell   *pl;
 	ObjectAddress address;
+	ObjectAddress typoAddr;
 
 	/*
 	 * As of Postgres 8.4, we require superuser privilege to create a base
@@ -661,7 +662,7 @@ DefineType(List *names, List *parameters)
 	/* alignment must be 'i' or 'd' for arrays */
 	alignment = (alignment == 'd') ? 'd' : 'i';
 
-	typoid = TypeCreate(array_oid,		/* force assignment of this type OID */
+	typoAddr = TypeCreate(array_oid,		/* force assignment of this type OID */
 						array_type,		/* type name */
 						typeNamespace,	/* namespace */
 						InvalidOid,		/* relation oid (n/a here) */
@@ -1165,6 +1166,7 @@ DefineEnum(CreateEnumStmt *stmt)
 	Oid			old_type_oid;
 	Oid			enumArrayOid;
 	ObjectAddress enumTypeAddr;
+	Oid enumTypeOid;
 
 	/* Convert list of names to a name and namespace */
 	enumNamespace = QualifiedNameGetCreationNamespace(stmt->typeName,

@@ -115,8 +115,8 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 	 * All seem ok, go ahead (possible failure would be a duplicate conversion
 	 * name)
 	 */
-	Oid			convOid;
-	convOid = ConversionCreate(conversion_name, namespaceId, GetUserId(),
+	ObjectAddress			convAddr;
+	convAddr = ConversionCreate(conversion_name, namespaceId, GetUserId(),
 							   from_encoding, to_encoding, funcoid, stmt->def);
 					 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -129,5 +129,5 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 									NULL);
 	}
 
-	return convOid;
+	return convAddr;
 }

@@ -155,7 +155,7 @@ DefineCollation(List *names, List *parameters, bool if_not_exists)
 							 false);	/* not quiet */
 
 	if (!OidIsValid(newoid))
-		return InvalidOid;
+		return InvalidObjectAddress;
 
 	ObjectAddressSet(address, CollationRelationId, newoid);
 

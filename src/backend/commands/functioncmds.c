@@ -1182,7 +1182,7 @@ CreateFunction(CreateFunctionStmt *stmt, const char *queryString)
 	Oid         describeFuncOid  = InvalidOid;
 	char		dataAccess;
 	char		execLocation;
-	Oid			funcOid;
+	ObjectAddress funcAddr;
 
 	SIMPLE_FAULT_INJECTOR("create_function_fail");
 	/* Convert list of names to a name and namespace */
@@ -1362,7 +1362,7 @@ CreateFunction(CreateFunctionStmt *stmt, const char *queryString)
 	 * And now that we have all the parameters, and know we're permitted to do
 	 * so, go ahead and create the function.
 	 */
-	funcOid = ProcedureCreate(funcname,
+	funcAddr = ProcedureCreate(funcname,
 						   namespaceId,
 						   stmt->replace,
 						   returnsSet,
@@ -1400,7 +1400,7 @@ CreateFunction(CreateFunctionStmt *stmt, const char *queryString)
 									NULL);
 	}
 
-	return funcOid;
+	return funcAddr;
 }
 
 /*

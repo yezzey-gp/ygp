@@ -1664,14 +1664,14 @@ ProcessUtilitySlow(Node *parsetree,
 
 			case T_CreateTrigStmt:
 				{
-					Oid			trigOid;
+					ObjectAddress			trigAddr;
 
-					trigOid = CreateTrigger((CreateTrigStmt *) parsetree, queryString,
+					trigAddr = CreateTrigger((CreateTrigStmt *) parsetree, queryString,
 											InvalidOid, InvalidOid, InvalidOid,
 											InvalidOid, false);
 					if (Gp_role == GP_ROLE_DISPATCH)
 					{
-						((CreateTrigStmt *) parsetree)->trigOid = trigOid;
+						((CreateTrigStmt *) parsetree)->trigOid = trigAddr.objectId;
 						CdbDispatchUtilityStatement((Node *) parsetree,
 													DF_CANCEL_ON_ERROR|
 													DF_WITH_SNAPSHOT|

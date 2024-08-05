@@ -10610,7 +10610,7 @@ CreateFKCheckTrigger(Oid myRelOid, Oid refRelOid, Constraint *fkconstraint,
 	fk_trigger->args = NIL;
 
 	trigobj = CreateTrigger(fk_trigger, NULL, myRelOid, refRelOid, constraintOid,
-							indexOid, true);
+							indexOid, true).objectId;
 
 	if (on_insert)
 		fkconstraint->trig1Oid = trigobj;
@@ -10699,7 +10699,7 @@ createForeignKeyTriggers(Relation rel, Oid refRelOid, Constraint *fkconstraint,
 	fk_trigger->trigOid = fkconstraint->trig3Oid;
 
 	fkconstraint->trig3Oid = CreateTrigger(fk_trigger, NULL, refRelOid, myRelOid, constraintOid,
-										   indexOid, true);
+										   indexOid, true).objectId;
 
 	/* Make changes-so-far visible */
 	CommandCounterIncrement();
@@ -10755,7 +10755,7 @@ createForeignKeyTriggers(Relation rel, Oid refRelOid, Constraint *fkconstraint,
 	fk_trigger->trigOid = fkconstraint->trig4Oid;
 
 	fkconstraint->trig4Oid = CreateTrigger(fk_trigger, NULL, refRelOid, myRelOid, constraintOid,
-										   indexOid, true);
+										   indexOid, true).objectId;
 
 	/* Make changes-so-far visible */
 	CommandCounterIncrement();

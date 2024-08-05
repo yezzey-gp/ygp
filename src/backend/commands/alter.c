@@ -512,11 +512,11 @@ ExecAlterObjectSchemaStmt_internal(AlterObjectSchemaStmt *stmt,
 }
 
 ObjectAddress
-ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
+ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt, ObjectAddress *oldSchemaAddr)
 {
 	ObjectAddress			result;
 
-	result = ExecAlterObjectSchemaStmt_internal(stmt);
+	result = ExecAlterObjectSchemaStmt_internal(stmt, oldSchemaAddr);
 
 	/*
 	 * Dispatch to the segments. Except for event triggers, they're only stored

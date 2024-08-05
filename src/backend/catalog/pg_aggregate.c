@@ -635,6 +635,7 @@ AggregateCreate(const char *aggName,
 							 PRODATAACCESS_NONE,		/* prodataaccess */
 							 PROEXECLOCATION_ANY);		/* proexeclocation */
 
+	procOid = myself.objectId;
 	/*
 	 * Okay to create the pg_aggregate entry.
 	 */
