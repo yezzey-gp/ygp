@@ -655,7 +655,7 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	 * is created in the initialization of the plan in QEs, but with NO DATA, we
 	 * don't need to dispatch the plan during ExecutorStart().
 	 */
-	(void) create_ctas_internal(attrList, into, queryDesc,
+	intoRelationAddr = create_ctas_internal(attrList, into, queryDesc,
 										  into->skipData ? true : false);
 
 	/*
