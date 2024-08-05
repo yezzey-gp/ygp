@@ -4020,8 +4020,9 @@ _outRangeTblEntry(StringInfo str, const RangeTblEntry *node)
 	WRITE_UINT_FIELD(requiredPerms);
 	WRITE_OID_FIELD(checkAsUser);
 	WRITE_BITMAPSET_FIELD(selectedCols);
-	WRITE_BITMAPSET_FIELD(modifiedCols);
-
+	WRITE_BITMAPSET_FIELD(insertedCols);
+	WRITE_BITMAPSET_FIELD(updatedCols);
+	
 	WRITE_BOOL_FIELD(forceDistRandom);
 	/*
 	 * pseudocols is intentionally not serialized. It's only used in the planning
