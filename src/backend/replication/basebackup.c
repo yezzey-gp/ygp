@@ -1545,8 +1545,7 @@ _tarWriteDir(const char *pathbuf, int basepathlen, struct stat * statbuf,
 #else
 	if (pgwin32_is_junction(pathbuf))
 #endif
-		statbuf->st_mode = S_IFDIR | S_IRWXU;
-
+	/* Don't change statbuf->st_mode, they already have the necessary permitions */
 	_tarWriteHeader(pathbuf + basepathlen + 1, NULL, statbuf);
 	return 512;
 }
