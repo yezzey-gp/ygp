@@ -846,8 +846,8 @@ processRetry(fts_context *context)
 			case FTS_PROBE_RETRY_WAIT:
 			case FTS_SYNCREP_OFF_RETRY_WAIT:
 			case FTS_PROMOTE_RETRY_WAIT:
-				/* Wait for 1 second before making another attempt. */
-				if ((int) (now - ftsInfo->retryStartTime) < 1)
+				/* Wait for retry interval seconds before making another attempt. */
+				if ((int) (now - ftsInfo->retryStartTime) < gp_fts_retry_interval)
 					break;
 				/*
 				 * We have remained in retry state for over a second, it's time

@@ -2794,7 +2794,29 @@ LookupExplicitNamespace(const char *nspname, bool missing_ok)
 	if (missing_ok && !OidIsValid(namespaceId))
 		return InvalidOid;
 
-	aclresult = pg_namespace_aclcheck(namespaceId, GetUserId(), ACL_USAGE);
+	HeapTuple tuple;
+	Oid ownerId;
+
+	tuple = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(namespaceId));
+	if (!HeapTupleIsValid(tuple))
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_SCHEMA),
+				 errmsg("schema with OID %u does not exist", namespaceId)));
+
+	ownerId = ((Form_pg_namespace) GETSTRUCT(tuple))->nspowner;
+
+	ReleaseSysCache(tuple);
+	
+	bool mdb_admin_can_take = !superuser_arg(ownerId);
+	Oid mdb_admin = get_role_oid("mdb_admin", true);
+	bool is_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+	bool bypass_owner_checks = mdb_admin_can_take && is_mdb_admin;
+
+	if (!bypass_owner_checks) {
+		aclresult = pg_namespace_aclcheck(namespaceId, GetUserId(), ACL_USAGE);
+	} else {
+		aclresult = ACLCHECK_OK;
+	}
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, ACL_KIND_NAMESPACE,
 					   nspname);
@@ -2877,6 +2899,13 @@ CheckSetNamespace(Oid oldNspOid, Oid nspOid, Oid classid, Oid objid)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
+	
+
+	/* same for AO SEGMENT schema */
+	if (nspOid == YEZZEY_AUX_NAMESPACE || oldNspOid == YEZZEY_AUX_NAMESPACE)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot move objects into or out of Yezzey schema")));
 }
 
 /*

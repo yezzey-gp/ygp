@@ -126,7 +126,8 @@ const char *MD5Calc::Get() {
     return this->result.c_str();
 }
 
-Config::Config(const string &filename, const string &url, const char *datadir) : _conf(NULL) {
+Config::Config(const string &filename, const string& urlWithOptions, const string &url, const char *datadir) : _conf(NULL) {
+    this->_urlWithOptions = urlWithOptions;
     if (!url.empty()) {
         this->_conf = ini_load_from_url(url.c_str(), datadir);
     } else {
@@ -140,6 +141,18 @@ Config::Config(const string &filename, const string &url, const char *datadir) :
 #endif
     }
 }
+Config::Config(const string &filename, const string& urlWithOptions) : _conf(NULL) {
+    this->_urlWithOptions = urlWithOptions;
+    if (!filename.empty()) this->_conf = ini_load(filename.c_str());
+    if (this->_conf == NULL) {
+#ifndef S3_STANDALONE
+        write_log("Failed to load config file:'%s'\n", filename.c_str());
+#else
+        S3ERROR("Failed to load config file:'%s'", filename.c_str());
+#endif
+    }
+}
+
 Config::Config(const string &filename) : _conf(NULL) {
     if (!filename.empty()) this->_conf = ini_load(filename.c_str());
     if (this->_conf == NULL) {
@@ -163,7 +176,19 @@ string Config::Get(const string &sec, const string &key, const string &defaultva
     string ret = defaultvalue;
     if ((key == "") || (sec == "") || (this->_conf == NULL)) return ret;
 
-    const char *tmp = ini_get(this->_conf, sec.c_str(), key.c_str());
+    const char *tmp = NULL;
+
+
+    string opt = GetOptS3(this->_urlWithOptions, key);
+//    S3_DIE(S3RuntimeError, "unexpected response " + this->_urlWithOptions + " " + key  + " " + opt);
+    if (opt.length()) {
+        tmp = opt.c_str();
+    }
+
+    if (tmp == NULL) {
+        tmp = ini_get(this->_conf, sec.c_str(), key.c_str());
+    }
+
     if (tmp) ret = tmp;
     return ret;
 }

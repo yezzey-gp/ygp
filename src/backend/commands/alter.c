@@ -884,6 +884,10 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 		Datum	   *values;
 		bool	   *nulls;
 		bool	   *replaces;
+		bool		mdb_admin_can_take = !superuser_arg(old_ownerId);
+		Oid			mdb_admin = get_role_oid("mdb_admin", true);
+		bool		is_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+		bool		bypass_owner_checks = mdb_admin_can_take && is_mdb_admin;
 
 		/* Superusers can bypass permission checks */
 		if (!superuser())
@@ -891,7 +895,7 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 			AclObjectKind aclkind = get_object_aclkind(classId);
 
 			/* must be owner */
-			if (!has_privs_of_role(GetUserId(), old_ownerId))
+			if (!has_privs_of_role(GetUserId(), old_ownerId) && !bypass_owner_checks)
 			{
 				char	   *objname;
 				char		namebuf[NAMEDATALEN];
@@ -909,10 +913,23 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 							 HeapTupleGetOid(oldtup));
 					objname = namebuf;
 				}
+				elog(WARNING,"2");
 				aclcheck_error(ACLCHECK_NOT_OWNER, aclkind, objname);
 			}
-			/* Must be able to become new owner */
-			check_is_member_of_role(GetUserId(), new_ownerId);
+
+			if (!is_mdb_admin) {
+				/* Must be able to become new owner */
+				check_is_member_of_role(GetUserId(), new_ownerId);
+			} else {
+				// role is mdb admin 
+				if (superuser_arg(new_ownerId)) {
+					ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+							 errmsg("cannot transfer ownership to superuser \"%s\"",
+									GetUserNameFromId(new_ownerId))));
+					
+				}	
+			}
 
 			/* New owner must have CREATE privilege on namespace */
 			if (OidIsValid(namespaceId))
@@ -949,7 +966,7 @@ AlterObjectOwner_internal(Relation rel, Oid objectId, Oid new_ownerId)
 			
 			is_trusted = DatumGetBool(datum);
 			
-			if(!is_trusted && !superuser_arg(new_ownerId))
+			if(!is_trusted && !superuser_arg(new_ownerId) && !mdb_admin)
 				ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					errmsg("untrusted protocol \"%s\" can't be owned by non superuser", old_name)));

@@ -239,6 +239,7 @@ int			gp_perfmon_segment_interval;
 /* Perfmon debug GUC */
 bool		gp_perfmon_print_packet_info;
 bool		gp_resource_group_bypass_catalog_query;
+char*		gp_perfmon_log_directory;
 
 bool		vmem_process_interrupt = false;
 bool		execute_pruned_plan = false;
@@ -3383,6 +3384,16 @@ struct config_bool ConfigureNamesBool_gp[] =
 	},
 
 	{
+		{"gp_external_fail_on_eof", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Fail with ERROR and rollback on 'unexpected end of file' error when used with a CUSTOM formatter."),
+			NULL,
+		},
+		&gp_external_fail_on_eof,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
 			{"gp_detect_data_correctness", PGC_USERSET, UNGROUPED,
 			 gettext_noop("Detect if the current partitioning of the table or data distribution is correct."),
 			 NULL,
@@ -4090,6 +4101,18 @@ struct config_int ConfigureNamesInt_gp[] =
 		},
 		&gp_fts_probe_retries,
 		5, 0, 100,
+		NULL, NULL, NULL
+	},
+
+
+	{
+		{"gp_fts_retry_interval", PGC_SIGHUP, GP_ARRAY_TUNING,
+			gettext_noop("Minumum time (in seconds) between FTS checks."),
+			gettext_noop("Used by the fts-probe process."),
+			GUC_UNIT_S
+		},
+		&gp_fts_retry_interval,
+		1, 0, 3600,
 		NULL, NULL, NULL
 	},
 
@@ -4953,6 +4976,17 @@ struct config_string ConfigureNamesString_gp[] =
 		"none",
 		NULL, NULL, NULL
 	},
+
+	{
+	    {"gp_perfmon_log_directory", PGC_SUSET, DEVELOPER_OPTIONS,
+         gettext_noop("Sets directory for gpdb-alert* log files"),
+         NULL,
+         GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+         },
+         &gp_perfmon_log_directory,
+         "gpperfmon/logs",
+         NULL, NULL, NULL
+     },
 
 	{
 		{"memory_profiler_dataset_id", PGC_USERSET, DEVELOPER_OPTIONS,

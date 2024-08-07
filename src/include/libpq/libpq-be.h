@@ -140,6 +140,10 @@ typedef struct Port
 	 */
 	char	   *database_name;
 	char	   *user_name;
+	/*
+	* MDB-23247: service role name to perform auth - passthrough 
+	*/
+	char       *service_auth_role;
 	char	   *cmdline_options;
 	List	   *guc_options;
 
@@ -184,10 +188,12 @@ typedef struct Port
 	 * SSL structures (keep these last so that USE_SSL doesn't affect
 	 * locations of other fields)
 	 */
+    bool		ssl_in_use;
+    char	   *peer_cn;
+    bool       peer_cert_valid;
 #ifdef USE_SSL
 	SSL		   *ssl;
 	X509	   *peer;
-	char	   *peer_cn;
 	unsigned long count;
 #endif
 	char	   *diff_options;
@@ -243,3 +249,7 @@ extern int	pq_setkeepalivesinterval(int interval, Port *port);
 extern int	pq_setkeepalivescount(int count, Port *port);
 
 #endif   /* LIBPQ_BE_H */
+
+extern int	be_tls_init(bool failOnError);
+extern void be_tls_destroy(void);
+extern bool secure_loaded_verify_locations(void);

@@ -265,7 +265,9 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 		CreateExternalStmt
 		CreateQueueStmt CreateResourceGroupStmt
 		DropQueueStmt DropResourceGroupStmt
-		ExtTypedesc OptSingleRowErrorHandling ExtSingleRowErrorHandling
+		ExtTypedesc ExtSingleRowErrorHandling
+
+%type<list> 	OptSingleRowErrorHandling
 
 %type <node>    deny_login_role deny_interval deny_point deny_day_specifier
 
@@ -3889,8 +3891,22 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 								 errmsg("STDIN/STDOUT not allowed with PROGRAM"),
 								 parser_errposition(@8)));
 
+// -- non-upstream patch begin
+					if (n->is_program) {
+						/*
+						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
+						*/
+						// ereport(ERROR,
+						// 	(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						// 		errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+						// 		errhint("Anyone can COPY to stdout or from stdin. "
+						// 				"psql's \\copy command also works for anyone.")));
+					}
+// --- non-upstream patch end
+
 					n->options = NIL;
 					n->skip_ext_partition = $13;
+
 
 					/* Concatenate user-supplied flags */
 					if ($2)
@@ -3901,6 +3917,9 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 						n->options = lappend(n->options, $9);
 					if ($11)
 						n->options = list_concat(n->options, $11);
+					if ($12) {
+						n->options = list_concat(n->options, $12);
+					}
 					$$ = (Node *)n;
 				}
 			| COPY select_with_parens TO opt_program copy_file_name opt_with copy_options
@@ -3922,6 +3941,20 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 								(errcode(ERRCODE_SYNTAX_ERROR),
 								 errmsg("STDIN/STDOUT not allowed with PROGRAM"),
 								 parser_errposition(@5)));
+
+// -- non-upstream patch begin
+					if (n->is_program) {
+						/*
+						* MDB-21297: forbit usage of COPY TO PROGRAM and COPY FROM PROGRAM at all
+						*/
+						// ereport(ERROR,
+						// 	(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						// 		errmsg("forbidden to COPY to or from an external program or file in Yandex Cloud"),
+						// 		errhint("Anyone can COPY to stdout or from stdin. "
+						// 				"psql's \\copy command also works for anyone.")));
+					}
+// --- non-upstream patch end
+
 
 					$$ = (Node *)n;
 				}
@@ -5718,7 +5751,7 @@ OptSingleRowErrorHandling:
 					   (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						errmsg("invalid (ROWS) reject limit. Should be 2 or larger")));
 
-			$$ = (Node *)n;
+			$$ = lappend(NULL, makeDefElem("sreh", (Node *) n));
 		}
 		| /*EMPTY*/		{ $$ = NULL; }
 		;

@@ -718,6 +718,7 @@ with_gnu_ld
 LD
 LDFLAGS_SL
 LDFLAGS_EX
+with_mdblocales
 ELF_SYS
 EGREP
 GREP
@@ -748,6 +749,7 @@ INCLUDES
 enable_ic_proxy
 HAVE_CXX11
 enable_gpcloud
+enable_yezzey
 enable_mapreduce
 enable_orca
 autodepend
@@ -867,6 +869,7 @@ enable_debugntuplestore
 enable_orca
 enable_mapreduce
 enable_gpcloud
+enable_yezzey
 enable_ic_proxy
 enable_thread_safety
 with_tcl
@@ -896,6 +899,7 @@ with_rt
 with_libcurl
 with_apr_config
 with_apu_config
+with_mdblocales
 with_gnu_ld
 enable_largefile
 '
@@ -1551,6 +1555,7 @@ Optional Features:
   --disable-orca          disable ORCA optimizer
   --enable-mapreduce      enable Greenplum Mapreduce support
   --disable-gpcloud       disable gpcloud support
+  --disable-yezzey        disable yezzey support
   --enable-ic-proxy       enable interconnect proxy mode (requires libuv
                           library)
   --disable-thread-safety disable thread-safety in client libraries
@@ -1605,6 +1610,7 @@ Optional Packages:
   --without-libcurl       do not use libcurl
   --with-apr-config=PATH  path to apr-1-config utility
   --with-apu-config=PATH  path to apu-1-config utility
+  --without-mdblocales    build without MDB locales
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
 
 Some influential environment variables:
@@ -3311,6 +3317,8 @@ else
 fi
 
 
+
+
 #
 # include debug extensions in gpcontrib
 #
@@ -3391,6 +3399,7 @@ else
   enable_gpperfmon=no
 
 fi
+
 
 
 
@@ -4418,13 +4427,13 @@ if test "$ac_test_CFLAGS" = set; then
   CFLAGS=$ac_save_CFLAGS
 elif test $ac_cv_prog_cc_g = yes; then
   if test "$GCC" = yes; then
-    CFLAGS="-g -O2"
+    CFLAGS="-g "
   else
     CFLAGS="-g"
   fi
 else
   if test "$GCC" = yes; then
-    CFLAGS="-O2"
+    CFLAGS=""
   else
     CFLAGS=
   fi
@@ -4776,13 +4785,13 @@ if test "$ac_test_CXXFLAGS" = set; then
   CXXFLAGS=$ac_save_CXXFLAGS
 elif test $ac_cv_prog_cxx_g = yes; then
   if test "$GXX" = yes; then
-    CXXFLAGS="-g -O2"
+    CXXFLAGS="-g "
   else
     CXXFLAGS="-g"
   fi
 else
   if test "$GXX" = yes; then
-    CXXFLAGS="-O2"
+    CXXFLAGS=""
   else
     CXXFLAGS=
   fi
@@ -4864,11 +4873,11 @@ elif test "${CFLAGS+set}" = set; then
 elif test "$enable_coverage" = yes; then
   : # no optimization by default
 elif test "$GCC" = yes; then
-  CFLAGS="-O3"
+  CFLAGS=""
 else
   # if the user selected debug mode, don't use -O
   if test "$enable_debug" != yes; then
-    CFLAGS="-O"
+    CFLAGS=""
   fi
 fi
 
@@ -6433,6 +6442,31 @@ else
 $as_echo "#define USE_GPCLOUD 1" >>confdefs.h
 
 fi
+
+# Check whether --enable-yezzey was given.
+if test "${enable_yezzey+set}" = set; then :
+  enableval=$enable_yezzey;
+  case $enableval in
+    yes)
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --enable-yezzey option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  enable_yezzey=yes
+
+$as_echo "#define USE_YEZZEY 1" >>confdefs.h
+
+fi
+
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: checking whether to build with gpcloud... $enable_gpcloud" >&5
@@ -8308,6 +8342,39 @@ else
 fi
 fi
 rm -f conftest*
+
+
+
+#
+# MDB locales
+#
+
+
+
+# Check whether --with-mdblocales was given.
+if test "${with_mdblocales+set}" = set; then :
+  withval=$with_mdblocales;
+  case $withval in
+    yes)
+
+$as_echo "#define USE_MDBLOCALES 1" >>confdefs.h
+
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-mdblocales option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_mdblocales=yes
+
+$as_echo "#define USE_MDBLOCALES 1" >>confdefs.h
+
+fi
+
 
 
 
@@ -11430,6 +11497,56 @@ Use --without-readline to disable readline support." "$LINENO" 5
   fi
 fi
 
+if test "$with_mdblocales" = yes; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mdb_setlocale in -lmdblocales" >&5
+$as_echo_n "checking for mdb_setlocale in -lmdblocales... " >&6; }
+if ${ac_cv_lib_mdblocales_mdb_setlocale+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmdblocales  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char mdb_setlocale ();
+int
+main ()
+{
+return mdb_setlocale ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_mdblocales_mdb_setlocale=yes
+else
+  ac_cv_lib_mdblocales_mdb_setlocale=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mdblocales_mdb_setlocale" >&5
+$as_echo "$ac_cv_lib_mdblocales_mdb_setlocale" >&6; }
+if test "x$ac_cv_lib_mdblocales_mdb_setlocale" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBMDBLOCALES 1
+_ACEOF
+
+  LIBS="-lmdblocales $LIBS"
+
+else
+  as_fn_error $? "mdblocales library not found" "$LINENO" 5
+fi
+
+fi
+
 if test "$with_zlib" = yes; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for inflate in -lz" >&5
 $as_echo_n "checking for inflate in -lz... " >&6; }
@@ -13943,6 +14060,17 @@ else
 If you have zlib already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support." "$LINENO" 5
+fi
+
+
+fi
+
+if test "$with_mdblocales" = yes; then
+  ac_fn_c_check_header_mongrel "$LINENO" "mdblocales.h" "ac_cv_header_mdblocales_h" "$ac_includes_default"
+if test "x$ac_cv_header_mdblocales_h" = xyes; then :
+
+else
+  as_fn_error $? "mdblocales header not found." "$LINENO" 5
 fi
 
 
@@ -18696,8 +18824,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking which random number source to use" >&5
 $as_echo_n "checking which random number source to use... " >&6; }
 
-
-
 if test x"$USE_OPENSSL_RANDOM" = x"1" ; then
 
 $as_echo "#define USE_OPENSSL_RANDOM 1" >>confdefs.h
@@ -18728,6 +18854,7 @@ if test "$PORTNAME" != "win32"; then
 else
   LATCH_IMPLEMENTATION="src/backend/port/win32_latch.c"
 fi
+
 
 # If not set in template file, set bytes to use libc memset()
 if test x"$MEMSET_LOOP_LIMIT" = x"" ; then

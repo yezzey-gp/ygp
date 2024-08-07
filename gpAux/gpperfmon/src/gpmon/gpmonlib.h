@@ -27,12 +27,11 @@ typedef int SOCKET;
 #define ASSERT(x)    if (x) ; else gpmon_fatal(FLINE, "Check condition:%s failed", #x)
 
 extern int verbose;
-/* TODO: REMOVE */
-//extern int very_verbose;
+
 #define TR0(x) gpmon_print x
-#define TR1(x) if (verbose == 1) gpmon_print x
-#define TR2(x) if (verbose == 2) gpmon_print x
-#define TR1_FILE(x) if (verbose == 1) gpmon_print_file x
+#define TR1(x) if (verbose >= 1) gpmon_print x
+#define TR2(x) if (verbose >= 2) gpmon_print x
+#define TR1_FILE(x) if (verbose >= 1) gpmon_print_file x
 
 /* Architecture specific limits for metrics */
 #if defined(osx104_x86) || defined(osx105_x86)
@@ -123,20 +122,19 @@ typedef struct mmon_options_t
 	char* smon_hadoop_swonly_logdir;
 	char* smon_hadoop_swonly_binfile;
 	char* smdw_aliases;
-	apr_uint64_t max_log_size;
 	int max_fd; /* this is the max fd value we ever seen */
 	int v;
 	int quantum;
 	int min_query_time;
 	int qamode;
-	int harvest_interval;
-	apr_uint64_t tail_buffer_max;
 	int console;
 	int warning_disk_space_percentage;
 	int error_disk_space_percentage;
 	time_t disk_space_interval; // interval in seconds
 	unsigned int max_disk_space_messages_per_interval;
+	bool enable_queries_now;
 	int partition_age;  		// in month
+	char* username;
 } mmon_options_t;
 
 typedef struct addressinfo_holder_t addressinfo_holder_t;

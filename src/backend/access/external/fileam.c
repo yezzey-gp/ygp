@@ -1093,7 +1093,7 @@ externalgettup_custom(FileScanDesc scan)
 		 * The formatter needs more data, but we have reached
 		 * EOF. This is an error.
 		 */
-		ereport(WARNING,
+		ereport(gp_external_fail_on_eof ? ERROR : WARNING,
 				(ERRCODE_DATA_EXCEPTION,
 				 errmsg("unexpected end of file")));
 	}

@@ -4211,6 +4211,16 @@ pg_class_aclmask(Oid table_oid, Oid roleid,
 	 */
 	ownerId = classForm->relowner;
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
+
 	aclDatum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relacl,
 							   &isNull);
 	if (isNull)
@@ -4326,6 +4336,16 @@ pg_proc_aclmask(Oid proc_oid, Oid roleid,
 				 errmsg("function with OID %u does not exist", proc_oid)));
 
 	ownerId = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
 
 	aclDatum = SysCacheGetAttr(PROCOID, tuple, Anum_pg_proc_proacl,
 							   &isNull);
@@ -4545,6 +4565,16 @@ pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
 
 	ownerId = ((Form_pg_namespace) GETSTRUCT(tuple))->nspowner;
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+		{
+			ReleaseSysCache(tuple);
+			return mask;
+		}
+	}
+
 	aclDatum = SysCacheGetAttr(NAMESPACEOID, tuple, Anum_pg_namespace_nspacl,
 							   &isNull);
 	if (isNull)
@@ -4585,7 +4615,7 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 	Oid			ownerId;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (superuser_arg(roleid) || spc_oid == YEZZEYTABLESPACE_OID)
 		return mask;
 
 	/*
@@ -5119,6 +5149,11 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
+	Oid	mdb_admin = get_role_oid("mdb_admin", true);
+	if (is_member_of_role(roleid, mdb_admin) && mode == ACL_USAGE) {
+		return ACLCHECK_OK;
+	}
+
 	if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
 		return ACLCHECK_OK;
 	else
@@ -5185,6 +5220,13 @@ pg_class_ownercheck(Oid class_oid, Oid roleid)
 	ownerId = ((Form_pg_class) GETSTRUCT(tuple))->relowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }
@@ -5263,6 +5305,13 @@ pg_proc_ownercheck(Oid proc_oid, Oid roleid)
 	ownerId = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }
@@ -5362,6 +5411,13 @@ pg_namespace_ownercheck(Oid nsp_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
+
 	return has_privs_of_role(roleid, ownerId);
 }
 
@@ -5375,7 +5431,7 @@ pg_tablespace_ownercheck(Oid spc_oid, Oid roleid)
 	Oid			spcowner;
 
 	/* Superusers bypass all permission checking. */
-	if (superuser_arg(roleid))
+	if (superuser_arg(roleid) || spc_oid == YEZZEYTABLESPACE_OID)
 		return true;
 
 	/* Search syscache for pg_tablespace */
@@ -5524,6 +5580,13 @@ pg_foreign_data_wrapper_ownercheck(Oid srv_oid, Oid roleid)
 
 	ReleaseSysCache(tuple);
 
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
+
 	return has_privs_of_role(roleid, ownerId);
 }
 
@@ -5550,6 +5613,13 @@ pg_foreign_server_ownercheck(Oid srv_oid, Oid roleid)
 	ownerId = ((Form_pg_foreign_server) GETSTRUCT(tuple))->srvowner;
 
 	ReleaseSysCache(tuple);
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleid, mdb_admin))
+			return true;
+	}
 
 	return has_privs_of_role(roleid, ownerId);
 }

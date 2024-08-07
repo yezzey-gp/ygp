@@ -771,6 +771,11 @@ gp_hyperloglog_add_item(GpHLLCounter hllcounter, Datum element, int16 typlen, bo
 		/* varlena */
 		hyperloglog = gp_hll_add_element(hyperloglog, VARDATA_ANY(element), VARSIZE_ANY_EXHDR(element));
 	}
+	else if (typlen == -2)
+	{
+		/* cstring */
+		hyperloglog = gp_hll_add_element(hyperloglog, DatumGetCString(element), strlen(element));
+	}
 	else if (typbyval)
 	{
 		/* fixed-length, passed by value */

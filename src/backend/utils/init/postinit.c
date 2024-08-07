@@ -93,6 +93,8 @@ static void StatementTimeoutHandler(void);
 static void GpParallelRetrieveCursorCheckTimeoutHandler(void);
 static void LockTimeoutHandler(void);
 static void ClientCheckTimeoutHandler(void);
+static void IdleInTransactionSessionTimeoutHandler(void);
+static void IdleSessionTimeoutHandler(void);
 static bool ThereIsAtLeastOneRole(void);
 static void process_startup_options(Port *port, bool am_superuser);
 static void process_settings(Oid databaseid, Oid roleid);
@@ -617,6 +619,9 @@ static void check_superuser_connection_limit()
  * name can be returned to the caller in out_dbname.  If out_dbname isn't
  * NULL, it must point to a buffer of size NAMEDATALEN.
  *
+ * Similarly, the username can be passed by name, using the username parameter,
+ * or by OID using the useroid parameter.
+ *
  * In bootstrap mode no parameters are used.  The autovacuum launcher process
  * doesn't use any parameters either, because it only goes far enough to be
  * able to read pg_database; it doesn't connect to any particular database.
@@ -631,10 +636,11 @@ static void check_superuser_connection_limit()
  */
 void
 InitPostgres(const char *in_dbname, Oid dboid, const char *username,
-			 char *out_dbname)
+			 Oid useroid, char *out_dbname, bool skip_cdb_init)
 {
 	bool		bootstrap = IsBootstrapProcessingMode();
 	bool		am_superuser;
+	bool		am_mdb_admin = false;
 	char	   *fullpath;
 	char		dbname[NAMEDATALEN];
 
@@ -691,6 +697,9 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		RegisterTimeout(LOCK_TIMEOUT, LockTimeoutHandler);
 		RegisterTimeout(GANG_TIMEOUT, IdleGangTimeoutHandler);
 		RegisterTimeout(CLIENT_CONNECTION_CHECK_TIMEOUT, ClientCheckTimeoutHandler);
+		RegisterTimeout(IDLE_IN_TRANSACTION_SESSION_TIMEOUT,
+						IdleInTransactionSessionTimeoutHandler);
+		RegisterTimeout(IDLE_SESSION_TIMEOUT, IdleSessionTimeoutHandler);
 	}
 
 	/*
@@ -810,19 +819,24 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("no roles are defined in this database system"),
 					 errhint("You should immediately run CREATE USER \"%s\" SUPERUSER;.",
-							 username)));
+							 username != NULL ? username : "postgres")));
 	}
 	else if (IsBackgroundWorker)
 	{
-		if (username == NULL)
+		if (username == NULL && !OidIsValid(useroid))
 		{
 			InitializeSessionUserIdStandalone();
 			am_superuser = true;
 		}
 		else
 		{
-			InitializeSessionUserId(username);
+			InitializeSessionUserId(username, useroid);
 			am_superuser = superuser();
+			if (!am_superuser)
+			{
+				Oid	mdb_admin = get_role_oid("mdb_admin", true);
+				am_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+			}
 		}
 	}
 	else if (am_mirror)
@@ -842,8 +856,13 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		/* normal multiuser case */
 		Assert(MyProcPort != NULL);
 		PerformAuthentication(MyProcPort);
-		InitializeSessionUserId(username);
+		InitializeSessionUserId(username, useroid);
 		am_superuser = superuser();
+		if (!am_superuser)
+		{
+			Oid	mdb_admin = get_role_oid("mdb_admin", true);
+			am_mdb_admin = is_member_of_role(GetUserId(), mdb_admin);
+		}
 		BackendCancelInit(MyBackendId);
 	}
 
@@ -888,6 +907,18 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * walsender anyways so we should allow the connection to happen. This may
 	 * need to be reviewed later when we start supporting multiple mirrors.
 	 */
+
+	/*
+	 * mdb_admin reserved extra ReservedBackends above already reserved ReservedBackends for superuser.
+	 */
+
+	if ((!am_superuser && !am_mdb_admin) &&
+		ReservedBackends > 0 &&
+		!HaveNFreeProcs(ReservedBackends * 2))
+		ereport(FATAL,
+				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
+				 errmsg("remaining connection slots are reserved for non-replication superuser connections or mdb_admin")));
+
 	if ((!am_superuser /* || am_walsender */) &&
 		ReservedBackends > 0 &&
 		!HaveNFreeProcs(ReservedBackends))
@@ -1218,7 +1249,7 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
      * This is SKIPPED when the database is in bootstrap mode or 
      * Is not UnderPostmaster.
      */
-    if (!bootstrap && IsUnderPostmaster)
+    if (!skip_cdb_init && !bootstrap && IsUnderPostmaster)
     {
 		cdb_setup();
 		on_proc_exit( cdb_cleanup, 0 );
@@ -1492,6 +1523,22 @@ static void
 ClientCheckTimeoutHandler(void)
 {
 	CheckClientConnectionPending = true;
+	InterruptPending = true;
+	SetLatch(&MyProc->procLatch);
+}
+
+static void
+IdleInTransactionSessionTimeoutHandler(void)
+{
+	IdleInTransactionSessionTimeoutPending = true;
+	InterruptPending = true;
+	SetLatch(&MyProc->procLatch);
+}
+
+static void
+IdleSessionTimeoutHandler(void)
+{
+	IdleSessionTimeoutPending = true;
 	InterruptPending = true;
 	SetLatch(&MyProc->procLatch);
 }

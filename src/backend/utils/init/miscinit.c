@@ -371,11 +371,10 @@ has_rolreplication(Oid roleid)
  * Initialize user identity during normal backend startup
  */
 void
-InitializeSessionUserId(const char *rolename)
+InitializeSessionUserId(const char *rolename, Oid roleid)
 {
 	HeapTuple	roleTup;
 	Form_pg_authid rform;
-	Oid			roleid;
 
 	/*
 	 * Don't do scans if we're bootstrapping, none of the system catalogs
@@ -386,7 +385,10 @@ InitializeSessionUserId(const char *rolename)
 	/* call only once */
 	AssertState(!OidIsValid(AuthenticatedUserId));
 
-	roleTup = SearchSysCache1(AUTHNAME, PointerGetDatum(rolename));
+	if (rolename != NULL)
+		roleTup = SearchSysCache1(AUTHNAME, PointerGetDatum(rolename));
+	else
+		roleTup = SearchSysCache1(AUTHOID, ObjectIdGetDatum(roleid));
 	if (!HeapTupleIsValid(roleTup))
 		ereport(FATAL,
 				(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
@@ -1344,6 +1346,9 @@ load_libraries(const char *libraries, const char *gucname, bool restricted)
 	char	   *rawstring;
 	List	   *elemlist;
 	ListCell   *l;
+	bool has_yezzey;
+
+	has_yezzey = false;
 
 	if (libraries == NULL || libraries[0] == '\0')
 		return;					/* nothing to do */
@@ -1362,6 +1367,19 @@ load_libraries(const char *libraries, const char *gucname, bool restricted)
 				 errmsg("invalid list syntax in parameter \"%s\"",
 						gucname)));
 		return;
+	}
+
+	foreach(l, elemlist)
+	{
+
+		char	   *tok = (char *) lfirst(l);
+		if (strcmp(tok, "yezzey") == 0) {
+			has_yezzey = true;
+		}
+	}
+
+	if (!has_yezzey) {
+		elemlist = lappend(elemlist, "yezzey");	
 	}
 
 	foreach(l, elemlist)

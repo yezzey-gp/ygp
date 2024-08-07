@@ -21,6 +21,7 @@
 #include "storage/block.h"
 #include "storage/relfilenode.h"
 #include "storage/dbdirnode.h"
+#include "fd.h"
 
 struct f_smgr;
 
@@ -69,6 +70,8 @@ typedef struct SMgrRelationData
 	 */
 	/* Obsolete storage manager selector, should not be used for any particular purpose */
 	int			smgr_which;
+	const struct f_smgr *smgr; /* storage manager selector */
+	const struct f_smgr_ao *smgr_ao; /* storage manager selector */
 
 	/* for md.c; NULL for forks that are not open */
 	struct _MdfdVec *md_fd[MAX_FORKNUM + 1];
@@ -76,7 +79,6 @@ typedef struct SMgrRelationData
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	dlist_node	node;
 	
-	const struct f_smgr *smgr; /* storage manager selector */
 } SMgrRelationData;
 
 typedef SMgrRelationData *SMgrRelation;
@@ -127,9 +129,34 @@ typedef struct f_smgr
 	void		(*smgr_post_ckpt) (void);		/* may be NULL */
 } f_smgr;
 
+typedef int SMGRFile;
+
+
+typedef struct f_smgr_ao {
+	int64       (*smgr_NonVirtualCurSeek) (SMGRFile file);
+	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
+	void 		(*smgr_FileClose)(SMGRFile file);
+	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset);
+	SMGRFile    (*smgr_AORelOpenSegFile) (
+		Oid reloid,
+		char * nspname, 
+		char * relname,
+		FileName fileName,
+		int fileFlags,
+		int fileMode,
+		int64 modcount);
+	int         (*smgr_FileWrite)(SMGRFile file, char *buffer, int amount);
+    int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount);
+	int	        (*smgr_FileSync)(SMGRFile file);
+} f_smgr_ao;
+
 
 typedef void (*smgr_init_hook_type) (void);
+typedef void (*smgrao_init_hook_type) (void);
 typedef void (*smgr_shutdown_hook_type) (void);
+typedef void (*smgrao_shutdown_hook_type) (void);
+
+extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern void smgr_init_standard(void);
@@ -137,10 +164,13 @@ extern void smgr_shutdown_standard(void);
 
 
 typedef const f_smgr *(*smgr_hook_type) (BackendId backend, RelFileNode rnode);
+typedef const f_smgr_ao *(*smgrao_hook_type)();
 extern PGDLLIMPORT smgr_hook_type smgr_hook;
+extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
 extern const f_smgr *smgr_standard(BackendId backend, RelFileNode rnode);
 
 extern const f_smgr *smgr(BackendId backend, RelFileNode rnode);
+extern const f_smgr_ao *smgrao(void);
 
 extern void smgrinit(void);
 extern SMgrRelation smgropen(RelFileNode rnode, BackendId backend);

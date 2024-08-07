@@ -66,6 +66,7 @@
 #include "getaddrinfo.h"
 #include "getopt_long.h"
 #include "miscadmin.h"
+#include "common/mdb_locale.h"
 
 
 /* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
@@ -2442,6 +2443,9 @@ make_template0(void)
 		 */
 		"REVOKE CREATE,TEMPORARY ON DATABASE template1 FROM public;\n",
 		"REVOKE CREATE,TEMPORARY ON DATABASE template0 FROM public;\n",
+		"REVOKE ALL ON pg_exttable FROM public;\n",
+		"CREATE ROLE mdb_admin;\n",
+		"GRANT ALL ON pg_exttable TO mdb_admin WITH GRANT OPTION;\n",
 
 		"COMMENT ON DATABASE template0 IS 'unmodifiable empty database';\n",
 
@@ -2666,12 +2670,12 @@ locale_date_order(const char *locale)
 
 	result = DATEORDER_MDY;		/* default */
 
-	save = setlocale(LC_TIME, NULL);
+	save = SETLOCALE(LC_TIME, NULL);
 	if (!save)
 		return result;
 	save = pg_strdup(save);
 
-	setlocale(LC_TIME, locale);
+    SETLOCALE(LC_TIME, locale);
 
 	memset(&testtime, 0, sizeof(testtime));
 	testtime.tm_mday = 22;
@@ -2680,7 +2684,7 @@ locale_date_order(const char *locale)
 
 	res = my_strftime(buf, sizeof(buf), "%x", &testtime);
 
-	setlocale(LC_TIME, save);
+    SETLOCALE(LC_TIME, save);
 	free(save);
 
 	if (res == 0)
@@ -2724,7 +2728,7 @@ check_locale_name(int category, const char *locale, char **canonname)
 	if (canonname)
 		*canonname = NULL;		/* in case of failure */
 
-	save = setlocale(category, NULL);
+	save = SETLOCALE(category, NULL);
 	if (!save)
 	{
 		fprintf(stderr, _("%s: setlocale() failed\n"),
@@ -2736,14 +2740,14 @@ check_locale_name(int category, const char *locale, char **canonname)
 	save = pg_strdup(save);
 
 	/* set the locale with setlocale, to see if it accepts it. */
-	res = setlocale(category, locale);
+	res = SETLOCALE(category, locale);
 
 	/* save canonical name if requested. */
 	if (res && canonname)
 		*canonname = pg_strdup(res);
 
 	/* restore old value. */
-	if (!setlocale(category, save))
+	if (!SETLOCALE(category, save))
 	{
 		fprintf(stderr, _("%s: failed to restore old locale \"%s\"\n"),
 				progname, save);
@@ -3495,7 +3499,7 @@ create_data_directory(void)
 				   pg_data);
 			fflush(stdout);
 
-			if (pg_mkdir_p(pg_data, S_IRWXU) != 0)
+			if (pg_mkdir_p(pg_data, S_IRWXU | S_IRGRP | S_IXGRP) != 0)
 			{
 				fprintf(stderr, _("%s: could not create directory \"%s\": %s\n"),
 						progname, pg_data, strerror(errno));
@@ -3513,7 +3517,7 @@ create_data_directory(void)
 				   pg_data);
 			fflush(stdout);
 
-			if (chmod(pg_data, S_IRWXU) != 0)
+			if (chmod(pg_data, S_IRWXU | S_IRGRP | S_IXGRP) != 0)
 			{
 				fprintf(stderr, _("%s: could not change permissions of directory \"%s\": %s\n"),
 						progname, pg_data, strerror(errno));
@@ -3685,7 +3689,7 @@ initialize_data_directory(void)
 
 	setup_signals();
 
-	umask(S_IRWXG | S_IRWXO);
+	umask(S_IWGRP | S_IRWXO);
 
 	create_data_directory();
 
@@ -3695,11 +3699,33 @@ initialize_data_directory(void)
 	printf(_("creating subdirectories ... "));
 	fflush(stdout);
 
+	/*
+	 * MDB-15383: expand permitions for pg_log directory to g+rx
+	 */
+	char			*pg_log;
+
+	pg_log = psprintf("%s/%s", pg_data, "pg_log");
+	if (mkdir(pg_log, S_IRWXU | S_IRGRP | S_IXGRP) < 0)
+	{
+		fprintf(stderr, _("%s: could not create directory \"%s\": %s\n"),
+				progname, pg_log, strerror(errno));
+		exit_nicely();
+	}
+
 	for (i = 0; i < lengthof(subdirs); i++)
 	{
 		char	   *path;
 
 		path = psprintf("%s/%s", pg_data, subdirs[i]);
+
+		if (strcmp(path, pg_log) == 0)
+		{
+			fprintf(stderr, _("%s: directory \"%s\": %s, skipping directory creation\n"),
+					progname, path, strerror(errno));
+			free(path);
+			free(pg_log);
+			continue;
+		}
 
 		/*
 		 * The parent directory already exists, so we only need mkdir() not

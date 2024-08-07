@@ -58,7 +58,9 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 #include "cdb/memquota.h"
+#include "commands/queue.h"
 #include "utils/metrics_utils.h"
+#include "utils/resscheduler.h"
 
 typedef struct
 {
@@ -418,6 +420,17 @@ ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
 								GetActiveSnapshot(), InvalidSnapshot,
 								dest, params, 0);
 
+	if (gp_enable_gpperfmon && Gp_role == GP_ROLE_DISPATCH)
+	{
+		Assert(queryString);
+		gpmon_qlog_query_submit(queryDesc->gpmon_pkt);
+		gpmon_qlog_query_text(queryDesc->gpmon_pkt,
+				queryString,
+				application_name,
+				GetResqueueName(GetResQueueId()),
+				GetResqueuePriority(GetResQueueId()));
+	}
+
 	/* GPDB hook for collecting query info */
 	if (query_info_collect_hook)
 		(*query_info_collect_hook)(METRICS_QUERY_SUBMIT, queryDesc);
@@ -721,7 +734,7 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 		tuple = ExecCopySlotMemTuple(slot);
 		if (myState->ao_insertDesc == NULL)
-			myState->ao_insertDesc = appendonly_insert_init(into_rel, RESERVED_SEGNO, false);
+			myState->ao_insertDesc = appendonly_insert_init(NULL, into_rel, RESERVED_SEGNO, false);
 
 		appendonly_insert(myState->ao_insertDesc, tuple, InvalidOid, &aoTupleId);
 		pfree(tuple);

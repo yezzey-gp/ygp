@@ -107,7 +107,8 @@ markDirty(Buffer buffer, Relation relation, HeapTupleHeader tuple, bool isXmin)
 	 */
 	if (relation == NULL ||
 		RelationGetRelid(relation) < FirstNormalObjectId ||
-		RelationGetNamespace(relation) == PG_AOSEGMENT_NAMESPACE)
+		RelationGetNamespace(relation) == PG_AOSEGMENT_NAMESPACE ||
+		RelationGetNamespace(relation) == YEZZEY_AUX_NAMESPACE)
 	{
 		MarkBufferDirtyHint(buffer, true);
 		return;

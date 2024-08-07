@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
 		char		addrbuf[INET6_ADDRSTRLEN];
 		const char *addrstr;
 
-		struct sockaddr_in	   *addr4;
-		struct sockaddr_in6	   *addr6;
+		struct sockaddr_in	   *addr4 = NULL;
+		struct sockaddr_in6	   *addr6 = NULL;
 		struct sockaddr		   *addr = list->ifa_addr;
 
 		if (addr == NULL)

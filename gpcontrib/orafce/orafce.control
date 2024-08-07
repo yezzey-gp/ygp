@@ -3,3 +3,4 @@ comment = 'Functions and operators that emulate a subset of functions and packag
 default_version = '3.7'
 module_pathname = '$libdir/orafce'
 relocatable = false
+trusted = true

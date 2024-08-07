@@ -1,0 +1,4 @@
+comment = 'Greenplum parser funcs'
+default_version = '1.0'
+relocatable = false
+trusted = true

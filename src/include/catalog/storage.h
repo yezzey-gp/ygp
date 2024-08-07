@@ -21,6 +21,7 @@
 
 extern void RelationCreateStorage(RelFileNode rnode, char relpersistence, char relstorage);
 extern void RelationDropStorage(Relation rel);
+extern void RelationDropStoragePure(Relation rel);
 extern void RelationPreserveStorage(RelFileNode rnode, bool atCommit);
 extern void RelationTruncate(Relation rel, BlockNumber nblocks);
 /*
@@ -32,5 +33,12 @@ extern int	smgrGetPendingDeletes(bool forCommit, RelFileNodePendingDelete **ptr)
 extern void AtSubCommit_smgr(void);
 extern void AtSubAbort_smgr(void);
 extern void PostPrepare_smgr(void);
+
+
+/* Hook for yezzey meta-related logic */
+typedef void (*TrackDropObject_hook_type) (Relation);
+
+extern PGDLLIMPORT TrackDropObject_hook_type TrackDropObject_hook;
+
 
 #endif   /* STORAGE_H */

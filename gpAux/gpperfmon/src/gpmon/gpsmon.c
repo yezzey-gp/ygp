@@ -40,14 +40,12 @@ static struct
 	int D;
 	const char* arg_port;
 	const char* log_dir;
-	apr_uint64_t max_log_size;
 	// The timeout in seconds for smon to restart if no requests
 	// come during that period.
 	apr_uint64_t terminate_timeout;
 } opt = { 0 };
 
 int verbose = 0; /* == opt.v */
-int very_verbose = 0; /* == opt.V */
 int number_cpu_cores = 1;
 float cpu_cores_utilization_multiplier = 1.0; /* multipy CPU % from libsigar by this factor to get the CPU % per machine */
 
@@ -100,6 +98,8 @@ struct gx_t
 	apr_hash_t* segmenttab; /* stores segment packets */
 	apr_hash_t* pidtab; /* key=pid, value=pidrec_t */
 	apr_hash_t* querysegtab; /* stores gpmon_query_seginfo_t */
+
+	int rotate;
 };
 
 typedef struct qexec_agg_hash_key_t {
@@ -149,13 +149,16 @@ void update_log_filename()
 {
 	time_t stamp = time(NULL);
 	struct tm* tm = gmtime(&stamp);
-	snprintf(log_filename, LOG_FILENAME_SIZE, "gpsmon.%d.%02d.%02d_%02d%02d%02d.log",
-		tm->tm_year + 1900,
-		tm->tm_mon + 1,
-		tm->tm_mday,
-		tm->tm_hour,
-		tm->tm_min,
-		tm->tm_sec);
+	snprintf(log_filename, LOG_FILENAME_SIZE, "gpsmon.log");
+}
+
+/**
+ * Signal handlers
+ */
+static void SIGUSR1_handler(int sig)
+{
+    /* Flag to reload configuration values from conf file */
+    gx.rotate = 1;
 }
 
 static void gx_accept(SOCKET sock, short event, void* arg);
@@ -1555,7 +1558,7 @@ void gx_main(int port, apr_int64_t signature)
 	}
 
 	update_log_filename();
-	freopen(log_filename, "w", stdout);
+	FILE* f = freopen(log_filename, "a", stdout);
 	setlinebuf(stdout);
 
 	if (!get_and_allocate_hostname())
@@ -1611,19 +1614,13 @@ void gx_main(int port, apr_int64_t signature)
                     rec->key.ccnt);
 		}
 
-		/* check log size */
-		if (gx.tick % 60 == 0)
+		if (gx.rotate)
 		{
-			apr_finfo_t finfo;
-			if (0 == apr_stat(&finfo, log_filename, APR_FINFO_SIZE, gx.pool))
-			{
-				if (opt.max_log_size != 0 && finfo.size > opt.max_log_size)
-				{
-					update_log_filename();
-					freopen(log_filename, "w", stdout);
-					setlinebuf(stdout);
-				}
-			}
+		    gx.rotate = 0;
+		    TR0(("sigusr1 received, reopening log file\n"));
+		    f = freopen(log_filename, "w", stdout);
+		    setlinebuf(stdout);
+		    TR0(("finished reopening log file\n"));
 		}
 	}
 }
@@ -1679,7 +1676,6 @@ static void parse_command_line(int argc, const char* const argv[])
 
 	opt.pname = bin_start;
 	opt.v = opt.D = 0;
-	opt.max_log_size = 0;
 	opt.terminate_timeout = 0;
 
 	if (0 != (e = apr_getopt_init(&os, pool, argc, argv)))
@@ -1703,9 +1699,6 @@ static void parse_command_line(int argc, const char* const argv[])
 		case 'l':
 			opt.log_dir = strdup(arg);
 			break;
-		case 'm':
-			opt.max_log_size = apr_atoi64(arg);
-			break;
 		case 't':
 			opt.terminate_timeout = apr_atoi64(arg);
 			break;
@@ -1722,7 +1715,6 @@ static void parse_command_line(int argc, const char* const argv[])
 	apr_pool_destroy(pool);
 
 	verbose = opt.v;
-	very_verbose = opt.V;
 }
 
 int main(int argc, const char* const argv[])
@@ -1762,6 +1754,12 @@ int main(int argc, const char* const argv[])
 	}
 
 	cpu_cores_utilization_multiplier = 100.0 / (float)number_cpu_cores;
+
+	/* Set up signal handlers */
+	if (signal(SIGUSR1, SIGUSR1_handler) == SIG_ERR)
+	{
+	    gpmon_warning(FLINE, "Failed to set signal handlers\n");
+	}
 
 	gx_main(port, signature);
 	return 0;

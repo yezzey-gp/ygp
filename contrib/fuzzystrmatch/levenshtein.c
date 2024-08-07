@@ -29,7 +29,7 @@ static int levenshtein_internal(text *s, text *t,
 					 int ins_c, int del_c, int sub_c);
 #endif
 
-#define MAX_LEVENSHTEIN_STRLEN		255
+#define MAX_LEVENSHTEIN_STRLEN		65535
 
 
 /*

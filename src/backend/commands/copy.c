@@ -395,6 +395,9 @@ typedef struct
 /* Size of the struct, without padding at the end. */
 #define SizeOfCopyFromDispatchError (offsetof(copy_from_dispatch_error, line_buf_converted) + sizeof(bool))
 
+bool yc_allow_copy_to_program;
+bool yc_allow_copy_to_file;
+bool yc_allow_copy_from_file;
 
 /*
  * Send copy start/stop messages for frontend copies.  These have changed
@@ -979,31 +982,41 @@ DoCopy(const CopyStmt *stmt, const char *queryString, uint64 *processed)
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("COPY single row error handling only available using COPY FROM")));
 
-/* GPDB_91_MERGE_FIXME: this should probably be done earlier, e.g. in parser */
-	/* Transfer any SREH options to the options list, so that BeginCopy can see them. */
-	if (stmt->sreh)
-	{
-		SingleRowErrorDesc *sreh = (SingleRowErrorDesc *) stmt->sreh;
-
-		options = list_copy(options);
-		options = lappend(options, makeDefElem("sreh", (Node *) sreh));
-	}
-
 	/* Disallow COPY to/from file or program except to superusers. */
-	if (!pipe && !superuser())
+	if (!pipe)
 	{
-		if (stmt->is_program)
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to COPY to or from an external program"),
-					 errhint("Anyone can COPY to stdout or from stdin. "
-						   "psql's \\copy command also works for anyone.")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to COPY to or from a file"),
-					 errhint("Anyone can COPY to stdout or from stdin. "
-						   "psql's \\copy command also works for anyone.")));
+		/* not pipe (stdin/stdout) means program or some file */
+		/* we allow this only for superuser with `yc_allow_copy_to_program` specified */
+		if (stmt->is_program) {
+			if (!(superuser() && yc_allow_copy_to_program)) {
+				ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								errmsg("forbidden to COPY to or from an external program in Yandex Cloud"),
+								errhint("Anyone can COPY to stdout or from stdin. "
+										"psql's \\copy command also works for anyone.")));
+			}
+		} else {
+			if (is_from) {
+				// this is copy from file. This only could legitimately happen in initdb
+				if (!(superuser() && yc_allow_copy_from_file)) {
+					ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									errmsg("forbidden to COPY from file in Yandex Cloud"),
+									errhint("Anyone can COPY to stdout or from stdin. "
+											"psql's \\copy command also works for anyone.")));
+				}
+			
+			} else {
+				// this is copy to file.
+				if (!(superuser() && yc_allow_copy_to_file)) {
+					ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									errmsg("forbidden to COPY to file in Yandex Cloud"),
+									errhint("Anyone can COPY to stdout or from stdin. "
+											"psql's \\copy command also works for anyone.")));
+				}
+			}
+		}
 	}
 
 	if (stmt->relation)
@@ -4081,7 +4094,7 @@ CopyFrom(CopyState cstate)
 			{
 				ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
 				resultRelInfo->ri_aoInsertDesc =
-					appendonly_insert_init(resultRelInfo->ri_RelationDesc,
+					appendonly_insert_init(NULL, resultRelInfo->ri_RelationDesc,
 										   resultRelInfo->ri_aosegno, false);
 			}
 			else if (relstorage == RELSTORAGE_AOCOLS &&

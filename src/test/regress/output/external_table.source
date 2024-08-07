@@ -4789,6 +4789,7 @@ line_delim=E'\n'
 ;
 drop external table large_custom_format_definitions;
 -- Incomplete external data file
+-- WARNING on EOF
 CREATE OR REPLACE FUNCTION gpformatter() RETURNS record
 AS '$libdir/gpformatter.so', 'formatter_import'
 LANGUAGE C STABLE;
@@ -4810,6 +4811,24 @@ CONTEXT:  External table tbl_ext_gpformatter
  1
 (2 rows)
 
+-- ERROR on EOF
+BEGIN;
+SET LOCAL gp_external_fail_on_eof TO true;
+CREATE OR REPLACE FUNCTION gpformatter() RETURNS record
+AS '$libdir/gpformatter.so', 'formatter_import'
+LANGUAGE C STABLE;
+DROP EXTERNAL TABLE IF EXISTS tbl_ext_gpformatter;
+CREATE READABLE EXTERNAL TABLE tbl_ext_gpformatter (
+d1 text
+)
+LOCATION (
+  'file://smiatkin-nux/home/smiatkin/projects/6.19.3/gpdb_src/src/test/regress/data/incomplete_formatter_data.tbl'
+)
+FORMAT 'CUSTOM' (formatter='gpformatter');
+SELECT * FROM tbl_ext_gpformatter;
+ERROR:  unexpected end of file (fileam.c:1086)  (seg0 slice1 127.0.1.1:6002 pid=155340) (fileam.c:1086)
+CONTEXT:  External table tbl_ext_gpformatter
+COMMIT;
 --
 -- Test information_schema views for external tables
 --

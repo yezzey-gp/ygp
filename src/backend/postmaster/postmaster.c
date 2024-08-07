@@ -375,6 +375,12 @@ static time_t AbortStartTime = 0;
 /* Set at database system is ready to accept connections */
 pg_time_t PMAcceptingConnectionsStartTime = 0;
 
+#ifdef USE_SSL
+/* Set when and if SSL has been initialized properly */
+    static bool LoadedSSL = false;
+#endif
+
+
 static BackgroundWorker PMAuxProcList[MaxPMAuxProc] =
 {
 	{"ftsprobe process",
@@ -413,7 +419,7 @@ static BackgroundWorker PMAuxProcList[MaxPMAuxProc] =
 	 BackoffSweeperStartRule},
 
 	{"perfmon process",
-	 BGWORKER_SHMEM_ACCESS,
+	 0,
 	 BgWorkerStart_RecoveryFinished,
 	 0, /* restart immediately if perfmon process exits with non-zero code */
 	 PerfmonMain, {0}, {0}, 0, 0,
@@ -1123,9 +1129,14 @@ PostmasterMain(int argc, char *argv[])
 	/*
 	 * Initialize SSL library, if specified.
 	 */
+
+
 #ifdef USE_SSL
 	if (EnableSSL)
-		secure_initialize();
+    {
+        int tmp =  secure_initialize(true);
+		LoadedSSL = true;
+    }
 #endif
 
 	/*
@@ -1682,12 +1693,12 @@ checkDataDir(void)
 	 * reasonable check to apply on Windows.
 	 */
 #if !defined(WIN32) && !defined(__CYGWIN__)
-	if (stat_buf.st_mode & (S_IRWXG | S_IRWXO))
+	if (stat_buf.st_mode & (S_IWGRP | S_IRWXO))
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("data directory \"%s\" has group or world access",
+				 errmsg("data directory \"%s\" has group write or world access",
 						DataDir),
-				 errdetail("Permissions should be u=rwx (0700).")));
+				 errdetail("Permissions should be u=rwx, g=rx (0750).")));
 #endif
 
 	/* Look for PG_VERSION before looking for pg_control */
@@ -2244,7 +2255,7 @@ ProcessStartupPacket(Port *port, bool SSLdone)
 
 #ifdef USE_SSL
 		/* No SSL when disabled or on Unix sockets */
-		if (!EnableSSL || IS_AF_UNIX(port->laddr.addr.ss_family))
+		if (!LoadedSSL || IS_AF_UNIX(port->laddr.addr.ss_family))
 			SSLok = 'N';
 		else
 			SSLok = 'S';		/* Support for SSL */
@@ -2339,6 +2350,8 @@ retry1:
 				break;			/* missing value, will complain below */
 			valptr = ((char *) buf) + valoffset;
 
+			elog(DEBUG5, "startup got %s %s", nameptr, valptr);
+
 			if (strcmp(nameptr, "database") == 0)
 				port->database_name = pstrdup(valptr);
 			else if (strcmp(nameptr, "user") == 0)
@@ -2369,13 +2382,18 @@ retry1:
 			}
 			else if (strncmp(nameptr, "_pq_.", 5) == 0)
 			{
-				/*
-				 * Any option beginning with _pq_. is reserved for use as a
-				 * protocol-level option, but at present no such options are
-				 * defined.
-				 */
-				unrecognized_protocol_options =
-					lappend(unrecognized_protocol_options, pstrdup(nameptr));
+				/* MDB-23247: parse service auth role from  startup options */
+				if (strcmp(nameptr, "_pq_.service_auth_role") == 0) {
+					port->service_auth_role = pstrdup(valptr);
+				} else {
+					/*
+					* Any option beginning with _pq_. is reserved for use as a
+					* protocol-level option, but at present no such options are
+					* defined.
+					*/
+					unrecognized_protocol_options =
+						lappend(unrecognized_protocol_options, pstrdup(nameptr));
+				}
 			}
 			else if (strcmp(nameptr, GPCONN_TYPE) == 0)
 			{
@@ -2997,12 +3015,29 @@ SIGHUP_handler(SIGNAL_ARGS)
 
 		/* Reload authentication config files too */
 		if (!load_hba())
-			ereport(WARNING,
+			ereport(LOG,
 					(errmsg("pg_hba.conf not reloaded")));
 
 		if (!load_ident())
-			ereport(WARNING,
+			ereport(LOG,
 					(errmsg("pg_ident.conf not reloaded")));
+
+#ifdef USE_SSL
+        /* Reload SSL configuration as well */
+		if (EnableSSL)
+		{
+			if (secure_initialize(false) == 0)
+				LoadedSSL = true;
+			else
+				ereport(LOG,
+						(errmsg("SSL context not reloaded")));
+		}
+		else
+		{
+			secure_destroy();
+			LoadedSSL = false;
+		}
+#endif
 
 #ifdef EXEC_BACKEND
 		/* Update the starting-point file for future children */
@@ -5326,7 +5361,13 @@ SubPostmasterMain(int argc, char *argv[])
 		 */
 #ifdef USE_SSL
 		if (EnableSSL)
-			secure_initialize();
+		{
+			if (secure_initialize(false) == 0)
+				LoadedSSL = true;
+			else
+				ereport(LOG,
+						(errmsg("SSL context could not be reloaded in child process")));
+		}
 #endif
 
 		/*
@@ -6003,7 +6044,30 @@ BackgroundWorkerInitializeConnection(char *dbname, char *username)
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("database connection requirement not indicated during registration")));
 
-	InitPostgres(dbname, InvalidOid, username, NULL);
+	InitPostgres(dbname, InvalidOid, username, InvalidOid, NULL, false);
+
+	/* it had better not gotten out of "init" mode yet */
+	if (!IsInitProcessingMode())
+		ereport(ERROR,
+				(errmsg("invalid processing mode in background worker")));
+	SetProcessingMode(NormalProcessing);
+}
+
+/*
+ * Connect background worker to a database using OIDs.
+ */
+void
+BackgroundWorkerInitializeConnectionByOid(Oid dboid, Oid useroid)
+{
+	BackgroundWorker *worker = MyBgworkerEntry;
+
+	/* XXX is this the right errcode? */
+	if (!(worker->bgw_flags & BGWORKER_BACKEND_DATABASE_CONNECTION))
+		ereport(FATAL,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("database connection requirement not indicated during registration")));
+
+	InitPostgres(NULL, dboid, NULL, useroid, NULL, false);
 
 	/* it had better not gotten out of "init" mode yet */
 	if (!IsInitProcessingMode())

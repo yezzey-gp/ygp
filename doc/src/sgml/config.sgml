@@ -1003,10 +1003,10 @@ include_dir 'conf.d'
       <listitem>
        <para>
         Enables <acronym>SSL</> connections. Please read
-        <xref linkend="ssl-tcp"> before using this. The default
-        is <literal>off</>. This parameter can only be set at server
-        start.  <acronym>SSL</> communication is only possible with
-        TCP/IP connections.
+        <xref linkend="ssl-tcp"> before using this.
+        This parameter can only be set in the <filename>postgresql.conf</>
+        file or on the server command line.
+        The default is <literal>off</>.
        </para>
       </listitem>
      </varlistentry>
@@ -1020,11 +1020,16 @@ include_dir 'conf.d'
       <listitem>
        <para>
         Specifies the name of the file containing the SSL server certificate
-        authority (CA).  The default is empty, meaning no CA file is loaded,
-        and client certificate verification is not performed.  (In previous
-        releases of PostgreSQL, the name of this file was hard-coded
-        as <filename>root.crt</filename>.)  Relative paths are relative to the
-        data directory.  This parameter can only be set at server start.
+        authority (CA).
+        Relative paths are relative to the data directory.
+        This parameter can only be set in the <filename>postgresql.conf</>
+        file or on the server command line.
+        The default is empty, meaning no CA file is loaded,
+        and client certificate verification is not performed.
+       </para>
+       <para>
+         In previous releases of PostgreSQL, the name of this file was
+         hard-coded as <filename>root.crt</filename>.
        </para>
       </listitem>
      </varlistentry>
@@ -1038,9 +1043,10 @@ include_dir 'conf.d'
       <listitem>
        <para>
         Specifies the name of the file containing the SSL server certificate.
-        The default is <filename>server.crt</filename>.  Relative paths are
-        relative to the data directory.  This parameter can only be set at
-        server start.
+        Relative paths are relative to the data directory.
+        This parameter can only be set in the <filename>postgresql.conf</>
+        file or on the server command line.
+        The default is <filename>server.crt</filename>.
        </para>
       </listitem>
      </varlistentry>
@@ -5816,6 +5822,65 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
         Setting <varname>lock_timeout</> in
         <filename>postgresql.conf</> is not recommended because it would
         affect all sessions.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry id="guc-idle-in-transaction-session-timeout" xreflabel="idle_in_transaction_session_timeout">
+      <term><varname>idle_in_transaction_session_timeout</varname> (<type>integer</type>)
+      <indexterm>
+       <primary><varname>idle_in_transaction_session_timeout</> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        Terminate any session that has been idle (that is, waiting for a
+        client query) within an open transaction for longer than the
+        specified amount of time.
+        If this value is specified without units, it is taken as milliseconds.
+        A value of zero (the default) disables the timeout.
+       </para>
+
+       <para>
+        This option can be used to ensure that idle sessions do not hold
+        locks for an unreasonable amount of time.  Even when no significant
+        locks are held, an open transaction prevents vacuuming away
+        recently-dead tuples that may be visible only to this transaction;
+        so remaining idle for a long time can contribute to table bloat.
+        See <xref linkend="routine-vacuuming"/> for more details.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry id="guc-idle-session-timeout" xreflabel="idle_session_timeout">
+      <term><varname>idle_session_timeout</varname> (<type>integer</type>)
+      <indexterm>
+       <primary><varname>idle_session_timeout</varname> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        Terminate any session that has been idle (that is, waiting for a
+        client query), but not within an open transaction, for longer than
+        the specified amount of time.
+        If this value is specified without units, it is taken as milliseconds.
+        A value of zero (the default) disables the timeout.
+       </para>
+
+       <para>
+        Unlike the case with an open transaction, an idle session without a
+        transaction imposes no large costs on the server, so there is less
+        need to enable this timeout
+        than <varname>idle_in_transaction_session_timeout</varname>.
+       </para>
+
+       <para>
+       The default value of 0 disables this feature.
+        Be wary of enforcing this timeout on connections made through
+        connection-pooling software or other middleware, as such a layer
+        may not react well to unexpected connection closure.  It may be
+        helpful to enable this timeout only for interactive sessions,
+        perhaps by applying it only to particular users.
        </para>
       </listitem>
      </varlistentry>

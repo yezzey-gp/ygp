@@ -5053,6 +5053,8 @@ roles_is_member_of(Oid roleid)
 bool
 has_privs_of_role(Oid member, Oid role)
 {
+	Oid mdb_superuser_roleoid;
+
 	/* Fast path for simple case */
 	if (member == role)
 		return true;
@@ -5061,6 +5063,24 @@ has_privs_of_role(Oid member, Oid role)
 	if (superuser_arg(member))
 		return true;
 
+	mdb_superuser_roleoid = get_role_oid("mdb_superuser", true /*if nodoby created mdb_superuser role in this database*/);
+
+	if (is_member_of_role(member, mdb_superuser_roleoid)) {
+		/* if target role is superuser, disallow */
+		if (!superuser_arg(role)) {
+			/* GPDB: Here we keep msg from PG-patch, which checks
+			* for pre-defined roles cases. However, there is no 
+			* such roles (in GP & in out patches)
+			*/
+			/* we want mdb_roles_admin to bypass
+			* has_priv_of_roles test
+			* if target role is neither superuser nor
+			* some dangerous system role
+			*/
+			return true;
+		}
+	}
+	
 	/*
 	 * Find all the roles that member has the privileges of, including
 	 * multi-level recursion, then see if target role is any one of them.
@@ -5279,6 +5299,17 @@ select_best_grantor(Oid roleId, AclMode privileges,
 		*grantorId = ownerId;
 		*grantOptions = needed_goptions;
 		return;
+	}
+
+	if (!superuser_arg(ownerId))
+	{
+		Oid	mdb_admin = get_role_oid("mdb_admin", true);
+		if (is_member_of_role(roleId, mdb_admin))
+		{
+			*grantorId = ownerId;
+			*grantOptions = needed_goptions;
+			return;
+		}
 	}
 
 	/*

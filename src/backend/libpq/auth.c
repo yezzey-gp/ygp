@@ -55,6 +55,7 @@
 #include "replication/walsender.h"
 #include "storage/ipc.h"
 #include "utils/timestamp.h"
+#include "utils/acl.h"
 
 extern bool gp_reject_internal_tcp_conn;
 
@@ -68,7 +69,7 @@ int     getpeereid(int, uid_t *__restrict__, gid_t *__restrict__);
  */
 static void sendAuthRequest(Port *port, AuthRequest areq, char *extradata,
 				int extralen);
-static void auth_failed(Port *port, int status, char *logdetail);
+static void auth_failed(Port *port, UserAuth method, int status, char *logdetail);
 static char *recv_password_packet(Port *port);
 
 
@@ -78,7 +79,7 @@ static char *recv_password_packet(Port *port);
  */
 
 static int	CheckPasswordAuth(Port *port, char **logdetail);
-static int	CheckPWChallengeAuth(Port *port, char **logdetail);
+static int	CheckPWChallengeAuth(Port *port, UserAuth method, char **logdetail);
 static int	CheckMD5Auth(Port *port, char *shadow_pass, char **logdetail);
 static int	CheckSCRAMAuth(Port *port, char *shadow_pass, char **logdetail);
 
@@ -258,7 +259,7 @@ ClientAuthentication_hook_type ClientAuthentication_hook = NULL;
  * particular, if logdetail isn't NULL, we send that string to the log.
  */
 static void
-auth_failed(Port *port, int status, char *logdetail)
+auth_failed(Port *port, UserAuth method, int status, char *logdetail)
 {
 	const char *errstr;
 	char	   *cdetail;
@@ -285,7 +286,7 @@ auth_failed(Port *port, int status, char *logdetail)
 	}
 	else
 	{
-	  switch (port->hba->auth_method)
+	  switch (method)
 	  {
 		case uaReject:
 		case uaImplicitReject:
@@ -338,7 +339,7 @@ auth_failed(Port *port, int status, char *logdetail)
      * Avoid leak user infomations when failed to connect database using LDAP,
      * and we need hide failed details return by LDAP.
      * */
-    if (port->hba->auth_method == uaLDAP)
+    if (method == uaLDAP)
     {
         pfree(cdetail);
         cdetail = NULL;
@@ -609,6 +610,7 @@ ClientAuthentication(Port *port)
 {
 	int			status = STATUS_ERROR;
 	char	   *logdetail = NULL;
+	UserAuth method;
 
 	/*
 	 * For parallel retrieve cursor,
@@ -643,12 +645,8 @@ ClientAuthentication(Port *port)
 	 */
 	hba_getauthmethod(port);
 
-	/*
-	 * Enable immediate response to SIGTERM/SIGINT/timeout interrupts. (We
-	 * don't want this during hba_getauthmethod() because it might have to do
-	 * database access, eg for role membership checks.)
-	 */
-	ImmediateInterruptOK = true;
+
+    ImmediateInterruptOK = true;
 	/* And don't forget to detect one that already arrived */
 	CHECK_FOR_INTERRUPTS();
 
@@ -659,34 +657,36 @@ ClientAuthentication(Port *port)
 	 */
 	if (port->hba->clientcert)
 	{
-		/*
-		 * When we parse pg_hba.conf, we have already made sure that we have
-		 * been able to load a certificate store. Thus, if a certificate is
-		 * present on the client, it has been verified against our root
-		 * certificate store, and the connection would have been aborted
-		 * already if it didn't verify ok.
-		 */
+        if (!secure_loaded_verify_locations())
+            ereport(FATAL,
+                    (errcode(ERRCODE_CONFIG_FILE_ERROR),
+                            errmsg("client certificates can only be checked if a root certificate store is available")));
+        /*
+         * When we parse pg_hba.conf, we have already made sure that we have
+         * been able to load a certificate store. Thus, if a certificate is
+         * present on the client, it has been verified against our root
+         * certificate store, and the connection would have been aborted
+         * already if it didn't verify ok.
+         */
+
 #ifdef USE_SSL
 		if (!port->peer)
-		{
 			ereport(FATAL,
-					(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
-				  errmsg("connection requires a valid client certificate")));
-		}
-#else
-
-		/*
-		 * hba.c makes sure hba->clientcert can't be set unless OpenSSL is
-		 * present.
-		 */
-		Assert(false);
+                    (errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
+                            errmsg("connection requires a valid client certificate")));
 #endif
-	}
 
+	}
+	method = port->hba->auth_method;
+
+	/* MDB-23247 + MDB-27141 */
+	if (port->service_auth_role) {
+		method = uaMD5; /* or scram, does not matter */
+	}			
 	/*
 	 * Now proceed to do the actual authentication check
 	 */
-	switch (port->hba->auth_method)
+	switch (method)
 	{
 		case uaReject:
 
@@ -861,7 +861,7 @@ ClientAuthentication(Port *port)
 
 		case uaMD5:
 		case uaSCRAM:
-			status = CheckPWChallengeAuth(port, &logdetail);
+			status = CheckPWChallengeAuth(port, method, &logdetail);
 			break;
 
 		case uaPassword:
@@ -914,7 +914,7 @@ ClientAuthentication(Port *port)
 	if (status == STATUS_OK)
 		sendAuthRequest(port, AUTH_REQ_OK, NULL, 0);
 	else
-		auth_failed(port, status, logdetail);
+		auth_failed(port, method, status, logdetail);
 
 	/* Done with authentication, so we should turn off immediate interrupts */
 	ImmediateInterruptOK = false;
@@ -1080,17 +1080,35 @@ CheckPasswordAuth(Port *port, char **logdetail)
  * MD5 and SCRAM authentication.
  */
 static int
-CheckPWChallengeAuth(Port *port, char **logdetail)
+CheckPWChallengeAuth(Port *port, UserAuth method, char **logdetail)
 {
 	int			auth_result;
 	char	   *shadow_pass;
 	PasswordType pwtype;
+	Oid mdb_service_authoid;
+	Oid useroid;
+	Oid service_auth_roleoid;
 
-	Assert(port->hba->auth_method == uaSCRAM ||
-		   port->hba->auth_method == uaMD5);
+	Assert(method == uaSCRAM || method == uaMD5);
 
-	/* First look up the user's password. */
-	shadow_pass = get_role_password(port->user_name, logdetail);
+	
+	if (port->service_auth_role) {
+		mdb_service_authoid = get_role_oid("mdb_service_auth", true);
+		service_auth_roleoid = get_role_oid(port->service_auth_role, true);
+		useroid = get_role_oid(port->user_name, true);
+
+		/* MDB-23247: check that given role name has priviledge for auth - passthrough*/
+		if (!is_member_of_role(service_auth_roleoid, mdb_service_authoid))
+			ereport(FATAL,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("invalid auth request for role %s",
+							port->service_auth_role)));
+
+		shadow_pass = get_role_password(port->service_auth_role, logdetail);
+	} else {
+		/* First look up the user's password. */
+		shadow_pass = get_role_password(port->user_name, logdetail);
+	}
 
 	/*
 	 * If the user does not exist, or has no password, we still go through the
@@ -1121,7 +1139,7 @@ CheckPWChallengeAuth(Port *port, char **logdetail)
 	 * If MD5 authentication is not allowed, always use SCRAM.  If the user
 	 * had an MD5 password, CheckSCRAMAuth() will fail.
 	 */
-	if (port->hba->auth_method == uaMD5 && (pwtype == PASSWORD_TYPE_MD5 || pwtype == PASSWORD_TYPE_PLAINTEXT))
+	if (method == uaMD5 && (pwtype == PASSWORD_TYPE_MD5 || pwtype == PASSWORD_TYPE_PLAINTEXT))
 	{
 		auth_result = CheckMD5Auth(port, shadow_pass, logdetail);
 	}
@@ -1171,9 +1189,10 @@ CheckMD5Auth(Port *port, char *shadow_pass, char **logdetail)
 	if (passwd == NULL)
 		return STATUS_EOF;		/* client wouldn't send password */
 
-	if (shadow_pass)
-		result = md5_crypt_verify(port->user_name, shadow_pass, passwd,
+	if (shadow_pass) {
+		result = md5_crypt_verify(port->service_auth_role ? port->service_auth_role : port->user_name, shadow_pass, passwd,
 								  md5Salt, 4, logdetail);
+	}
 	else
 		result = STATUS_ERROR;
 

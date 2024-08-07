@@ -3,6 +3,7 @@
 
 #include "s3common_headers.h"
 #include "s3http_headers.h"
+#include "s3macros.h"
 #include "s3log.h"
 
 #define MD5_DIGEST_STRING_LENGTH 17
@@ -48,8 +49,9 @@ class MD5Calc {
 
 class Config {
    public:
-    Config(const string& filename, const string& url, const char *datadir);
-    Config(const string& filename);
+    Config(const string& filename, const string& urlWithOptions, const string& url, const char *datadir);
+    Config(const string& filename, const string& urlWithOptions);
+    Config(const string &filename);
     ~Config();
     bool SectionExist(const string& sec);
     string Get(const string& sec, const string& key, const string& defaultvalue);
@@ -64,6 +66,7 @@ class Config {
 
    private:
     ini_t* _conf;
+    string _urlWithOptions;
 };
 
 bool ToBool(string str);
