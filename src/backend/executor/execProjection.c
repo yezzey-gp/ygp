@@ -112,6 +112,9 @@ ExecCloseProjection(ResultRelInfo *resultRelInfo)
 		if (prjDescs[i] == NULL)
 			continue;			/* shouldn't happen? */
 
+
+		table_dml_finish(prjDescs[i]);
+		
 		/* Drop lock acquired by ExecOpenIndices */
 		table_close(prjDescs[i], RowExclusiveLock);
 	}

@@ -305,6 +305,8 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.partbound = stmt->partbound;
 	cxt.ofType = (stmt->ofTypename != NULL);
 
+	cxt.isprojection = false;
+
 	Assert(!stmt->ofTypename || !stmt->inhRelations);	/* grammar enforces */
 
 	if (stmt->ofTypename)
@@ -2235,6 +2237,8 @@ transformCreateExternalStmt(CreateExternalStmt *stmt, const char *queryString)
 	cxt.attr_encodings = NIL;
 	cxt.pkey = NULL;
 	cxt.rel = NULL;
+
+	cxt.isprojection = false;
 
 	cxt.blist = NIL;
 	cxt.alist = NIL;
