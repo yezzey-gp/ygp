@@ -435,6 +435,14 @@ ExecSimpleRelationInsert(EState *estate, TupleTableSlot *slot)
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
 												   NIL);
 
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(slot,
+								estate);
+		}
+
+
 		/* AFTER ROW INSERT Triggers */
 		ExecARInsertTriggers(estate, resultRelInfo, slot,
 							 recheckIndexes, NULL);
@@ -501,6 +509,13 @@ ExecSimpleRelationUpdate(EState *estate, EPQState *epqstate,
 			recheckIndexes = ExecInsertIndexTuples(slot, estate, false, NULL,
 												   NIL);
 
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(slot,
+								estate);
+		}
+		
 		/* AFTER ROW UPDATE Triggers */
 		ExecARUpdateTriggers(estate, resultRelInfo,
 							 tid, NULL, slot,

@@ -925,6 +925,8 @@ objectsInSchemaToOids(ObjectType objtype, List *nspnames)
 				objects = list_concat(objects, objs);
 				objs = getRelationsInNamespace(namespaceId, RELKIND_PARTITIONED_TABLE);
 				objects = list_concat(objects, objs);
+				objs = getRelationsInNamespace(namespaceId, RELKIND_PROJECTION);
+				objects = list_concat(objects, objs);
 				break;
 			case OBJECT_SEQUENCE:
 				objs = getRelationsInNamespace(namespaceId, RELKIND_SEQUENCE);
@@ -2258,6 +2260,7 @@ ExecGrant_Relation(InternalGrant *istmt)
 			if (!bTemp
 				&& ((pg_class_tuple->relkind == RELKIND_INDEX) ||
 					(pg_class_tuple->relkind == RELKIND_RELATION) ||
+					(pg_class_tuple->relkind == RELKIND_PROJECTION) ||
 					(pg_class_tuple->relkind == RELKIND_SEQUENCE) ||
 					(pg_class_tuple->relkind == RELKIND_VIEW)))
 				MetaTrackUpdObject(RelationRelationId,
@@ -3780,6 +3783,9 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_PUBLICATION:
 						msg = gettext_noop("permission denied for publication %s");
 						break;
+					case OBJECT_PROJECTION:
+						msg = gettext_noop("ermission denied for projection %s");
+						break;
 					case OBJECT_ROUTINE:
 						msg = gettext_noop("permission denied for routine %s");
 						break;
@@ -3813,6 +3819,7 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 					case OBJECT_VIEW:
 						msg = gettext_noop("permission denied for view %s");
 						break;
+
 					case OBJECT_EXTPROTOCOL:
 						msg = gettext_noop("permission denied for external protocol %s");
 						break;
@@ -3906,6 +3913,9 @@ aclcheck_error(AclResult aclerr, ObjectType objtype,
 						break;
 					case OBJECT_PROCEDURE:
 						msg = gettext_noop("must be owner of procedure %s");
+						break;
+					case OBJECT_PROJECTION:
+						msg = gettext_noop("must be owner of projection %s");
 						break;
 					case OBJECT_PUBLICATION:
 						msg = gettext_noop("must be owner of publication %s");
@@ -6598,6 +6608,7 @@ CopyRelationAcls(Oid srcId, Oid destId)
 	pg_class_tuple = (Form_pg_class) GETSTRUCT(destTuple);
 
 	if (pg_class_tuple->relkind != RELKIND_RELATION &&
+	    pg_class_tuple->relkind != RELKIND_PROJECTION &&
 		pg_class_tuple->relkind != RELKIND_PARTITIONED_TABLE &&
 		pg_class_tuple->relkind != RELKIND_FOREIGN_TABLE)
 		elog(ERROR, "unexpected relkind %c",  pg_class_tuple->relkind);

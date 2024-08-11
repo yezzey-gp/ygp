@@ -780,6 +780,21 @@ _readIndexElem(void)
 	READ_DONE();
 }
 
+static ProjectionElem *
+_readProjectionElem(void)
+{
+	READ_LOCALS(ProjectionElem);
+
+	READ_STRING_FIELD(name);
+	READ_NODE_FIELD(expr);
+	READ_STRING_FIELD(prjcolname);
+	READ_NODE_FIELD(collation);
+	READ_NODE_FIELD(opclass);
+
+	READ_DONE();
+}
+
+
 static ReindexStmt *
 _readReindexStmt(void)
 {

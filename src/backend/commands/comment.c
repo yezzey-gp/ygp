@@ -94,6 +94,7 @@ CommentObject(CommentStmt *stmt)
 			 * failures.
 			 */
 			if (relation->rd_rel->relkind != RELKIND_RELATION &&
+		     	relation->rd_rel->relkind != RELKIND_PROJECTION &&
 				relation->rd_rel->relkind != RELKIND_VIEW &&
 				relation->rd_rel->relkind != RELKIND_MATVIEW &&
 				relation->rd_rel->relkind != RELKIND_COMPOSITE_TYPE &&
@@ -101,7 +102,7 @@ CommentObject(CommentStmt *stmt)
 				relation->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("\"%s\" is not a table, view, materialized view, composite type, or foreign table",
+						 errmsg("\"%s\" is not a table, projection, view, materialized view, composite type, or foreign table",
 								RelationGetRelationName(relation))));
 			break;
 		default:

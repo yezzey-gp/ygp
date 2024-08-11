@@ -761,6 +761,7 @@ _readCreateStmt_common(CreateStmt *local_node)
 	 * during serialization/deserialization
 	 */
 	Assert(local_node->relKind == RELKIND_RELATION ||
+        	local_node->relKind == RELKIND_PROJECTION||
 		   local_node->relKind == RELKIND_PARTITIONED_TABLE ||
 		   local_node->relKind == RELKIND_INDEX ||
 		   local_node->relKind == RELKIND_SEQUENCE ||
@@ -779,6 +780,30 @@ _readCreateStmt(void)
 	READ_LOCALS(CreateStmt);
 
 	_readCreateStmt_common(local_node);
+
+	READ_DONE();
+}
+
+
+static void
+_readCreateProjection_common(CreateProjectionStmt *local_node)
+{
+	READ_STRING_FIELD(prjname);
+	READ_NODE_FIELD(relation);
+	READ_STRING_FIELD(accessMethod);
+	READ_STRING_FIELD(tableSpace);
+	READ_STRING_FIELD(prjcomment);
+	READ_NODE_FIELD(prjParams);
+	READ_NODE_FIELD(whereClause);
+	READ_NODE_FIELD(distributedBy);
+}
+
+
+static CreateProjectionStmt *
+_readCreateProjection(void) {
+	READ_LOCALS(CreateProjectionStmt);
+
+	_readCreateProjection_common(local_node);
 
 	READ_DONE();
 }
@@ -2125,6 +2150,9 @@ readNodeBinary(void)
 			case T_CreateStmt:
 				return_value = _readCreateStmt();
 				break;
+			case T_CreateProjectionStmt:
+				return_value = _readCreateProjection();
+				break;
 			case T_CreateForeignTableStmt:
 				return_value = _readCreateForeignTableStmt();
 				break;
@@ -2341,6 +2369,9 @@ readNodeBinary(void)
 				break;
 			case T_IndexElem:
 				return_value = _readIndexElem();
+				break;
+			case T_ProjectionElem:
+				return_value = _readProjectionElem();
 				break;
 			case T_Query:
 				return_value = _readQuery();

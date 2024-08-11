@@ -97,6 +97,7 @@
 #include "catalog/gp_distribution_policy.h"         /* GpPolicy */
 #include "catalog/heap.h"
 #include "catalog/index.h"
+#include "catalog/ygp_prj.h"
 #include "cdb/cdbtm.h"
 #include "cdb/cdbvars.h"        /* Gp_role */
 #include "cdb/cdbsreh.h"
@@ -131,6 +132,8 @@ static const FormData_pg_attribute Desc_pg_auth_time_constraint_members[Natts_pg
 static const FormData_pg_attribute Desc_pg_index[Natts_pg_index] = {Schema_pg_index};
 static const FormData_pg_attribute Desc_pg_shseclabel[Natts_pg_shseclabel] = {Schema_pg_shseclabel};
 static const FormData_pg_attribute Desc_pg_subscription[Natts_pg_subscription] = {Schema_pg_subscription};
+
+static const FormData_pg_attribute Desc_ygp_prj[Natts_ygp_prj] = {Schema_ygp_prj};
 
 /*
  *		Hash tables that index the relation cache
@@ -493,6 +496,7 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_VIEW:
 		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
+		case RELKIND_PROJECTION:
 			amoptsfn = NULL;
 			break;
 		case RELKIND_INDEX:
@@ -1278,6 +1282,12 @@ retry:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			RelationInitTableAccessMethod(relation);
 			break;
+		/* YGP */
+		case RELKIND_PROJECTION:
+			Assert(relation->rd_rel->relam != InvalidOid);
+			RelationInitTableAccessMethod(relation);
+			RelationInitProjectionAccessInfo(relation);
+			break;
 		case RELKIND_PARTITIONED_TABLE:
 			Assert(relation->rd_rel->relam != InvalidOid);
 			break;
@@ -1308,7 +1318,9 @@ retry:
     /*
      * initialize Greenplum Database partitioning info
      */
-	if ((relation->rd_rel->relkind == RELKIND_RELATION && !IsSystemRelation(relation)) ||
+	if ((
+		(relation->rd_rel->relkind == RELKIND_RELATION || 
+		relation->rd_rel->relkind == RELKIND_PROJECTION) && !IsSystemRelation(relation)) ||
 		relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE ||
 		relation->rd_rel->relkind == RELKIND_FOREIGN_TABLE ||
 		relation->rd_rel->relkind == RELKIND_MATVIEW)
@@ -1846,6 +1858,62 @@ static void
 InitTableAmRoutine(Relation relation)
 {
 	relation->rd_tableam = GetTableAmRoutine(relation->rd_amhandler);
+}
+
+void
+RelationInitProjectionAccessInfo(Relation relation) {
+	HeapTuple	tuple;
+	Form_pg_am	aform;
+	bool		isnull;
+	MemoryContext oldcontext;
+	MemoryContext prjcxt;
+	int			prjnatts;
+	uint16		amsupport;
+
+	/*
+	 * Make a copy of the pg_index entry for the index.  Since pg_index
+	 * contains variable-length and possibly-null fields, we have to do this
+	 * honestly rather than just treating it as a Form_pg_index struct.
+	 */
+	tuple = SearchSysCache1(PROJECTIONOID,
+							ObjectIdGetDatum(RelationGetRelid(relation)));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for projection %u",
+			 RelationGetRelid(relation));
+	oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
+	relation->rd_prjtuple = heap_copytuple(tuple);
+	relation->rd_prj = (Form_ygp_projection) GETSTRUCT(relation->rd_prjtuple);
+	MemoryContextSwitchTo(oldcontext);
+	ReleaseSysCache(tuple);
+
+	/*
+	 * Look up the projection's access method, save the OID of its handler function
+	 */
+	tuple = SearchSysCache1(AMOID, ObjectIdGetDatum(relation->rd_rel->relam));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for access method %u",
+			 relation->rd_rel->relam);
+	aform = (Form_pg_am) GETSTRUCT(tuple);
+	relation->rd_amhandler = aform->amhandler;
+	ReleaseSysCache(tuple);
+
+	prjnatts = RelationGetNumberOfAttributes(relation);
+
+
+	/*
+	 * Make the private context to hold projection access info.  The reason we need
+	 * a context, and not just a couple of pallocs, is so that we won't leak
+	 * any subsidiary info attached to fmgr lookup records.
+	 */
+	prjcxt = AllocSetContextCreate(CacheMemoryContext,
+									 "projection info",
+									 ALLOCSET_SMALL_SIZES);
+	relation->rd_prjcxt = prjcxt;
+
+	/*
+	 * Now we can fetch the projection AM's API struct
+	 */
+	InitTableAmRoutine(relation);
 }
 
 /*
@@ -2532,6 +2600,7 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 	FreeTriggerDesc(relation->trigdesc);
 	list_free_deep(relation->rd_fkeylist);
 	list_free(relation->rd_indexlist);
+	list_free(relation->rd_prjlist);
 	list_free(relation->rd_statlist);
 	bms_free(relation->rd_indexattr);
 	bms_free(relation->rd_keyattr);
@@ -2543,6 +2612,8 @@ RelationDestroyRelation(Relation relation, bool remember_tupdesc)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)
 		pfree(relation->rd_indextuple);
+	if (relation->rd_prjtuple)
+		pfree(relation->rd_prjtuple);
 	if (relation->rd_aotuple)
 		pfree(relation->rd_aotuple);
 	if (relation->rd_amcache)
@@ -3673,9 +3744,14 @@ RelationBuildLocalRelation(const char *relname,
 		relkind == RELKIND_MATVIEW)
 		RelationInitTableAccessMethod(rel);
 
+	/* GPDB */	
 	if (relkind == RELKIND_AOSEGMENTS ||
 		relkind == RELKIND_AOVISIMAP ||
 		relkind == RELKIND_AOBLOCKDIR)
+		RelationInitTableAccessMethod(rel);
+
+	/* YGP */	
+	if (relkind == RELKIND_PROJECTION)
 		RelationInitTableAccessMethod(rel);
 
 	/*
@@ -3789,6 +3865,12 @@ RelationSetNewRelfilenode(Relation relation, char persistence)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOVISIMAP:
 		case RELKIND_AOBLOCKDIR:
+			table_relation_set_new_filenode(relation, &newrnode,
+											persistence,
+											&freezeXid, &minmulti);
+			break;
+
+		case RELKIND_PROJECTION:
 			table_relation_set_new_filenode(relation, &newrnode,
 											persistence,
 											&freezeXid, &minmulti);
@@ -4386,6 +4468,20 @@ GetPgIndexDescriptor(void)
 	return pgindexdesc;
 }
 
+
+static TupleDesc
+GetProjectionDescriptor(void)
+{
+	static TupleDesc pgprojectiondesc = NULL;
+
+	/* Already done? */
+	if (pgprojectiondesc == NULL)
+		pgprojectiondesc = BuildHardcodedDescriptor(Natts_ygp_prj,
+											   Desc_ygp_prj);
+
+	return pgprojectiondesc;
+}
+
 /*
  * Load any default attribute value definitions for the relation.
  */
@@ -4773,6 +4869,63 @@ RelationGetIndexList(Relation relation)
 	return result;
 }
 
+List *
+RelationGetPrjList(Relation relation) {
+	Relation	prjrel;
+	SysScanDesc prjscan;
+	ScanKeyData skey;
+	HeapTuple	htup;
+	List	   *result;
+	List	   *oldlist;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the list. */
+	if (relation->rd_prjvalid)
+		return list_copy(relation->rd_prjlist);
+
+	/*
+	 * We build the list we intend to return (in the caller's context) while
+	 * doing the scan.  After successfully completing the scan, we copy that
+	 * list into the relcache entry.  This avoids cache-context memory leakage
+	 * if we get some sort of error partway through.
+	 */
+	result = NIL;
+
+	/* Prepare to scan ygp_prj for entries having prjrelid = this rel. */
+	ScanKeyInit(&skey,
+				Anum_ygp_prj_prjrelid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationGetRelid(relation)));
+
+	prjrel = table_open(ProjectionRelationId, AccessShareLock);
+	prjscan = systable_beginscan(prjrel, InvalidOid, true,
+								 NULL, 1, &skey);
+
+	while (HeapTupleIsValid(htup = systable_getnext(prjscan)))
+	{
+		Form_ygp_projection prj = (Form_ygp_projection) GETSTRUCT(htup);
+
+		/* Add index's OID to result list in the proper order */
+		result = insert_ordered_oid(result, prj->projectionrelid);
+	}
+
+	systable_endscan(prjscan);
+
+	table_close(prjrel, AccessShareLock);
+
+	/* Now save a copy of the completed list in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
+	oldlist = relation->rd_prjlist;
+	relation->rd_prjlist = list_copy(result);
+	relation->rd_prjvalid = true;
+	MemoryContextSwitchTo(oldcxt);
+
+	/* Don't leak the old list, if there is one */
+	list_free(oldlist);
+
+	return result;
+}
+
 /*
  * RelationGetStatExtList
  *		get a list of OIDs of statistics objects on this relation
@@ -4991,6 +5144,69 @@ RelationGetIndexExpressions(Relation relation)
 	return result;
 }
 
+
+/*
+ * RelationGetProjectionExpressions -- get the projection expressions for an projection
+ *
+ * We cache the result of transforming ygp_prj.prjexprs into a node tree.
+ * If the rel is not an projection or has no expressional columns, we return NIL.
+ * Otherwise, the returned tree is copied into the caller's memory context.
+ * (We don't want to return a pointer to the relcache copy, since it could
+ * disappear due to relcache invalidation.)
+ */
+List *
+RelationGetProjectionExpressions(Relation relation)
+{
+	List	   *result;
+	Datum		exprsDatum;
+	bool		isnull;
+	char	   *exprsString;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the result. */
+	if (relation->rd_prjexprs)
+		return copyObject(relation->rd_prjexprs);
+
+	/* Quick exit if there is nothing to do. */
+	if (relation->rd_prjtuple == NULL ||
+		heap_attisnull(relation->rd_prjtuple, Anum_ygp_prj_projectionxprs, NULL))
+		return NIL;
+
+	/*
+	 * We build the tree we intend to return in the caller's context. After
+	 * successfully completing the work, we copy it into the relcache entry.
+	 * This avoids problems if we get some sort of error partway through.
+	 */
+	exprsDatum = heap_getattr(relation->rd_indextuple,
+							  Anum_ygp_prj_projectionxprs,
+							  GetProjectionDescriptor(),
+							  &isnull);
+	Assert(!isnull);
+	exprsString = TextDatumGetCString(exprsDatum);
+	result = (List *) stringToNode(exprsString);
+	pfree(exprsString);
+
+	/*
+	 * Run the expressions through eval_const_expressions. This is not just an
+	 * optimization, but is necessary, because the planner will be comparing
+	 * them to similarly-processed qual clauses, and may fail to detect valid
+	 * matches without this.  We must not use canonicalize_qual, however,
+	 * since these aren't qual expressions.
+	 */
+	result = (List *) eval_const_expressions(NULL, (Node *) result);
+
+	/* May as well fix opfuncids too */
+	fix_opfuncids((Node *) result);
+
+	/* Now save a copy of the completed tree in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(relation->rd_indexcxt);
+	relation->rd_prjexprs = copyObject(result);
+	MemoryContextSwitchTo(oldcxt);
+
+	return result;
+}
+
+
 /*
  * RelationGetDummyIndexExpressions -- get dummy expressions for an index
  *
@@ -5110,6 +5326,79 @@ RelationGetIndexPredicate(Relation relation)
 
 	return result;
 }
+
+
+
+
+/*
+ * RelationGetProjectionPredicate -- get the index predicate for an index
+ *
+ * We cache the result of transforming pg_index.indpred into an implicit-AND
+ * node tree (suitable for use in planning).
+ * If the rel is not an index or has no predicate, we return NIL.
+ * Otherwise, the returned tree is copied into the caller's memory context.
+ * (We don't want to return a pointer to the relcache copy, since it could
+ * disappear due to relcache invalidation.)
+ */
+List *
+RelationGetProjectionPredicate(Relation relation)
+{
+	List	   *result;
+	Datum		predDatum;
+	bool		isnull;
+	char	   *predString;
+	MemoryContext oldcxt;
+
+	/* Quick exit if we already computed the result. */
+	if (relation->rd_prjpred)
+		return copyObject(relation->rd_prjpred);
+
+	/* Quick exit if there is nothing to do. */
+	if (relation->rd_prjtuple == NULL ||
+		heap_attisnull(relation->rd_prjtuple, Anum_ygp_prj_prjpred, NULL))
+		return NIL;
+
+	/*
+	 * We build the tree we intend to return in the caller's context. After
+	 * successfully completing the work, we copy it into the relcache entry.
+	 * This avoids problems if we get some sort of error partway through.
+	 */
+	predDatum = heap_getattr(relation->rd_prjtuple,
+							 Anum_ygp_prj_prjpred,
+							 GetProjectionDescriptor(),
+							 &isnull);
+	Assert(!isnull);
+	predString = TextDatumGetCString(predDatum);
+	result = (List *) stringToNode(predString);
+	pfree(predString);
+
+	/*
+	 * Run the expression through const-simplification and canonicalization.
+	 * This is not just an optimization, but is necessary, because the planner
+	 * will be comparing it to similarly-processed qual clauses, and may fail
+	 * to detect valid matches without this.  This must match the processing
+	 * done to qual clauses in preprocess_expression()!  (We can skip the
+	 * stuff involving subqueries, however, since we don't allow any in index
+	 * predicates.)
+	 */
+	result = (List *) eval_const_expressions(NULL, (Node *) result);
+
+	result = (List *) canonicalize_qual((Expr *) result, false);
+
+	/* Also convert to implicit-AND format */
+	result = make_ands_implicit((Expr *) result);
+
+	/* May as well fix opfuncids too */
+	fix_opfuncids((Node *) result);
+
+	/* Now save a copy of the completed tree in the relcache entry. */
+	oldcxt = MemoryContextSwitchTo(relation->rd_prjcxt);
+	relation->rd_prjpred = copyObject(result);
+	MemoryContextSwitchTo(oldcxt);
+
+	return result;
+}
+
 
 /*
  * RelationGetIndexAttrBitmap -- get a bitmap of index attribute numbers
@@ -5949,7 +6238,9 @@ load_relcache_init_file(bool shared)
 				RelationInitTableAccessMethod(rel);
 
 			Assert(rel->rd_index == NULL);
+			Assert(rel->rd_prj == NULL);
 			Assert(rel->rd_indextuple == NULL);
+			Assert(rel->rd_prjtuple == NULL);
 			Assert(rel->rd_indexcxt == NULL);
 			Assert(rel->rd_indam == NULL);
 			Assert(rel->rd_opfamily == NULL);
@@ -5996,6 +6287,8 @@ load_relcache_init_file(bool shared)
 			rel->rd_refcnt = 0;
 		rel->rd_indexvalid = false;
 		rel->rd_indexlist = NIL;
+		rel->rd_prjvalid = false;
+		rel->rd_prjlist = NIL;
 		rel->rd_pkindex = InvalidOid;
 		rel->rd_replidindex = InvalidOid;
 		rel->rd_indexattr = NULL;

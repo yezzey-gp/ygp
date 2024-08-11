@@ -2547,7 +2547,7 @@ BeginCopyTo(ParseState *pstate,
 		0
 	};
 
-	if (rel != NULL && rel->rd_rel->relkind != RELKIND_RELATION && rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+	if (rel != NULL && rel->rd_rel->relkind != RELKIND_RELATION && rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE && rel->rd_rel->relkind != RELKIND_PROJECTION)
 	{
 		if (rel->rd_rel->relkind == RELKIND_VIEW)
 			ereport(ERROR,
@@ -3677,6 +3677,14 @@ CopyMultiInsertBufferFlush(CopyMultiInsertInfo *miinfo,
 			list_free(recheckIndexes);
 		}
 
+		/* insert rpj' tuples if needed */
+		if (resultRelInfo->ri_NumProjection > 0)
+		{
+			ExecInsertProjectionTuples(buffer->slots[i],
+								estate);
+		}
+
+
 		/*
 		 * There's no indexes, but see if we need to run AFTER ROW INSERT
 		 * triggers anyway.
@@ -3881,6 +3889,7 @@ CopyFrom(CopyState cstate)
 	 * allowed on views, so we only hint about them in the view case.)
 	 */
 	if (cstate->rel->rd_rel->relkind != RELKIND_RELATION &&
+	    cstate->rel->rd_rel->relkind != RELKIND_PROJECTION &&
 		cstate->rel->rd_rel->relkind != RELKIND_FOREIGN_TABLE &&
 		cstate->rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE &&
 		!(cstate->rel->trigdesc &&
@@ -4044,6 +4053,7 @@ CopyFrom(CopyState cstate)
 	CheckValidResultRel(resultRelInfo, CMD_INSERT);
 
 	ExecOpenIndices(resultRelInfo, false);
+	ExecOpenProjections(resultRelInfo);
 
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
@@ -4719,15 +4729,15 @@ CopyFrom(CopyState cstate)
 					else
 					{
 						/* OK, store the tuple and create index entries for it */
-						table_tuple_insert(resultRelInfo->ri_RelationDesc,
-										   myslot, mycid, ti_options, bistate);
-
-						if (resultRelInfo->ri_NumIndices > 0)
-							recheckIndexes = ExecInsertIndexTuples(myslot,
-																   estate,
-																   false,
-																   NULL,
-																   NIL);
+						if (table_tuple_insert_check_location(resultRelInfo->ri_RelationDesc,
+										   myslot, mycid, ti_options, bistate)) {
+							if (resultRelInfo->ri_NumIndices > 0)
+								recheckIndexes = ExecInsertIndexTuples(myslot,
+																	estate,
+																	false,
+																	NULL,
+																	NIL);
+						}
 					}
 
 					/* AFTER ROW INSERT Triggers */
@@ -4873,6 +4883,7 @@ CopyFrom(CopyState cstate)
 		table_dml_finish(target_resultRelInfo->ri_RelationDesc);
 
 	ExecCloseIndices(target_resultRelInfo);
+	ExecCloseProjection(target_resultRelInfo);
 
 	/* Close all the partitioned tables, leaf partitions, and their indices */
 	if (proute)

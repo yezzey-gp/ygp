@@ -3193,11 +3193,32 @@ _outCreateStmtInfo(StringInfo str, const CreateStmt *node)
 }
 
 static void
+_outCreateProjectionStmtInfo(StringInfo str, const CreateProjectionStmt *node) {
+	WRITE_STRING_FIELD(prjname);
+	WRITE_NODE_FIELD(relation);
+	WRITE_STRING_FIELD(accessMethod);
+	WRITE_STRING_FIELD(tableSpace);
+	WRITE_STRING_FIELD(prjcomment);
+	WRITE_NODE_FIELD(prjParams);
+	WRITE_NODE_FIELD(whereClause);
+	WRITE_NODE_FIELD(distributedBy);
+}
+
+static void
 _outCreateStmt(StringInfo str, const CreateStmt *node)
 {
 	WRITE_NODE_TYPE("CREATESTMT");
 
 	_outCreateStmtInfo(str, (const CreateStmt *) node);
+}
+
+
+static void
+_outCreateProjectionStmt(StringInfo str, const CreateProjectionStmt *node)
+{
+	WRITE_NODE_TYPE("CREATEPROJECTIONSTMT");
+
+	_outCreateProjectionStmtInfo(str, (const CreateProjectionStmt *) node);
 }
 
 static void
@@ -4266,6 +4287,18 @@ _outIndexElem(StringInfo str, const IndexElem *node)
 	WRITE_NODE_FIELD(opclass);
 	WRITE_ENUM_FIELD(ordering, SortByDir);
 	WRITE_ENUM_FIELD(nulls_ordering, SortByNulls);
+}
+
+static void
+_outProjectionElem(StringInfo str, const ProjectionElem *node)
+{
+	WRITE_NODE_TYPE("PROJECTIONELEM");
+
+	WRITE_STRING_FIELD(name);
+	WRITE_NODE_FIELD(expr);
+	WRITE_STRING_FIELD(prjcolname);
+	WRITE_NODE_FIELD(collation);
+	WRITE_NODE_FIELD(opclass);
 }
 
 static void
@@ -6300,6 +6333,9 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_IndexElem:
 				_outIndexElem(str, obj);
+				break;
+			case T_ProjectionElem:
+				_outProjectionElem(str, obj);
 				break;
 			case T_Query:
 				_outQuery(str, obj);

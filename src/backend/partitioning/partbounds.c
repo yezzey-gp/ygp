@@ -1440,7 +1440,7 @@ check_default_partition_contents(Relation parent, Relation default_rel,
 		 * Only RELKIND_RELATION relations (i.e. leaf partitions) need to be
 		 * scanned.
 		 */
-		if (part_rel->rd_rel->relkind != RELKIND_RELATION)
+		if (part_rel->rd_rel->relkind != RELKIND_RELATION || part_rel->rd_rel->relkind == RELKIND_PROJECTION)
 		{
 			if (part_rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
 				ereport(WARNING,

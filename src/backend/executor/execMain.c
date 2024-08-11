@@ -2045,6 +2045,7 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 	switch (resultRel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			CheckCmdReplicaIdentity(resultRel, operation);
 			break;
@@ -2222,6 +2223,7 @@ CheckValidRowMarkRel(Relation rel, RowMarkType markType)
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
@@ -2295,6 +2297,8 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	resultRelInfo->ri_NumIndices = 0;
 	resultRelInfo->ri_IndexRelationDescs = NULL;
 	resultRelInfo->ri_IndexRelationInfo = NULL;
+	resultRelInfo->ri_ProjectionRelationInfo = NULL;
+
 	/* make a copy so as not to depend on relcache info not changing... */
 	resultRelInfo->ri_TrigDesc = CopyTriggerDesc(resultRelationDesc->trigdesc);
 	if (resultRelInfo->ri_TrigDesc)
@@ -2581,6 +2585,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 	for (i = 0; i < estate->es_num_result_relations; i++)
 	{
 		ExecCloseIndices(resultRelInfo);
+		ExecCloseProjection(resultRelInfo);
 		resultRelInfo++;
 	}
 

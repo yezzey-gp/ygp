@@ -422,7 +422,7 @@ cdbpath_create_motion_path(PlannerInfo *root,
 		}
 
 		/* Must be general-->partitioned. */
-		if (!CdbPathLocus_IsPartitioned(locus))
+		if (!CdbPathLocus_IsPartitioned(locus) && !CdbPathLocus_IsMultiHash(locus))
 			goto invalid_motion_request;
 
 		/* Fail if caller wants no motion. */
@@ -483,6 +483,11 @@ cdbpath_create_motion_path(PlannerInfo *root,
 		}
 		else
 			goto invalid_motion_request;
+	}
+	else if (CdbPathLocus_IsMultiHash(locus)) 
+	{
+		// nuffin
+		;
 	}
 	else
 		goto invalid_motion_request;
@@ -2265,7 +2270,7 @@ try_redistribute(PlannerInfo *root, CdbpathMfjRel *g, CdbpathMfjRel *o,
  * distributed correctly for insertion into target table.
  */
 Path *
-create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
+create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath, bool relhasprj)
 {
 	GpPolicyType	policyType = policy->ptype;
 
@@ -2283,7 +2288,7 @@ create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
 		return cdbpath_create_motion_path(root, subpath, NIL, false, targetLocus);
 	}
 	else
-		return create_motion_path_for_insert(root, policy, subpath);
+		return create_motion_path_for_insert(root, policy, subpath, relhasprj);
 }
 
 /*
@@ -2292,7 +2297,7 @@ create_motion_path_for_ctas(PlannerInfo *root, GpPolicy *policy, Path *subpath)
  */
 Path *
 create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy,
-							  Path *subpath)
+							  Path *subpath, bool relhasprj)
 {
 	GpPolicyType	policyType = policy->ptype;
 	CdbPathLocus	targetLocus;
@@ -2311,7 +2316,7 @@ create_motion_path_for_insert(PlannerInfo *root, GpPolicy *policy,
 			subpath->locus.numsegments = policy->numsegments;
 		}
 
-		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget);
+		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget, relhasprj);
 
 		if (policy->nattrs == 0 && CdbPathLocus_IsPartitioned(subpath->locus))
 		{
@@ -2523,7 +2528,7 @@ create_split_update_path(PlannerInfo *root, Index rti, GpPolicy *policy, Path *s
 		 * e.g. because the input was eliminated by constraint
 		 * exclusion, we can skip it.
 		 */
-		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget);
+		targetLocus = cdbpathlocus_for_insert(root, policy, subpath->pathtarget, rti == 0 ? false : rt_fetch(rti,  root->parse->rtable)->relhasprj);
 
 		subpath = (Path *) make_splitupdate_path(root, subpath, rti);
 		subpath = cdbpath_create_explicit_motion_path(root,
@@ -2675,7 +2680,7 @@ can_elide_explicit_motion(PlannerInfo *root, Index rti, Path *subpath,
 
 	if (!CdbPathLocus_IsStrewn(subpath->locus))
 	{
-		CdbPathLocus    resultrelation_locus = cdbpathlocus_from_policy(root, rti, policy);
+		CdbPathLocus    resultrelation_locus = cdbpathlocus_from_policy(root, rti, policy, root->simple_rel_array[rti]->nprjs > 0);
 		return cdbpathlocus_equal(subpath->locus, resultrelation_locus);
 	}
 

@@ -2802,6 +2802,18 @@ _equalIndexElem(const IndexElem *a, const IndexElem *b)
 }
 
 static bool
+_equalProjectionElem(const ProjectionElem *a, const ProjectionElem *b)
+{
+	COMPARE_STRING_FIELD(name);
+	COMPARE_NODE_FIELD(expr);
+	COMPARE_STRING_FIELD(prjcolname);
+	COMPARE_NODE_FIELD(collation);
+	COMPARE_NODE_FIELD(opclass);
+
+	return true;
+}
+
+static bool
 _equalColumnDef(const ColumnDef *a, const ColumnDef *b)
 {
 	COMPARE_STRING_FIELD(colname);
@@ -3974,6 +3986,9 @@ equal(const void *a, const void *b)
 			break;
 		case T_IndexElem:
 			retval = _equalIndexElem(a, b);
+			break;
+		case T_ProjectionElem:
+			retval = _equalProjectionElem(a, b);
 			break;
 		case T_ColumnDef:
 			retval = _equalColumnDef(a, b);

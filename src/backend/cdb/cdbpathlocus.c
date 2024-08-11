@@ -200,7 +200,7 @@ cdb_build_distribution_keys(PlannerInfo *root, Index rti, GpPolicy *policy)
  */
 CdbPathLocus
 cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
-						PathTarget *pathtarget)
+						PathTarget *pathtarget, bool relhasprj)
 {
 	CdbPathLocus targetLocus;
 
@@ -280,7 +280,10 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
 		distkeys = lappend(distkeys, cdistkey);
 	}
 
-	if (failed)
+	if (relhasprj) {
+		CdbPathLocus_MakeMultiHashed(&targetLocus);
+	}
+	else if (failed)
 	{
 		CdbPathLocus_MakeNull(&targetLocus);
 	}
@@ -301,7 +304,7 @@ cdbpathlocus_for_insert(PlannerInfo *root, GpPolicy *policy,
  * Returns a locus describing the distribution of a policy
  */
 CdbPathLocus
-cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy)
+cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy, bool relhasprj)
 {
 	CdbPathLocus result;
 
@@ -313,8 +316,12 @@ cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, GpPolicy *policy)
 
 	if (GpPolicyIsPartitioned(policy))
 	{
+		if (relhasprj) {
+			CdbPathLocus_MakeMultiHashed(&result);
+			return result;
+		}
 		/* Are the rows distributed by hashing on specified columns? */
-		if (policy->nattrs > 0)
+		else if (policy->nattrs > 0)
 		{
 			List	   *distkeys = cdb_build_distribution_keys(root,
 															   rti,
@@ -356,7 +363,7 @@ CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo *root,
 						  struct RelOptInfo *rel)
 {
-	return cdbpathlocus_from_policy(root, rel->relid, rel->cdbpolicy);
+	return cdbpathlocus_from_policy(root, rel->relid, rel->cdbpolicy, rel->nprjs > 0);
 }								/* cdbpathlocus_from_baserel */
 
 
@@ -1144,6 +1151,7 @@ cdbpathlocus_is_valid(CdbPathLocus locus)
 	if (!CdbPathLocus_IsGeneral(locus) &&
 		!CdbPathLocus_IsEntry(locus) &&
 		!CdbPathLocus_IsOuterQuery(locus) &&
+		!CdbPathLocus_IsMultiHash(locus) &&
 		locus.numsegments == -1)
 		goto bad;
 

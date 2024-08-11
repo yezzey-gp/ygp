@@ -238,6 +238,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 	WindowDef			*windef;
 	JoinExpr			*jexpr;
 	IndexElem			*ielem;
+	ProjectionElem		*pelem;
 	Alias				*alias;
 	RangeVar			*range;
 	IntoClause			*into;
@@ -298,6 +299,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 		CreatePublicationStmt AlterPublicationStmt
 		CreateSubscriptionStmt AlterSubscriptionStmt DropSubscriptionStmt
 		RetrieveStmt
+		PrjStmt
 
 /* GPDB-specific commands */
 %type <node>	AlterTypeStmt AlterQueueStmt AlterResourceGroupStmt
@@ -390,7 +392,8 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 %type <str>		copy_file_name
 				database_name access_method_clause access_method attr_name
 				table_access_method_clause name cursor_name file_name
-				index_name opt_index_name cluster_index_specification
+				index_name opt_index_name cluster_index_specification 
+				projection_name 
 
 %type <list>	func_name handler_name qual_Op qual_all_Op subquery_Op
 				opt_class opt_inline_handler opt_validator validator_clause
@@ -456,6 +459,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 				TriggerTransitions TriggerReferencing
 				publication_name_list
 				vacuum_relation_list opt_vacuum_relation_list
+				projection_params opt_prj_params prj_params
 
 %type <list>	group_by_list
 %type <node>	group_by_item empty_grouping_set rollup_clause cube_clause
@@ -554,6 +558,7 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 %type <list>	func_alias_clause
 %type <sortby>	sortby
 %type <ielem>	index_elem
+%type <pelem>   prj_elem
 %type <node>	table_ref
 %type <jexpr>	joined_table
 %type <range>	relation_expr
@@ -846,6 +851,11 @@ static void check_expressions_in_partition_key(PartitionSpec *spec, core_yyscan_
 	VALIDATION
 
 	WEB WRITABLE
+
+
+
+/* YGP-added keywords, in alphabetical order */
+%token <keyword> PROJECTION
 
 /*
  * The grammar thinks these are keywords, but they are not in the kwlist.h
@@ -1417,6 +1427,7 @@ stmt :
 			| LockStmt
 			| NotifyStmt
 			| PrepareStmt
+			| PrjStmt
 			| ReassignOwnedStmt
 			| ReindexStmt
 			| RemoveAggrStmt
@@ -8884,6 +8895,7 @@ drop_type_any_name:
 			| SEQUENCE								{ $$ = OBJECT_SEQUENCE; }
 			| VIEW									{ $$ = OBJECT_VIEW; }
 			| MATERIALIZED VIEW						{ $$ = OBJECT_MATVIEW; }
+			| PROJECTION       						{ $$ = OBJECT_PROJECTION; }
 			| INDEX									{ $$ = OBJECT_INDEX; }
 			| FOREIGN TABLE							{ $$ = OBJECT_FOREIGN_TABLE; }
 			| EXTERNAL TABLE						{ $$ = OBJECT_FOREIGN_TABLE; }
@@ -9937,6 +9949,69 @@ defacl_privilege_target:
 			| SCHEMAS		{ $$ = OBJECT_SCHEMA; }
 		;
 
+
+/*****************************************************************************
+ *
+ *		QUERY: CREATE PROJECTION
+ *
+ * Note: we cannot put TABLESPACE clause after WHERE clause unless we are
+ * willing to make TABLESPACE a fully reserved word.
+ *****************************************************************************/
+
+
+
+projection_params:	prj_elem							{ $$ = list_make1($1); }
+			| projection_params ',' prj_elem			{ $$ = lappend($1, $3); }
+		;
+
+/*
+ * Index attributes can be either simple column references, or arbitrary
+ * expressions in parens.  For backwards-compatibility reasons, we allow
+ * an expression that's just a function call to be written without parens.
+ */
+prj_elem:	ColId opt_collate opt_class
+				{
+					$$ = makeNode(ProjectionElem);
+					$$->name = $1;
+					$$->expr = NULL;
+					$$->prjcolname = NULL;
+					$$->collation = $2;
+					$$->opclass = $3;
+				}
+		;
+
+
+prj_params: '(' projection_params ')' 
+	{ $$ = $2; }
+	;
+
+opt_prj_params:
+	prj_params { $$ = $1; } 
+	| /*EMPTY*/
+		{ $$ = NULL; }
+	;
+
+PrjStmt: 
+	CREATE PROJECTION 
+		projection_name 
+	ON relation_expr opt_prj_params table_access_method_clause where_clause DistributedBy 
+	{
+		CreateProjectionStmt *n = makeNode(CreateProjectionStmt);
+
+		n->prjname = $3;
+		n->relation = $5;
+
+		n->prjParams = $6;
+
+		n->accessMethod = $7;
+
+		n->whereClause = $8;
+
+		n->distributedBy = (DistributedBy *) $9;
+
+		$$ = (Node *)n;
+	}
+	;
 
 /*****************************************************************************
  *
@@ -17805,6 +17880,8 @@ attr_name:	ColLabel								{ $$ = $1; };
 
 index_name: ColId									{ $$ = $1; };
 
+projection_name: ColId									{ $$ = $1; };
+
 file_name:	Sconst									{ $$ = $1; };
 
 /*
@@ -18293,6 +18370,7 @@ unreserved_keyword:
 			| PROCEDURE
 			| PROCEDURES
 			| PROGRAM
+			| PROJECTION
 			| PROTOCOL
 			| PUBLICATION
 			| QUEUE

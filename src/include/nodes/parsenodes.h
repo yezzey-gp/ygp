@@ -772,6 +772,23 @@ typedef struct IndexElem
 } IndexElem;
 
 /*
+ * ProjectionElem - projection parameters (used in CREATE PROJECTION)
+ *
+ * For a plain index attribute, 'name' is the name of the table column to
+ * index, and 'expr' is NULL.  For an index expression, 'name' is NULL and
+ * 'expr' is the expression tree.
+ */
+typedef struct ProjectionElem
+{
+	NodeTag		type;
+	char	   *name;			/* name of attribute to index, or NULL */
+	Node	   *expr;			/* expression to index, or NULL */
+	char	   *prjcolname;	    /* name for index column; NULL = default */
+	List	   *collation;		/* name of collation; NIL = default */
+	List	   *opclass;		/* name of desired opclass; NIL = default */
+} ProjectionElem;
+
+/*
  * column reference encoding clause for storage
  */
 typedef struct ColumnReferenceStorageDirective
@@ -1194,6 +1211,8 @@ typedef struct RangeTblEntry
 	 * pseudo-function was specified as modifier in FROM-clause
 	 */
 	bool		forceDistRandom;
+
+	bool relhasprj;
 
 	/*
 	 * Fields valid in all RTEs:
@@ -1836,6 +1855,7 @@ typedef enum ObjectType
 	OBJECT_OPFAMILY,
 	OBJECT_POLICY,
 	OBJECT_PROCEDURE,
+	OBJECT_PROJECTION,
 	OBJECT_PUBLICATION,
 	OBJECT_PUBLICATION_REL,
 	OBJECT_ROLE,
@@ -3302,6 +3322,29 @@ typedef struct IndexStmt
 	bool		reset_default_tblspc;	/* reset default_tablespace prior to
 										 * executing */
 } IndexStmt;
+
+
+/* ----------------------
+ *		Create Projection Statement
+
+ * ----------------------
+ */
+typedef struct ProjectionStmt
+{
+	NodeTag		type;
+	char	   *prjname;		/* name of new projection, or NULL for default */
+	RangeVar   *relation;		/* relation to build projection on */
+	char	   *accessMethod;	/* name of access method (eg. btree) */
+	char	   *tableSpace;		/* tablespace, or NULL for default */
+	char	   *prjcomment;		/* comment to apply to index, or NULL */
+
+	List	   *prjParams;	/* columns to insert into projection: a list of ProjectionElem */
+
+	Node	   *whereClause;	/* qualification (partial-index predicate) */
+	
+	DistributedBy *distributedBy;   /* what columns we distribute the data by */
+} CreateProjectionStmt;
+
 
 /* ----------------------
  *		Create Statistics Statement

@@ -133,6 +133,10 @@ static const event_trigger_support_data event_trigger_support[] = {
 	{"EXTERNAL TABLE", true},
 	{"PROTOCOL", true},
 
+	/* PROJECTION */
+
+	{"PROJECTION", true},
+
 	{NULL, false}
 };
 
@@ -2294,6 +2298,7 @@ stringify_grant_objtype(ObjectType objtype)
 		case OBJECT_OPFAMILY:
 		case OBJECT_POLICY:
 		case OBJECT_PUBLICATION:
+		case OBJECT_PROJECTION:
 		case OBJECT_PUBLICATION_REL:
 		case OBJECT_ROLE:
 		case OBJECT_RULE:
@@ -2378,6 +2383,7 @@ stringify_adefprivs_objtype(ObjectType objtype)
 		case OBJECT_OPERATOR:
 		case OBJECT_OPFAMILY:
 		case OBJECT_POLICY:
+		case OBJECT_PROJECTION:
 		case OBJECT_PUBLICATION:
 		case OBJECT_PUBLICATION_REL:
 		case OBJECT_ROLE:

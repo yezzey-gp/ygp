@@ -2779,6 +2779,9 @@ getObjectClass(const ObjectAddress *object)
 			/* caller must check objectSubId */
 			return OCLASS_CLASS;
 
+		case ProjectionRelationId:
+			return OCLASS_CLASS;
+
 		case ProcedureRelationId:
 			return OCLASS_PROC;
 

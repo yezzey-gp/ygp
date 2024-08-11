@@ -189,6 +189,12 @@ static const struct dropmsgstrings dropmsgstringarray[] = {
 		gettext_noop("table \"%s\" does not exist, skipping"),
 		gettext_noop("\"%s\" is not a table"),
 	gettext_noop("Use DROP TABLE to remove a table.")},
+	{RELKIND_PROJECTION,
+		ERRCODE_UNDEFINED_TABLE,
+		gettext_noop("projection \"%s\" does not exist"),
+		gettext_noop("projection \"%s\" does not exist, skipping"),
+		gettext_noop("\"%s\" is not a table"),
+	gettext_noop("Use DROP PROJECTION to remove a projection.")},
 	{RELKIND_SEQUENCE,
 		ERRCODE_UNDEFINED_TABLE,
 		gettext_noop("sequence \"%s\" does not exist"),
@@ -1017,7 +1023,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * the already-processed options from the QD.
 	 */
 
-	if ((relkind == RELKIND_RELATION || relkind == RELKIND_MATVIEW ||
+	if ((relkind == RELKIND_RELATION || relkind == RELKIND_PROJECTION || relkind == RELKIND_MATVIEW ||
 		 relkind == RELKIND_PARTITIONED_TABLE) &&
 		Gp_role != GP_ROLE_EXECUTE)
 	{
@@ -1719,6 +1725,10 @@ RemoveRelations(DropStmt *drop)
 
 		case OBJECT_FOREIGN_TABLE:
 			relkind = RELKIND_FOREIGN_TABLE;
+			break;
+
+		case OBJECT_PROJECTION:
+			relkind = RELKIND_PROJECTION;
 			break;
 
 		default:
@@ -2482,6 +2492,7 @@ truncate_check_rel(Oid relid, Form_pg_class reltuple)
 	 * physical truncation will occur in their case.)
 	 */
 	if (reltuple->relkind != RELKIND_RELATION &&
+	    reltuple->relkind != RELKIND_PROJECTION &&
 		reltuple->relkind != RELKIND_PARTITIONED_TABLE &&
 		(!IsBinaryUpgrade || (
 			reltuple->relkind != RELKIND_AOSEGMENTS &&
@@ -3550,6 +3561,7 @@ renameatt_check(Oid myrelid, Form_pg_class classform, bool recursing)
 	 * restriction.
 	 */
 	if (relkind != RELKIND_RELATION &&
+	    relkind != RELKIND_PROJECTION &&
 		relkind != RELKIND_VIEW &&
 		relkind != RELKIND_MATVIEW &&
 		relkind != RELKIND_COMPOSITE_TYPE &&
@@ -6729,6 +6741,7 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			actual_target = ATT_TABLE;
 			break;
@@ -7056,6 +7069,7 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 		att = TupleDescAttr(rel->rd_att, pg_depend->objsubid - 1);
 
 		if (rel->rd_rel->relkind == RELKIND_RELATION ||
+		    rel->rd_rel->relkind == RELKIND_PROJECTION ||
 			rel->rd_rel->relkind == RELKIND_MATVIEW ||
 			rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 		{
@@ -7812,7 +7826,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * to perform the column optimized rewrite.
 	 * So, we only need to execute this block on QD.
 	 */
-	if (!recursing && (tab->relkind == RELKIND_PARTITIONED_TABLE || tab->relkind == RELKIND_RELATION) && Gp_role != GP_ROLE_EXECUTE)
+	if (!recursing && (tab->relkind == RELKIND_PARTITIONED_TABLE || tab->relkind == RELKIND_RELATION || tab->relkind == RELKIND_PROJECTION) && Gp_role != GP_ROLE_EXECUTE)
 		setupColumnOnlyRewrite(wqueue,
 							 tab, AT_AddColumn);
 
@@ -19914,6 +19928,7 @@ RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid, Oid oldrelid,
 	 */
 	if (IsA(stmt, AlterObjectSchemaStmt) &&
 		relkind != RELKIND_RELATION &&
+		relkind != RELKIND_PROJECTION &&
 		relkind != RELKIND_VIEW &&
 		relkind != RELKIND_MATVIEW &&
 		relkind != RELKIND_SEQUENCE &&

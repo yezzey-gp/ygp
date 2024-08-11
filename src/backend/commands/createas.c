@@ -738,7 +738,7 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 	 * tuple's xmin), but since we don't do that here...
 	 */
 
-	table_tuple_insert(myState->rel,
+	table_tuple_insert_check_location(myState->rel,
 					   slot,
 					   myState->output_cid,
 					   myState->ti_options,

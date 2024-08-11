@@ -788,6 +788,7 @@ DefineIndex(Oid relationId,
 	{
 		case RELKIND_RELATION:
 		case RELKIND_MATVIEW:
+		case RELKIND_PROJECTION:
 		case RELKIND_PARTITIONED_TABLE:
 			/* OK */
 			break;
@@ -3265,6 +3266,7 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		 * are processed.
 		 */
 		if (classtuple->relkind != RELKIND_RELATION &&
+		    classtuple->relkind != RELKIND_PROJECTION &&
 			classtuple->relkind != RELKIND_MATVIEW)
 			continue;
 

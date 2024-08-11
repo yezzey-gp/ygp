@@ -62,6 +62,7 @@ table_slot_callbacks(Relation relation)
 		 * that case here.
 		 */
 		Assert(relation->rd_rel->relkind == RELKIND_VIEW ||
+				relation->rd_rel->relkind == RELKIND_PROJECTION ||
 			   relation->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
 		tts_cb = &TTSOpsVirtual;
 	}
@@ -265,6 +266,12 @@ void
 simple_table_tuple_insert(Relation rel, TupleTableSlot *slot)
 {
 	table_tuple_insert(rel, slot, GetCurrentCommandId(true), 0, NULL);
+}
+
+void
+simple_table_tuple_insert_check_location(Relation rel, TupleTableSlot *slot)
+{
+	table_tuple_insert_check_location(rel, slot, GetCurrentCommandId(true), 0, NULL);
 }
 
 /*

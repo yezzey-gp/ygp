@@ -1851,6 +1851,35 @@ ProcessUtilitySlow(ParseState *pstate,
 					EventTriggerAlterTableEnd();
 				}
 				break;
+			
+			case T_CreateProjectionStmt:
+				{
+					Oid			reloid;
+					CreateProjectionStmt  *prjstmt = (CreateProjectionStmt *) parsetree;
+
+					reloid =
+							RangeVarGetRelidExtended(prjstmt->relation, ShareLock,
+												 0,
+												 RangeVarCallbackOwnsRelation,
+												 NULL);
+
+
+					/* Run parse analysis ... */
+
+					if (Gp_role == GP_ROLE_DISPATCH) {
+						prjstmt = transformPrjStmt(reloid, prjstmt, queryString);
+					}
+					
+					address = DefineProjection(
+						reloid,
+						prjstmt,
+						InvalidOid/* no pre-defined oid */,
+						true /* do check rights */,
+						true /* should dispatch on segs*/
+					);
+				}
+
+				break;
 
 			case T_CreateExtensionStmt:
 				address = CreateExtension(pstate, (CreateExtensionStmt *) parsetree);
@@ -2243,6 +2272,7 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
 		case OBJECT_FOREIGN_TABLE:
+		case OBJECT_PROJECTION:
 			RemoveRelations(stmt);
 			break;
 		default:
@@ -2562,6 +2592,9 @@ AlterObjectTypeCommandTag(ObjectType objtype)
 		case OBJECT_PROCEDURE:
 			tag = "ALTER PROCEDURE";
 			break;
+		case OBJECT_PROJECTION:
+			tag = "ALTER PROJECTION";
+			break;
 		case OBJECT_ROLE:
 			tag = "ALTER ROLE";
 			break;
@@ -2785,6 +2818,10 @@ CreateCommandTag(Node *parsetree)
 			tag = "CREATE EXTENSION";
 			break;
 
+		case T_CreateProjectionStmt:
+			tag = "CREATE PROJECTION";
+			break;
+
 		case T_AlterExtensionStmt:
 			tag = "ALTER EXTENSION";
 			break;
@@ -2891,6 +2928,9 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_PROCEDURE:
 					tag = "DROP PROCEDURE";
+					break;
+				case OBJECT_PROJECTION:
+					tag = "DROP PROJECTION";
 					break;
 				case OBJECT_ROUTINE:
 					tag = "DROP ROUTINE";
@@ -3604,6 +3644,7 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateStmt:
+		case T_CreateProjectionStmt:
 		case T_CreateForeignTableStmt:
 			lev = LOGSTMT_DDL;
 			break;

@@ -22,6 +22,7 @@
 #include "catalog/pg_class.h"
 #include "catalog/pg_index.h"
 #include "catalog/pg_publication.h"
+#include "catalog/ygp_prj.h"
 #include "fmgr.h"
 #include "nodes/bitmapset.h"
 #include "rewrite/prs2lock.h"
@@ -68,6 +69,7 @@ typedef struct RelationData
 	bool		rd_indexvalid;	/* is rd_indexlist valid? (also rd_pkindex and
 								 * rd_replidindex) */
 	bool		rd_statvalid;	/* is rd_statlist valid? */
+	bool        rd_prjvalid;    /* is rd_prjlist valid? */
 
 	/*----------
 	 * rd_createSubid is the ID of the highest subtransaction the rel has
@@ -124,6 +126,9 @@ typedef struct RelationData
 	List	   *rd_indexlist;	/* list of OIDs of indexes on relation */
 	Oid			rd_pkindex;		/* OID of primary key, if any */
 	Oid			rd_replidindex; /* OID of replica identity index, if any */
+
+	/* data managed by RelationGetPrjList: */
+	List	   *rd_prjlist;	/* list of OIDs of projections on relation */
 
 	/* data managed by RelationGetStatExtList: */
 	List	   *rd_statlist;	/* list of OIDs of extended stats */
@@ -202,6 +207,16 @@ typedef struct RelationData
 	Form_pg_appendonly rd_appendonly;
 	struct HeapTupleData *rd_aotuple;		/* all of pg_appendonly tuple */
 
+	/* These are non-NULL only for an projection relation: */
+	Form_ygp_projection rd_prj;		/* ygp_prj tuple describing this projection */
+	/* use "struct" here to avoid needing to include htup.h: */
+	struct HeapTupleData *rd_prjtuple;	/* all of ygp_prj tuple */
+
+
+	List	   *rd_prjexprs;	/* projection expression trees, if any */
+	List	   *rd_prjpred;		/* projection predicate tree, if any */
+
+	MemoryContext rd_prjcxt;	/* private memory cxt for this stuff */
 	/*
 	 * foreign-table support
 	 *

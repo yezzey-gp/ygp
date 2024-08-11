@@ -785,6 +785,36 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 	return n;
 }
 
+
+/*
+ * makePrjInfo
+ *	  create an PrjInfo node
+ */
+PrjInfo *
+makePrjInfo(int numattrs, Oid amoid, List* expressions,
+			  List *predicates)
+{
+	PrjInfo  *n = makeNode(PrjInfo);
+
+	n->pji_NumPrjAttrs = numattrs;
+	n->pji_PrjAttrNumbers = (Oid *) palloc(numattrs * sizeof(Oid));
+
+	/* predicates  */
+	n->pji_Predicate = predicates;
+	n->pji_PredicateState = NULL;
+
+	/* predicates  */
+	n->pji_Expressions = expressions;
+	n->pji_ExpressionsState = NULL;
+
+	/* set up for possible use by index AM */
+	n->pji_Am = amoid;
+	n->pji_AmCache = NULL;
+	n->pji_Context = CurrentMemoryContext;
+
+	return n;
+}
+
 /*
  * makeGroupingSet
  *

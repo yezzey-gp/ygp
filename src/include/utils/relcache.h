@@ -47,12 +47,15 @@ extern void RelationClose(Relation relation);
 struct GpPolicy *RelationGetPartitioningKey(Relation relation);
 extern List *RelationGetFKeyList(Relation relation);
 extern List *RelationGetIndexList(Relation relation);
+extern List * RelationGetPrjList(Relation relation);
 extern List *RelationGetStatExtList(Relation relation);
 extern Oid	RelationGetPrimaryKeyIndex(Relation relation);
 extern Oid	RelationGetReplicaIndex(Relation relation);
 extern List *RelationGetIndexExpressions(Relation relation);
+extern List *RelationGetProjectionExpressions(Relation relation);
 extern List *RelationGetDummyIndexExpressions(Relation relation);
 extern List *RelationGetIndexPredicate(Relation relation);
+extern List *RelationGetProjectionPredicate(Relation relation);
 
 typedef enum IndexAttrBitmapKind
 {
@@ -71,6 +74,9 @@ extern void RelationGetExclusionInfo(Relation indexRelation,
 									 uint16 **strategies);
 
 extern void RelationInitIndexAccessInfo(Relation relation);
+
+/* projection guts */
+extern void RelationInitProjectionAccessInfo(Relation relation);
 
 /* caller must include pg_publication.h */
 struct PublicationActions;

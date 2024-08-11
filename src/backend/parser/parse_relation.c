@@ -1291,7 +1291,7 @@ addRangeTableEntry(ParseState *pstate,
 		if (!rel)
 			elog(ERROR, "open relation(%u) fail", relid);
 
-		if (rel->rd_rel->relkind != RELKIND_RELATION ||
+		if ((rel->rd_rel->relkind != RELKIND_RELATION || rel->rd_rel->relkind != RELKIND_PROJECTION) ||
 			GpPolicyIsReplicated(rel->rd_cdbpolicy) ||
 			RelationIsAppendOptimized(rel))
 			pstate->p_canOptSelectLockingClause = false;
@@ -1323,6 +1323,7 @@ addRangeTableEntry(ParseState *pstate,
 	rte->relid = RelationGetRelid(rel);
 	rte->relkind = rel->rd_rel->relkind;
 	rte->rellockmode = lockmode;
+	rte->relhasprj = list_length(RelationGetPrjList(rel)) > 0;
 
 	/*
 	 * Build the list of effective column names using user-supplied aliases
@@ -1401,6 +1402,7 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	rte->rtekind = RTE_RELATION;
 	rte->alias = alias;
 	rte->relid = RelationGetRelid(rel);
+	rte->relhasprj = list_length(RelationGetPrjList(rel)) > 0;
 	rte->relkind = rel->rd_rel->relkind;
 	rte->rellockmode = lockmode;
 
@@ -2455,6 +2457,7 @@ isSimplyUpdatableRelation(Oid relid, bool noerror)
 		}
 
 		if (rel->rd_rel->relkind != RELKIND_RELATION &&
+		    rel->rd_rel->relkind != RELKIND_PROJECTION &&
 			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
 		{
 			if (!noerror)
