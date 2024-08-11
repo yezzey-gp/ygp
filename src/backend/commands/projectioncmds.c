@@ -33,6 +33,8 @@
 #include "access/xact.h"
 #include "access/tableam.h"
 
+#include "catalog/aocatalog.h"
+
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp_query.h"
 
@@ -568,14 +570,35 @@ DefineProjection(Oid relationId,
 	);
 
 
-	ReleaseSysCache(amtuple);
-
-
 	UpdateProjectionRelation(
 		prjOid,
 		relationId,
 		newInfo
 	);
+
+	/*
+	 * We must bump the command counter to make the newly-created relation
+	 * tuple visible for opening.
+	 */
+	CommandCounterIncrement();
+
+
+	/*
+	 * Open the new relation and acquire exclusive lock on it.  This isn't
+	 * really necessary for locking out other backends (since they can't see
+	 * the new rel anyway until we commit), but it keeps the lock manager from
+	 * complaining about deadlock risks.
+	 */
+	prjrel = table_open(prjOid, AccessExclusiveLock);
+
+	/*
+	 * If this is an append-only relation, create the auxliary tables necessary
+	 */
+	if (RelationStorageIsAO(prjrel))
+		NewRelationCreateAOAuxTables(RelationGetRelid(prjrel), false);
+
+
+	ReleaseSysCache(amtuple);
 
 	ObjectAddress myself, referenced;
 
@@ -622,20 +645,18 @@ DefineProjection(Oid relationId,
 
 	if (shouldPopulate)
 	{
-		prjrel = table_open(prjOid, AccessExclusiveLock);
 
 		projection_populate(stmt, rel, prjrel, newInfo);
 		
 		/* Make this changes visible */
 		CommandCounterIncrement();
 
-		table_close(prjrel, AccessExclusiveLock);
-
 		elog(LOG, "populated projection %s", stmt->prjname);
 	}
 
-	table_close(rel, ShareLock);
 
+	table_close(prjrel, AccessExclusiveLock);
+	table_close(rel, ShareLock);
 
 	return address;
 }

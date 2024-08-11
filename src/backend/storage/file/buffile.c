@@ -1373,7 +1373,7 @@ BufFileDumpCompressedBuffer(BufFile *file, const void *buffer, Size nbytes)
 	 * account to work_set->comp_buf_total.
 	 */
 
-	compressed_buffer_size = ZSTD_sizeof_CStream(file->zstd_context->cctx);
+	compressed_buffer_size = 0;
 
 	/*
 	 * As ZSTD comments said, the memory usage can evolve (increase or

@@ -82,6 +82,7 @@ ExecOpenProjections(ResultRelInfo *resultRelInfo)
 		prjInfoArray[i] = pji;
 
 		relationDescs[i] = prjDesc;
+		table_dml_init(prjDesc);
 		i++;
 	}
 
