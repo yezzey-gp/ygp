@@ -522,6 +522,10 @@ _outScanInfo(StringInfo str, const Scan *node)
 	_outPlanInfo(str, (const Plan *) node);
 
 	WRITE_UINT_FIELD(scanrelid);
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
+
 	WRITE_UINT_FIELD(segfile_count);
 
 	for (int i = 0; i < node->segfile_count; ++ i) {

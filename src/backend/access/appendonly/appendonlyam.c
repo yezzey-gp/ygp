@@ -1950,6 +1950,10 @@ appendonly_beginscan_y(Relation relation,
 		appendOnlyMetaDataSnapshot = SnapshotSelf;
 	}
 
+	if (seginfo == NULL) {
+		elog(ERROR, "failed to read segment info for yeneid relation scan");
+	}
+
 	/*
 	 * Get the pg_appendonly information for this table
 	 */
@@ -1976,7 +1980,9 @@ appendonly_beginscan_y(Relation relation,
 
 	for (int i = 0 ; i < distribution->dim1 ; ++ i) {
 		if (distribution->values[i] == GpIdentity.segindex) {
-			local_seginfo[local_segfile_count++] = seginfo[i];
+			if (i < segfile_count) {
+				local_seginfo[local_segfile_count++] = seginfo[i];
+			}
 		}
 	}
 

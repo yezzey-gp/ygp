@@ -546,6 +546,10 @@ typedef struct Scan
 	Plan		plan;
 	Index		scanrelid;		/* relid is index into the range table */
 
+
+	int numYezzeyKeyRanges;
+	int *yezzeyKeyRanges; /* yezzey */
+
 	/* yeneid segments */
 	int segfile_count;
 	FileSegInfo **seginfo;

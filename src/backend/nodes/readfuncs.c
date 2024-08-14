@@ -2710,6 +2710,10 @@ ReadCommonScan(Scan *local_node)
 
 	READ_UINT_FIELD(scanrelid);
 
+	READ_INT_FIELD(numYezzeyKeyRanges);
+
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
 	READ_UINT_FIELD(segfile_count);
 
 	local_node->seginfo = palloc0(sizeof(FileSegInfo*) * local_node->segfile_count);
@@ -2727,6 +2731,10 @@ ReadCommonScan(Scan *local_node)
 		READ_INT_FIELD(seginfo[i]->state);
 	}
 
+
+	for (int i = local_node->segfile_count; i < local_node->numYezzeyKeyRanges; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+	}
 }
 
 /*
