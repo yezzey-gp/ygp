@@ -247,7 +247,8 @@ typedef struct TableAmRoutine
 					 Snapshot snapshot,
 					 int nkeys, struct ScanKeyData *key,
 					 ParallelTableScanDesc pscan,
-					 uint32 flags, int segfile_count, FileSegInfo **seginfo, int numYezzeyChunkMetadata, yezzeyScanTuple * yezzeyChunkMetadata);
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo,
+					 int numYezzeyChunkMetadata, yezzeyScanTuple ** yezzeyChunkMetadata);
 	/*
 	 * GPDB: Extract columns for scan from either a projection array
 	 * or a targetlist and quals. This is currently used for AOCO
@@ -887,7 +888,7 @@ table_beginscan_es(Relation rel, Snapshot snapshot,
 				   List *targetList, List *qual, bool *proj, List *constraintList,
 				   int segfile_count, FileSegInfo **seginfo,
 				   int numYezzeyChunkMetadata,
-				   yezzeyScanTuple *yezzeyChunkMetadata)
+				   yezzeyScanTuple **yezzeyChunkMetadata)
 {
 	uint32		flags = SO_TYPE_SEQSCAN |
 	SO_ALLOW_STRAT | SO_ALLOW_SYNC | SO_ALLOW_PAGEMODE;

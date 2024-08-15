@@ -151,8 +151,9 @@ MakeAOSegmentFileName(Relation rel,
  * the File* routines can be used to read, write, close, etc, the file.
  */
 File
-OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount, 
-		yezzeyScanTuple *ytups, int numYtups)
+OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname,
+		int64 logicalEof, int64 modcount, 
+		yezzeyScanTuple **ytups, int numYtups)
 {
 	int			fileFlags = O_RDWR | PG_BINARY;
 	File		fd;

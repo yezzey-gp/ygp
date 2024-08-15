@@ -1749,7 +1749,7 @@ appendonly_beginrangescan_internal(Relation relation,
 								   Snapshot appendOnlyMetaDataSnapshot,
 								   FileSegInfo **seginfo,
 								   int segfile_count,
-								   yezzeyScanTuple *yezzeyChunkMetadata,
+								   yezzeyScanTuple **yezzeyChunkMetadata,
 								   int numYezzeyChunkMetadata,
 								   int nkeys,
 								   ScanKey key,
@@ -1946,7 +1946,7 @@ appendonly_beginscan_y(Relation relation,
 					 int nkeys, struct ScanKeyData *key,
 					 ParallelTableScanDesc pscan,
 					 uint32 flags, int segfile_count, FileSegInfo **seginfo,
-					 int numYezzeyChunkMetadata, yezzeyScanTuple * yezzeyChunkMetadata)
+					 int numYezzeyChunkMetadata, yezzeyScanTuple **yezzeyChunkMetadata)
 {
 	Snapshot	appendOnlyMetaDataSnapshot;
 	AppendOnlyScanDesc aoscan;
@@ -2548,7 +2548,7 @@ AppendOnlyFetchDesc
 appendonly_fetch_init(Relation relation,
 					  Snapshot snapshot,
 					  Snapshot appendOnlyMetaDataSnapshot,
-					  yezzeyScanTuple *yTups,
+					  yezzeyScanTuple **yTups,
 					  int numYtups)
 {
 	AppendOnlyFetchDesc				aoFetchDesc;

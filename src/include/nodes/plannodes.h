@@ -557,7 +557,7 @@ typedef struct Scan
 	FileSegInfo **seginfo;
 
 	int numYezzeyChunkMetadata;
-	yezzeyScanTuple *yezzeyChunkMetadata;
+	yezzeyScanTuple **yezzeyChunkMetadata;
 } Scan;
 
 /* ----------------

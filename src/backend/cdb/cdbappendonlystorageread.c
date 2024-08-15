@@ -66,7 +66,7 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 						   char *relationName,
 						   char *title,
 						   AppendOnlyStorageAttributes *storageAttributes,
-						   yezzeyScanTuple *ytup,
+						   yezzeyScanTuple **ytup,
 						   int numYtup)
 {
 	uint8	   *memory;

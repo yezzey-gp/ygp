@@ -1503,7 +1503,7 @@ typedef struct SeqScanState
 
 	
 	int numYezzeyChunkMetadata;
-	yezzeyScanTuple *yezzeyChunkMetadata;
+	yezzeyScanTuple **yezzeyChunkMetadata;
 } SeqScanState;
 
 /* ----------------

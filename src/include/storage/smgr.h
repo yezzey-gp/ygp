@@ -142,7 +142,7 @@ typedef struct f_smgr_ao {
 		const char * fileName,
 		int fileFlags,
 		int64 modcount,
-		yezzeyScanTuple *ytups,
+		yezzeyScanTuple **ytups,
 		int numYtups
 		);
 	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);

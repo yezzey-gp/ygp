@@ -92,7 +92,7 @@ SMGRFile AORelOpenSegFile(
 	Oid reloid, char * nspname, 
 	char * relname, const char * fileName, 
 	int fileFlags, int64 modcount,
-	yezzeyScanTuple *ytups,
+	yezzeyScanTuple **ytups,
 	int numYtups) {
 	return PathNameOpenFile(fileName, fileFlags);
 }

@@ -2739,11 +2739,20 @@ ReadCommonScan(Scan *local_node)
 	READ_INT_FIELD(numYezzeyChunkMetadata);
 
 
-	local_node->yezzeyChunkMetadata = palloc0(sizeof(yezzeyScanTuple) * local_node->numYezzeyChunkMetadata);
+	local_node->yezzeyChunkMetadata = palloc0(sizeof(yezzeyScanTuple*) * local_node->numYezzeyChunkMetadata);
 
 	for (int i = 0; i < local_node->numYezzeyChunkMetadata; ++ i) {
-		READ_INT_FIELD(yezzeyChunkMetadata[i].len);
-		READ_STRING_FIELD(yezzeyChunkMetadata[i].payload);
+		local_node->yezzeyChunkMetadata[i] = palloc0(sizeof(yezzeyScanTuple));
+		READ_OID_FIELD(yezzeyChunkMetadata[i]->reloid);
+		READ_OID_FIELD(yezzeyChunkMetadata[i]->relfileoid);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->blkno);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->start_offset);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->finish_offset);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->encrypted);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->reused);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->modcount);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->lsn);
+		READ_STRING_FIELD(yezzeyChunkMetadata[i]->x_path);
 	}
 }
 

@@ -194,7 +194,7 @@ typedef struct AppendOnlyStorageRead
 	PGFunction *compression_functions;	/* For AO or CO compression function
 										 * pointers. The array index
 										 * corresponds to COMP_FUNC_*	*/	
-	yezzeyScanTuple *ytups;
+	yezzeyScanTuple **ytups;
 	int numYtups;
 } AppendOnlyStorageRead;
 
@@ -205,7 +205,7 @@ extern void AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 						   char * relationNamespace,
 						   char *relationName, char *title,
 						   AppendOnlyStorageAttributes *storageAttributes,
-						   yezzeyScanTuple *ytup,
+						   yezzeyScanTuple **ytup,
 						   int numYtup);
 
 extern char *AppendOnlyStorageRead_RelationName(AppendOnlyStorageRead *storageRead);

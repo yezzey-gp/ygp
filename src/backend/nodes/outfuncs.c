@@ -542,8 +542,16 @@ _outScanInfo(StringInfo str, const Scan *node)
 	WRITE_INT_FIELD(numYezzeyChunkMetadata);
 
 	for (int i = 0; i < node->numYezzeyChunkMetadata; ++ i) {
-		WRITE_INT_FIELD(yezzeyChunkMetadata[i].len);
-		WRITE_STRING_FIELD(yezzeyChunkMetadata[i].payload);
+		WRITE_OID_FIELD(yezzeyChunkMetadata[i]->reloid);
+		WRITE_OID_FIELD(yezzeyChunkMetadata[i]->relfileoid);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->blkno);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->start_offset);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->finish_offset);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->encrypted);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->reused);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->modcount);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->lsn);
+		WRITE_STRING_FIELD(yezzeyChunkMetadata[i]->x_path);
 	}
 }
 

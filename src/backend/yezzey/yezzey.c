@@ -19,6 +19,7 @@
 #include "utils/fmgroids.h"
 
 #include "utils/snapmgr.h"
+#include "utils/builtins.h"
 
 void YezzeyPopulateMetadataRelation(EState *estate);
 void YeneidPopulateMetadataRelation(EState *estate);
@@ -79,27 +80,30 @@ void YezzeyPopulateScanMetadata(Relation relation, Scan *scan) {
     /* some random initial number*/
     int chunkSz = 100;
 
-    scan->yezzeyChunkMetadata = (yezzeyScanTuple *) palloc0(sizeof(yezzeyScanTuple) * chunkSz);
+    scan->yezzeyChunkMetadata = (yezzeyScanTuple **) palloc0(sizeof(yezzeyScanTuple*) * chunkSz);
 
     while (HeapTupleIsValid(tuple = heap_getnext(desc, ForwardScanDirection))) {
         if (scan->numYezzeyChunkMetadata >= chunkSz) {
             chunkSz *= 2;
-            scan->yezzeyChunkMetadata = (yezzeyScanTuple *) repalloc(scan->yezzeyChunkMetadata, sizeof(yezzeyScanTuple) * chunkSz);
+            scan->yezzeyChunkMetadata = (yezzeyScanTuple **) repalloc(scan->yezzeyChunkMetadata, sizeof(yezzeyScanTuple*) * chunkSz);
         }
-        MemTuple memtup;
-    
-		/* Break down the tuple into fields */
-		heap_deform_tuple(tuple, tupdesc, values, nulls);
 
-        memtup = memtuple_form(mt_bind, values, nulls);
+        yezzeyScanTupleDB * ytupdb = ((yezzeyScanTupleDB *)GETSTRUCT(tuple));
 
-        /*
-        * get space to insert our next item (tuple)
-        */
-        itemLen = memtuple_get_size(memtup);
+        yezzeyScanTuple * ytup = palloc0(sizeof(yezzeyScanTuple));
 
-        scan->yezzeyChunkMetadata[scan->numYezzeyChunkMetadata].len = itemLen;
-        scan->yezzeyChunkMetadata[scan->numYezzeyChunkMetadata].payload = memtup;
+        ytup->reloid = ytupdb->reloid;
+        ytup->relfileoid = ytupdb->relfileoid;
+        ytup->blkno = ytupdb->blkno;
+        ytup->start_offset = ytupdb->start_offset;
+        ytup->finish_offset = ytupdb->finish_offset;
+        ytup->encrypted = ytupdb->encrypted;
+        ytup->reused = ytupdb->reused;
+        ytup->modcount = ytupdb->modcount;
+        ytup->lsn = ytupdb->lsn;
+        ytup->x_path = text_to_cstring(&(ytupdb->x_path));
+
+        scan->yezzeyChunkMetadata[scan->numYezzeyChunkMetadata] = ytup;
 
         scan->numYezzeyChunkMetadata++;
     }

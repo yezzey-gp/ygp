@@ -286,7 +286,7 @@ typedef struct AppendOnlyScanDescData
 	int64 		sampleTargetBlk;
 
 
-	yezzeyScanTuple *yezzeyChunkMetadata;
+	yezzeyScanTuple **yezzeyChunkMetadata;
 	int numYezzeyChunkMetadata;
 }	AppendOnlyScanDescData;
 
@@ -475,7 +475,7 @@ extern TableScanDesc appendonly_beginscan_y(Relation relation,
 					 int nkeys, struct ScanKeyData *key,
 					 ParallelTableScanDesc pscan,
 					 uint32 flags, int segfile_count, FileSegInfo **seginfo, 
-					 int numYezzeyChunkMetadata, yezzeyScanTuple *yezzeyChunkMetadata);
+					 int numYezzeyChunkMetadata, yezzeyScanTuple **yezzeyChunkMetadata);
 
 extern void appendonly_rescan(TableScanDesc scan, ScanKey key,
 								bool set_params, bool allow_strat,
@@ -491,7 +491,7 @@ extern AppendOnlyFetchDesc appendonly_fetch_init(
 	Relation 	relation,
 	Snapshot    snapshot,
 	Snapshot 	appendOnlyMetaDataSnapshot,
-	yezzeyScanTuple *yTups,
+	yezzeyScanTuple **yTups,
 	int numYtups);
 extern bool appendonly_fetch(
 	AppendOnlyFetchDesc aoFetchDesc,
