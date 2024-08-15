@@ -151,14 +151,15 @@ MakeAOSegmentFileName(Relation rel,
  * the File* routines can be used to read, write, close, etc, the file.
  */
 File
-OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount)
+OpenAOSegmentFile(Relation aorel, const char *nspname, char *filepathname, int64 logicalEof, int64 modcount, 
+		yezzeyScanTuple *ytups, int numYtups)
 {
 	int			fileFlags = O_RDWR | PG_BINARY;
 	File		fd;
 
 	errno = 0;
 
-	fd = aorel->rd_smgr->storageManagerAO->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, modcount);
+	fd = aorel->rd_smgr->storageManagerAO->smgr_AORelOpenSegFile(RelationGetRelid(aorel), nspname, RelationGetRelationName(aorel), filepathname, O_RDWR | PG_BINARY, modcount, ytups, numYtups);
 	if (fd < 0)
 	{
 		if (logicalEof == 0 && errno == ENOENT)
@@ -430,7 +431,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		InvalidOid /* dont need reloid */,
 		NULL,
 		NULL, /*we dont need to pass original relation name here, because yezzey not need it in r/o case*/
-		srcsegpath, O_RDONLY | PG_BINARY, -1 /* FIXME */);
+		srcsegpath, O_RDONLY | PG_BINARY, -1 /* FIXME */, NULL, 0);
 
 	if (srcFile < 0)
 		ereport(ERROR,
@@ -450,7 +451,7 @@ copy_file(char *srcsegpath, char *dstsegpath,
 		InvalidOid /*FIXME: copying yezzey files may not work here */,
 		NULL,
 		NULL,/*FIXME: copying yezzey files may not work here*/
-		dstsegpath, dstflags, 0);
+		dstsegpath, dstflags, 0, NULL, 0);
 	if (dstFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -635,7 +636,7 @@ truncate_ao_perFile(const int segno, void *ctx)
 
 	RelationOpenSmgr(aorel);
 
-	fd = OpenAOSegmentFile(aorel, nspname, segPath, 0, -1);
+	fd = OpenAOSegmentFile(aorel, nspname, segPath, 0, -1, NULL, 0);
 
 	if (fd >= 0)
 	{

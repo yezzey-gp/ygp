@@ -171,7 +171,9 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 								   nspname,
 								   NameStr(scan->aos_rd->rd_rel->relname),
 								   scan->title,
-								   &scan->storageAttributes);
+								   &scan->storageAttributes,
+								   scan->yezzeyChunkMetadata,
+								   scan->numYezzeyChunkMetadata);
 
 		pfree(nspname);
 
@@ -1702,7 +1704,9 @@ appendonly_blkdirscan_init(AppendOnlyScanDesc scan)
 	if (scan->aofetch == NULL)
 		scan->aofetch = appendonly_fetch_init(scan->aos_rd,
 											  scan->snapshot,
-											  scan->appendOnlyMetaDataSnapshot);
+											  scan->appendOnlyMetaDataSnapshot,
+											  scan->yezzeyChunkMetadata,
+											  scan->numYezzeyChunkMetadata);
 
 	scan->blkdirscan = palloc0(sizeof(AOBlkDirScanData));
 	AOBlkDirScan_Init(scan->blkdirscan, &scan->aofetch->blockDirectory);
@@ -1760,9 +1764,6 @@ appendonly_beginrangescan_internal(Relation relation,
 	int16		compresslevel = 0;
 	NameData	compresstype;
 
-	scan->yezzeyChunkMetadata = yezzeyChunkMetadata;
-	scan->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
-
 	GetAppendOnlyEntryAttributes(relation->rd_id, &blocksize, &compresslevel, &checksum, &compresstype);
 
 	/*
@@ -1794,6 +1795,10 @@ appendonly_beginrangescan_internal(Relation relation,
 	scan->snapshot = snapshot;
 	scan->aos_nkeys = nkeys;
 	scan->aoScanInitContext = CurrentMemoryContext;
+
+
+	scan->yezzeyChunkMetadata = yezzeyChunkMetadata;
+	scan->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
 
 	initStringInfo(&titleBuf);
 	appendStringInfo(&titleBuf, "Scan of Append-Only Row-Oriented relation '%s'",
@@ -2542,7 +2547,9 @@ resetCurrentBlockInfo(AOFetchBlockMetadata * currentBlock)
 AppendOnlyFetchDesc
 appendonly_fetch_init(Relation relation,
 					  Snapshot snapshot,
-					  Snapshot appendOnlyMetaDataSnapshot)
+					  Snapshot appendOnlyMetaDataSnapshot,
+					  yezzeyScanTuple *yTups,
+					  int numYtups)
 {
 	AppendOnlyFetchDesc				aoFetchDesc;
 	AppendOnlyStorageAttributes	   *attr;
@@ -2661,7 +2668,7 @@ appendonly_fetch_init(Relation relation,
 							   nspname,
 							   NameStr(aoFetchDesc->relation->rd_rel->relname),
 							   aoFetchDesc->title,
-							   &aoFetchDesc->storageAttributes);
+							   &aoFetchDesc->storageAttributes, yTups, numYtups);
 
 	pfree(nspname);
 

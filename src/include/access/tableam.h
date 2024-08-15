@@ -29,6 +29,8 @@
 
 #include "access/aosegfiles.h"
 
+#include "yezzey/yezzey_base.h"
+
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
 

@@ -22,6 +22,8 @@
 #include "storage/dbdirnode.h"
 #include "fd.h"
 
+#include "yezzey/yezzey_base.h"
+
 typedef enum SMgrImplementation
 {
 	SMGR_MD = 0,
@@ -139,7 +141,10 @@ typedef struct f_smgr_ao {
 		char * relname,
 		const char * fileName,
 		int fileFlags,
-		int64 modcount);
+		int64 modcount,
+		yezzeyScanTuple *ytups,
+		int numYtups
+		);
 	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);
 	int			(*smgr_FileDiskSize) (SMGRFile file);
 } f_smgr_ao;

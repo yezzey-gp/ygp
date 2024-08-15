@@ -193,8 +193,9 @@ typedef struct AppendOnlyStorageRead
 	int			blocksize;		/* For AO or CO uncompresed block size			*/
 	PGFunction *compression_functions;	/* For AO or CO compression function
 										 * pointers. The array index
-										 * corresponds to COMP_FUNC_*	*/
-
+										 * corresponds to COMP_FUNC_*	*/	
+	yezzeyScanTuple *ytups;
+	int numYtups;
 } AppendOnlyStorageRead;
 
 extern void AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
@@ -203,7 +204,9 @@ extern void AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 						   int32 maxBufferLen,
 						   char * relationNamespace,
 						   char *relationName, char *title,
-						   AppendOnlyStorageAttributes *storageAttributes);
+						   AppendOnlyStorageAttributes *storageAttributes,
+						   yezzeyScanTuple *ytup,
+						   int numYtup);
 
 extern char *AppendOnlyStorageRead_RelationName(AppendOnlyStorageRead *storageRead);
 extern char *AppendOnlyStorageRead_SegmentFileName(AppendOnlyStorageRead *storageRead);

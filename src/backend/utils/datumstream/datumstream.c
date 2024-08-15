@@ -697,7 +697,7 @@ create_datumstreamread(
 							   relnamespace,
 							   relname,
 							   title,
-							   &acc->ao_attr);
+							   &acc->ao_attr, NULL, 0);
 
 	acc->ao_read.compression_functions = compressionFunctions;
 	acc->ao_read.compressionState = compressionState;

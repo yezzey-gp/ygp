@@ -620,7 +620,8 @@ appendonly_index_fetch_tuple(struct IndexFetchTableData *scan,
 		aoscan->aofetch =
 			appendonly_fetch_init(aoscan->xs_base.rel,
 								  snapshot,
-								  appendOnlyMetaDataSnapshot);
+								  appendOnlyMetaDataSnapshot,
+								  NULL, 0);
 	}
 	/*
 	 * There is no reason to expect changes on snapshot between tuple
@@ -2282,7 +2283,8 @@ appendonly_scan_bitmap_next_tuple(TableScanDesc scan,
 		aoscan->aofetch =
 			appendonly_fetch_init(aoscan->rs_base.rs_rd,
 			                      aoscan->snapshot,
-			                      aoscan->appendOnlyMetaDataSnapshot);
+			                      aoscan->appendOnlyMetaDataSnapshot,
+								  aoscan->yezzeyChunkMetadata, aoscan->numYezzeyChunkMetadata);
 
 	}
 

@@ -25,6 +25,7 @@
 #include "parsenodes.h"
 
 #include "access/aosegfiles.h"
+#include "yezzey/yezzey_base.h"
 
 typedef struct DirectDispatchInfo
 {
@@ -536,10 +537,6 @@ typedef struct BitmapOr
 	List	   *bitmapplans;
 } BitmapOr;
 
-typedef struct yezzeyScanTuple {
-	int len;
-	char * payload;
-} yezzeyScanTuple;
 
 /*
  * ==========

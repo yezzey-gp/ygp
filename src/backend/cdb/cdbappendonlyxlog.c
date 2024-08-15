@@ -89,7 +89,7 @@ ao_insert_replay(XLogReaderState *record)
 		NULL,
 		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
 		path, 
-		fileFlags, -1 /* FIXME */);
+		fileFlags, -1 /* FIXME */, NULL, 0);
 	if (file < 0)
 	{
 		XLogAOSegmentFile(xlrec->target.node, xlrec->target.segment_filenum);
@@ -157,7 +157,7 @@ ao_truncate_replay(XLogReaderState *record)
 		NULL,
 		NULL/*table name is not known, but also not need in yezzey during recovery*/, 
 		path, 
-		O_RDWR | PG_BINARY, -1 /* FIXME */);
+		O_RDWR | PG_BINARY, -1 /* FIXME */, NULL, 0);
 	if (file < 0)
 	{
 		/*

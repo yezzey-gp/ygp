@@ -65,7 +65,9 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 						   char *relationNamespace,
 						   char *relationName,
 						   char *title,
-						   AppendOnlyStorageAttributes *storageAttributes)
+						   AppendOnlyStorageAttributes *storageAttributes,
+						   yezzeyScanTuple *ytup,
+						   int numYtup)
 {
 	uint8	   *memory;
 	int32		memoryLen;
@@ -140,6 +142,8 @@ AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
 	MemoryContextSwitchTo(oldMemoryContext);
 
 	storageRead->isActive = true;
+	storageRead->ytups = ytup;
+	storageRead->numYtups = numYtup;
 }
 
 /*
@@ -260,7 +264,7 @@ AppendOnlyStorageRead_DoOpenFile(AppendOnlyStorageRead *storageRead,
 		storageRead->relationNamespace,
 		storageRead->relationName,
 		filePathName,
-		fileFlags, -1 /*FIXME*/);
+		fileFlags, -1 /*FIXME*/, storageRead->ytups, storageRead->numYtups);
 
 	return file;
 }

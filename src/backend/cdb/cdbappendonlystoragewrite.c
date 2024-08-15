@@ -342,7 +342,7 @@ AppendOnlyStorageWrite_OpenFile(AppendOnlyStorageWrite *storageWrite,
 		storageWrite->relationName,
 		path, 
 		fileFlags,
-		modcount);
+		modcount, NULL, 0);
 
 	if (file < 0)
 		ereport(ERROR,

@@ -2397,7 +2397,7 @@ aocs_begin_headerscan(Relation rel, int colno)
 							   nspname,
 							   RelationGetRelationName(rel),
 							   "ALTER TABLE ADD COLUMN scan",
-							   &ao_attr);
+							   &ao_attr, NULL, 0);
 	hdesc->colno = colno;
 	hdesc->relid = RelationGetRelid(rel);
 

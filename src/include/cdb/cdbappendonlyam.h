@@ -490,7 +490,9 @@ extern bool appendonly_get_target_tuple(AppendOnlyScanDesc aoscan,
 extern AppendOnlyFetchDesc appendonly_fetch_init(
 	Relation 	relation,
 	Snapshot    snapshot,
-	Snapshot 	appendOnlyMetaDataSnapshot);
+	Snapshot 	appendOnlyMetaDataSnapshot,
+	yezzeyScanTuple *yTups,
+	int numYtups);
 extern bool appendonly_fetch(
 	AppendOnlyFetchDesc aoFetchDesc,
 	AOTupleId *aoTid,
