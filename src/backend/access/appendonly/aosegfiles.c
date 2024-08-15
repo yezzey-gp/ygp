@@ -468,14 +468,14 @@ GetAllFileSegInfo(Relation parentrel,
 
 	pg_aoseg_rel = table_open(segrelid, AccessShareLock);
 
+	if (parentrel->rd_ydtuple != NULL) {
+		distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, parentrel->rd_ydtuple,
+						Anum_yezzey_distrib_y_key_distriubtion,
+						&isNull)); 
 
-	
-	distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, parentrel->rd_ydtuple,
-					Anum_yezzey_distrib_y_key_distriubtion,
-					&isNull)); 
-
-	if (!isNull) {
-		exp_size = distribution->dim1;
+		if (!isNull) {
+			exp_size = distribution->dim1;
+		}
 	}
 
 
