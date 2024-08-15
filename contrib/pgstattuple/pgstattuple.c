@@ -302,6 +302,8 @@ pgstat_relation(Relation rel, FunctionCallInfo fcinfo)
 			break;
 		case RELKIND_PARTITIONED_INDEX:
 			err = "partitioned index";
+		case RELKIND_YEZZEYINDEX:
+			err = "yezzey virtual index";
 			break;
 		default:
 			err = "unknown";

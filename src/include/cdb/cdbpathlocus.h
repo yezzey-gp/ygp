@@ -59,6 +59,7 @@ typedef enum CdbLocusType
     CdbLocusType_Hashed,        /* hash partitioned over all qExecs of N-gang */
     CdbLocusType_HashedOJ,      /* result of hash partitioned outer join, NULLs can be anywhere */
     CdbLocusType_Strewn,        /* partitioned on no known function */
+    CdbLocusType_Yezzey,        /* partitioned with Yezzey hash */
     CdbLocusType_End            /* = last valid CdbLocusType + 1 */
 } CdbLocusType;
 
@@ -148,8 +149,11 @@ typedef enum CdbLocusType
 typedef struct CdbPathLocus
 {
 	CdbLocusType locustype;
-	List	   *distkey;		/* List of DistributionKeys */
-	int			numsegments;
+	/* list of key-ranges in case of CdbLocusType_Yezzey */
+    List	   *distkey;		/* List of DistributionKeys */
+    int			numsegments;
+    int         numykr;
+    int         *ykr;
 } CdbPathLocus;
 
 #define CdbPathLocus_NumSegments(locus)         \
@@ -164,7 +168,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_IsEqual(a, b)              \
             ((a).locustype == (b).locustype &&  \
              (a).numsegments == (b).numsegments && \
-             (a).distkey == (b).distkey)
+             (a).distkey == (b).distkey && \
+             (a).numykr == (b).numykr && \
+             (a).ykr == (b).ykr)
 
 #define CdbPathLocus_CommonSegments(a, b) \
             Min((a).numsegments, (b).numsegments)
@@ -190,7 +196,9 @@ typedef struct CdbPathLocus
 #define CdbPathLocus_IsPartitioned(locus)       \
             (CdbPathLocus_IsHashed(locus) ||    \
              CdbPathLocus_IsHashedOJ(locus) ||  \
-             CdbPathLocus_IsStrewn(locus))
+             CdbPathLocus_IsStrewn(locus) || \
+             CdbPathLocus_IsYezzey(locus))
+
 
 #define CdbPathLocus_IsNull(locus)          \
             ((locus).locustype == CdbLocusType_Null)
@@ -212,6 +220,8 @@ typedef struct CdbPathLocus
             ((locus).locustype == CdbLocusType_SegmentGeneral)
 #define CdbPathLocus_IsOuterQuery(locus)        \
             ((locus).locustype == CdbLocusType_OuterQuery)
+#define CdbPathLocus_IsYezzey(locus)        \
+            ((locus).locustype == CdbLocusType_Yezzey)
 
 #define CdbPathLocus_MakeSimple(plocus, _locustype, numsegments_) \
     do {                                                \
@@ -219,6 +229,8 @@ typedef struct CdbPathLocus
         _locus->locustype = (_locustype);               \
         _locus->numsegments = (numsegments_);                        \
         _locus->distkey = NIL;                        \
+        _locus->numykr = 0;                           \
+        _locus->ykr = NULL;                           \
     } while (0)
 
 #define CdbPathLocus_MakeNull(plocus)                   \
@@ -239,6 +251,8 @@ typedef struct CdbPathLocus
         _locus->locustype = CdbLocusType_Hashed;		\
         _locus->numsegments = (numsegments_);           \
         _locus->distkey = (distkey_);					\
+        _locus->numykr = 0;	     			            \
+        _locus->ykr = NULL;					            \
         Assert(cdbpathlocus_is_valid(*_locus));         \
     } while (0)
 #define CdbPathLocus_MakeHashedOJ(plocus, distkey_, numsegments_)     \
@@ -247,10 +261,23 @@ typedef struct CdbPathLocus
         _locus->locustype = CdbLocusType_HashedOJ;		\
         _locus->numsegments = (numsegments_);           \
         _locus->distkey = (distkey_);					\
+        _locus->numykr = 0;	     			            \
+        _locus->ykr = NULL;					            \
         Assert(cdbpathlocus_is_valid(*_locus));         \
     } while (0)
 #define CdbPathLocus_MakeStrewn(plocus, numsegments_)                 \
             CdbPathLocus_MakeSimple((plocus), CdbLocusType_Strewn, (numsegments_))
+
+#define CdbPathLocus_MakeYezzey(plocus, distkey_, numykr, ykr_, numseg)       \
+    do {                                                \
+        CdbPathLocus *_locus = (plocus);                \
+        _locus->locustype = CdbLocusType_Yezzey;		\
+        _locus->numsegments = numseg;                       \
+        _locus->distkey = (distkey_);					\
+        _locus->numykr = (numykr);					     \
+        _locus->ykr = (ykr_);					        \
+        Assert(cdbpathlocus_is_valid(*_locus));         \
+    } while (0)
 
 #define CdbPathLocus_MakeOuterQuery(plocus)                 \
 	CdbPathLocus_MakeSimple((plocus), CdbLocusType_OuterQuery, -1)
@@ -263,10 +290,11 @@ extern bool cdbpathlocus_equal(CdbPathLocus a, CdbPathLocus b);
 
 extern CdbPathLocus cdbpathlocus_for_insert(struct PlannerInfo *root,
 											struct GpPolicy *policy,
+                                            int2vector *ykr,
 											struct PathTarget *pathtarget);
 
 CdbPathLocus
-cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy);
+cdbpathlocus_from_policy(struct PlannerInfo *root, Index rti, struct GpPolicy *policy, int nykr, int *ykr);
 CdbPathLocus
 cdbpathlocus_from_baserel(struct PlannerInfo   *root,
                           struct RelOptInfo    *rel);

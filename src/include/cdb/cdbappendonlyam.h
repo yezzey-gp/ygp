@@ -64,6 +64,7 @@ extern AppendOnlyBlockDirectory *GetAOBlockDirectory(Relation relation);
 typedef struct AppendOnlyInsertDescData
 {
 	Relation		aoi_rel;
+	Relation		from_aoi_rel;
 	Snapshot		appendOnlyMetaDataSnapshot;
 	MemTupleBinding *mt_bind;
 	File			appendFile;
@@ -283,6 +284,10 @@ typedef struct AppendOnlyScanDescData
 	 * to comply with the TSM API).
 	 */
 	int64 		sampleTargetBlk;
+
+
+	yezzeyScanTuple **yezzeyChunkMetadata;
+	int numYezzeyChunkMetadata;
 }	AppendOnlyScanDescData;
 
 typedef AppendOnlyScanDescData *AppendOnlyScanDesc;
@@ -465,6 +470,13 @@ extern TableScanDesc appendonly_beginscan(Relation relation,
 										  int nkeys, struct ScanKeyData *key,
 										  ParallelTableScanDesc pscan,
 										  uint32 flags);
+extern TableScanDesc appendonly_beginscan_y(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo, 
+					 int numYezzeyChunkMetadata, yezzeyScanTuple **yezzeyChunkMetadata);
+
 extern void appendonly_rescan(TableScanDesc scan, ScanKey key,
 								bool set_params, bool allow_strat,
 								bool allow_sync, bool allow_pagemode);
@@ -478,7 +490,9 @@ extern bool appendonly_get_target_tuple(AppendOnlyScanDesc aoscan,
 extern AppendOnlyFetchDesc appendonly_fetch_init(
 	Relation 	relation,
 	Snapshot    snapshot,
-	Snapshot 	appendOnlyMetaDataSnapshot);
+	Snapshot 	appendOnlyMetaDataSnapshot,
+	yezzeyScanTuple **yTups,
+	int numYtups);
 extern bool appendonly_fetch(
 	AppendOnlyFetchDesc aoFetchDesc,
 	AOTupleId *aoTid,
@@ -486,14 +500,15 @@ extern bool appendonly_fetch(
 extern void appendonly_fetch_finish(AppendOnlyFetchDesc aoFetchDesc);
 extern AppendOnlyIndexOnlyDesc appendonly_index_only_init(Relation relation,
 														  Snapshot snapshot);
+
 extern bool appendonly_index_only_check(AppendOnlyIndexOnlyDesc indexonlydesc,
 										AOTupleId *aotid,
 										Snapshot snapshot);
 extern void appendonly_index_only_finish(AppendOnlyIndexOnlyDesc indexonlydesc);
-extern void appendonly_dml_init(Relation relation);
+extern void appendonly_dml_init(Relation relation, int segfile_count, FileSegInfo **seginfo);
 extern AppendOnlyInsertDesc appendonly_insert_init(Relation rel,
 												   int segno,
-												   int64 num_rows);
+												   int64 num_rows, FileSegInfo*seginfo);
 extern void appendonly_insert(
 		AppendOnlyInsertDesc aoInsertDesc, 
 		MemTuple instup, 

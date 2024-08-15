@@ -125,6 +125,21 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 	Relation	relation;
 	bool		hasindex;
 	List	   *indexinfos = NIL;
+	int2vector *yezzey_key_ranges;
+	int        *yezzeyKeyRanges;
+	int i;
+
+	yezzey_key_ranges = RelationGetYezzeyKeyByRelid(relationObjectId);
+
+	if (yezzey_key_ranges != NULL) {
+		yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));
+		
+		for (i = 0; i < yezzey_key_ranges->dim1; i ++) {
+			yezzeyKeyRanges[i] = yezzey_key_ranges->values[i];
+		}
+	} else {
+		yezzeyKeyRanges = NULL;
+	}
 
 	/*
 	 * We need not lock the relation since it was already locked, either by
@@ -153,6 +168,11 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
      * CDB: Get partitioning key info for distributed relation.
      */
     rel->cdbpolicy = RelationGetPartitioningKey(relation);
+	/*
+     * Yezzey: Get key ranges key info for distributed yezzey relation.
+     */
+    rel->yezzey_key_ranges = yezzeyKeyRanges;
+	rel->num_yezzey_key_ranges = yezzey_key_ranges ? yezzey_key_ranges->dim1 : 0;
 	rel->relam = relation->rd_rel->relam;
 
 	/*

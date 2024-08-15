@@ -101,10 +101,12 @@ BufferedReadInit(
 	/*
 	 * File level members.
 	 */
-	bufferedRead->file = -1;
+ 	bufferedRead->file = -1;
 	bufferedRead->fileLen = 0;
-	/* start reading from beginning of file */
-	bufferedRead->fileOff = 0;
+
+	/* Yezzey path begin */
+	bufferedRead->smgr = smgrao();
+	/* Yezzey path end */
 
 	/*
 	 * Temporary limit support for random reading.
@@ -183,7 +185,9 @@ BufferedReadIo(
 		if (track_io_timing)
 			INSTR_TIME_SET_CURRENT(io_start);
 
-		actualLen = FileRead(bufferedRead->file,
+
+		/* Read file using Yezzey AO smgr API */
+		actualLen = bufferedRead->smgr->smgr_FileRead(bufferedRead->file,
 							 (char *) largeReadMemory,
 							 largeReadLen,
 							 bufferedRead->fileOff,

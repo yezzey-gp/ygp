@@ -387,6 +387,18 @@ cdbconn_discardResults(SegmentDatabaseDescriptor *segdbDesc,
 	}
 	segdbDesc->conn->notifyHead = segdbDesc->conn->notifyTail = NULL;
 
+	segdbDesc->conn->nTuples = 0;
+	if (segdbDesc->conn->Tuples != NULL) {
+		free(segdbDesc->conn->Tuples);
+		segdbDesc->conn->Tuples = NULL;
+	}
+
+	segdbDesc->conn->AOnTuples = 0;
+	if (segdbDesc->conn->AOTuples != NULL) {
+		free(segdbDesc->conn->AOTuples);
+		segdbDesc->conn->AOTuples = NULL;
+	}
+
 	return retval;
 }
 

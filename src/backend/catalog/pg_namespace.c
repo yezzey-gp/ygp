@@ -84,7 +84,14 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 	nspoid = GetNewOidForNamespace(nspdesc, NamespaceOidIndexId,
 								   Anum_pg_namespace_oid,
 								   unconstify(char *, nspName));
-	values[Anum_pg_namespace_oid - 1] = ObjectIdGetDatum(nspoid);
+
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(nspName, "yezzey") == 0) {
+		values[Anum_pg_namespace_oid - 1] = YEZZEY_AUX_NAMESPACE;
+	} else {
+		values[Anum_pg_namespace_oid - 1] = ObjectIdGetDatum(nspoid);
+	}
+
 	namestrcpy(&nname, nspName);
 	values[Anum_pg_namespace_nspname - 1] = NameGetDatum(&nname);
 	values[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(ownerId);
@@ -94,9 +101,12 @@ NamespaceCreate(const char *nspName, Oid ownerId, bool isTemp)
 		nulls[Anum_pg_namespace_nspacl - 1] = true;
 
 
+
 	tup = heap_form_tuple(tupDesc, values, nulls);
 
+	
 	CatalogTupleInsert(nspdesc, tup);
+	
 	Assert(OidIsValid(nspoid));
 
 	table_close(nspdesc, RowExclusiveLock);

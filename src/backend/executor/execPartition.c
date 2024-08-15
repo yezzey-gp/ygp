@@ -942,8 +942,9 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
 		lappend(estate->es_tuple_routing_result_relations,
 				leaf_part_rri);
 
+	/* Yeneid fix this: */
 	if (leaf_part_rri->ri_RelationDesc->rd_tableam)
-		table_dml_init(leaf_part_rri->ri_RelationDesc);
+		table_dml_init(leaf_part_rri->ri_RelationDesc, 0, NULL);
 
 	MemoryContextSwitchTo(oldcxt);
 

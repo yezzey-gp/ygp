@@ -63,6 +63,8 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/snapmgr.h"
+#include "catalog/pg_namespace.h"
+#include "utils/syscache.h"
 
 
 typedef enum AoExecutorBlockKind
@@ -147,14 +149,33 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 	if (!scan->initedStorageRoutines)
 	{
 		PGFunction *fns = NULL;
+		HeapTuple tp;
+		char * nspname;
+
+		tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(scan->aos_rd->rd_rel->relnamespace));
+
+		if (HeapTupleIsValid(tp))
+		{
+			Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+			nspname = pstrdup(NameStr(nsptup->nspname));
+			ReleaseSysCache(tp);
+		} else {
+			elog(ERROR, "yezzey: failed to get namescape name of relation %s", scan->aos_rd->rd_rel->relname.data);
+		}
 
 		AppendOnlyStorageRead_Init(
 								   &scan->storageRead,
+								   scan->aos_rd->rd_id,
 								   scan->aoScanInitContext,
 								   scan->usableBlockSize,
+								   nspname,
 								   NameStr(scan->aos_rd->rd_rel->relname),
 								   scan->title,
-								   &scan->storageAttributes);
+								   &scan->storageAttributes,
+								   scan->yezzeyChunkMetadata,
+								   scan->numYezzeyChunkMetadata);
+
+		pfree(nspname);
 
 		/*
 		 * There is no guarantee that the current memory context will be
@@ -261,7 +282,7 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 								   &scan->storageRead,
 								   scan->aos_filenamepath,
 								   formatversion,
-								   eof);
+								   eof, scan->aos_rd->rd_node);
 
 	AppendOnlyExecutionReadBlock_SetSegmentFileNum(
 												   &scan->executorReadBlock,
@@ -361,10 +382,14 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 	 * Now, get the information for the file segment we are going to append
 	 * to.
 	 */
-	aoInsertDesc->fsInfo = GetFileSegInfo(aoInsertDesc->aoi_rel,
-										  aoInsertDesc->appendOnlyMetaDataSnapshot,
-										  aoInsertDesc->cur_segno,
-										  true);
+
+	/* In yezzey case we have already set fsInfo */
+	if (aoInsertDesc->fsInfo == NULL) {
+		aoInsertDesc->fsInfo = GetFileSegInfo(aoInsertDesc->aoi_rel,
+											aoInsertDesc->appendOnlyMetaDataSnapshot,
+											aoInsertDesc->cur_segno,
+											true);
+	}
 
 	/* Never insert into a segment that is awaiting a drop */
 	if (aoInsertDesc->fsInfo->state == AOSEG_STATE_AWAITING_DROP)
@@ -398,6 +423,7 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									aoInsertDesc->fsInfo->formatversion,
 									eof,
 									eof_uncompressed,
+									aoInsertDesc->fsInfo->modcount,
 									&rnode,
 									aoInsertDesc->cur_segno);
 
@@ -439,14 +465,26 @@ CloseWritableFileSeg(AppendOnlyInsertDesc aoInsertDesc)
 	/*
 	 * Update the AO segment info table with our new eof
 	 */
-	UpdateFileSegInfo(aoInsertDesc->aoi_rel,
-					  aoInsertDesc->cur_segno,
-					  fileLen,
-					  fileLen_uncompressed,
-					  aoInsertDesc->insertCount,
-					  aoInsertDesc->varblockCount,
-					  (aoInsertDesc->skipModCountIncrement ? 0 : 1),
-					  AOSEG_STATE_USECURRENT);
+	if (RelationIsYeneid(aoInsertDesc->aoi_rel)) {
+		UpdateYeneidFileSegInfo(aoInsertDesc->aoi_rel,
+						aoInsertDesc->fsInfo,
+						aoInsertDesc->cur_segno,
+						fileLen,
+						fileLen_uncompressed,
+						aoInsertDesc->insertCount,
+						aoInsertDesc->varblockCount,
+						(aoInsertDesc->skipModCountIncrement ? 0 : 1),
+						AOSEG_STATE_USECURRENT);
+	} else {
+		UpdateFileSegInfo(aoInsertDesc->aoi_rel,
+						aoInsertDesc->cur_segno,
+						fileLen,
+						fileLen_uncompressed,
+						aoInsertDesc->insertCount,
+						aoInsertDesc->varblockCount,
+						(aoInsertDesc->skipModCountIncrement ? 0 : 1),
+						AOSEG_STATE_USECURRENT);
+	}
 
 	pfree(aoInsertDesc->fsInfo);
 	aoInsertDesc->fsInfo = NULL;
@@ -1666,7 +1704,9 @@ appendonly_blkdirscan_init(AppendOnlyScanDesc scan)
 	if (scan->aofetch == NULL)
 		scan->aofetch = appendonly_fetch_init(scan->aos_rd,
 											  scan->snapshot,
-											  scan->appendOnlyMetaDataSnapshot);
+											  scan->appendOnlyMetaDataSnapshot,
+											  scan->yezzeyChunkMetadata,
+											  scan->numYezzeyChunkMetadata);
 
 	scan->blkdirscan = palloc0(sizeof(AOBlkDirScanData));
 	AOBlkDirScan_Init(scan->blkdirscan, &scan->aofetch->blockDirectory);
@@ -1709,6 +1749,8 @@ appendonly_beginrangescan_internal(Relation relation,
 								   Snapshot appendOnlyMetaDataSnapshot,
 								   FileSegInfo **seginfo,
 								   int segfile_count,
+								   yezzeyScanTuple **yezzeyChunkMetadata,
+								   int numYezzeyChunkMetadata,
 								   int nkeys,
 								   ScanKey key,
 								   ParallelTableScanDesc parallel_scan,
@@ -1753,6 +1795,10 @@ appendonly_beginrangescan_internal(Relation relation,
 	scan->snapshot = snapshot;
 	scan->aos_nkeys = nkeys;
 	scan->aoScanInitContext = CurrentMemoryContext;
+
+
+	scan->yezzeyChunkMetadata = yezzeyChunkMetadata;
+	scan->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
 
 	initStringInfo(&titleBuf);
 	appendStringInfo(&titleBuf, "Scan of Append-Only Row-Oriented relation '%s'",
@@ -1880,10 +1926,94 @@ appendonly_beginrangescan(Relation relation,
 											  appendOnlyMetaDataSnapshot,
 											  seginfo,
 											  segfile_count,
+											  NULL,
+											  0,
 											  nkeys,
 											  keys,
 											  NULL,
 											  0);
+}
+
+
+/* ugly hack, TBD: separate access method */
+/* ----------------
+ *		appendonly_beginscan_y	- begin yeneid relation scan
+ * ----------------
+ */
+TableScanDesc
+appendonly_beginscan_y(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo,
+					 int numYezzeyChunkMetadata, yezzeyScanTuple **yezzeyChunkMetadata)
+{
+	Snapshot	appendOnlyMetaDataSnapshot;
+	AppendOnlyScanDesc aoscan;
+
+	appendOnlyMetaDataSnapshot = snapshot;
+	if (appendOnlyMetaDataSnapshot == SnapshotAny)
+	{
+		/*
+		 * The append-only meta data should never be fetched with
+		 * SnapshotAny as bogus results are returned.
+		 * We use SnapshotSelf for metadata, as regular MVCC snapshot can hide
+		 * newly globally inserted tuples from global index build process.
+		 */
+		appendOnlyMetaDataSnapshot = SnapshotSelf;
+	}
+
+	if (seginfo == NULL) {
+		elog(ERROR, "failed to read segment info for yeneid relation scan");
+	}
+
+	/*
+	 * Get the pg_appendonly information for this table
+	 */
+
+	int local_segfile_count = 0;
+	FileSegInfo **local_seginfo;
+	bool isNull;
+
+	int2vector *distribution;
+	
+	distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, relation->rd_ydtuple,
+					Anum_yezzey_distrib_y_key_distriubtion,
+					&isNull)); 
+					
+	if (distribution->dim1 != segfile_count) {
+		elog(ERROR, "corrupted yezzey metadata");
+	}
+	
+	for (int i = 0 ; i < distribution->dim1; ++ i) {
+		if (distribution->values[i] == GpIdentity.segindex) {
+			++local_segfile_count;
+		}
+	}
+
+	local_seginfo = palloc0(sizeof(FileSegInfo *) * local_segfile_count);
+
+	local_segfile_count = 0;
+
+	for (int i = 0 ; i < distribution->dim1 ; ++ i) {
+		if (distribution->values[i] == GpIdentity.segindex) {
+				local_seginfo[local_segfile_count++] = seginfo[i];
+		}
+	}
+
+	aoscan = appendonly_beginrangescan_internal(relation,
+												snapshot,
+												appendOnlyMetaDataSnapshot,
+												local_seginfo,
+												local_segfile_count,
+												yezzeyChunkMetadata,
+												numYezzeyChunkMetadata,
+												nkeys,
+												key,
+												pscan,
+												flags);
+
+	return (TableScanDesc) aoscan;
 }
 
 /* ----------------
@@ -1925,6 +2055,8 @@ appendonly_beginscan(Relation relation,
 												appendOnlyMetaDataSnapshot,
 												seginfo,
 												segfile_count,
+												NULL,
+												0,
 												nkeys,
 												key,
 												pscan,
@@ -1932,6 +2064,7 @@ appendonly_beginscan(Relation relation,
 
 	return (TableScanDesc) aoscan;
 }
+
 
 /* ----------------
  *		appendonly_rescan		- restart a relation scan
@@ -2414,7 +2547,9 @@ resetCurrentBlockInfo(AOFetchBlockMetadata * currentBlock)
 AppendOnlyFetchDesc
 appendonly_fetch_init(Relation relation,
 					  Snapshot snapshot,
-					  Snapshot appendOnlyMetaDataSnapshot)
+					  Snapshot appendOnlyMetaDataSnapshot,
+					  yezzeyScanTuple **yTups,
+					  int numYtups)
 {
 	AppendOnlyFetchDesc				aoFetchDesc;
 	AppendOnlyStorageAttributes	   *attr;
@@ -2510,14 +2645,32 @@ appendonly_fetch_init(Relation relation,
 		aoFetchDesc->lastSequence[segno] = ReadLastSequence(segrelid, segno);
 	}
 
+	HeapTuple tp;
+	char * nspname;
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoFetchDesc->relation->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoFetchDesc->relation->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageRead_Init(
 							   &aoFetchDesc->storageRead,
+							   RelationGetRelid(aoFetchDesc->relation),
 							   aoFetchDesc->initContext,
 							   aoFetchDesc->usableBlockSize,
+							   nspname,
 							   NameStr(aoFetchDesc->relation->rd_rel->relname),
 							   aoFetchDesc->title,
-							   &aoFetchDesc->storageAttributes);
+							   &aoFetchDesc->storageAttributes, yTups, numYtups);
 
+	pfree(nspname);
 
 	fns = get_funcs_for_compression(attr->compressType);
 	aoFetchDesc->storageRead.compression_functions = fns;
@@ -2954,7 +3107,7 @@ appendonly_delete(AppendOnlyDeleteDesc aoDeleteDesc,
  * append only tables.
  */
 AppendOnlyInsertDesc
-appendonly_insert_init(Relation rel, int segno, int64 num_rows)
+appendonly_insert_init(Relation rel, int segno, int64 num_rows, FileSegInfo * seginfo)
 {
 	AppendOnlyInsertDesc aoInsertDesc;
 	int			maxtupsize;
@@ -3087,14 +3240,34 @@ appendonly_insert_init(Relation rel, int segno, int64 num_rows)
 					 RelationGetRelationName(aoInsertDesc->aoi_rel));
 	aoInsertDesc->title = titleBuf.data;
 
+	HeapTuple tp;
+	char * nspname;
+
+
+	tp = SearchSysCache1(NAMESPACEOID, ObjectIdGetDatum(aoInsertDesc->aoi_rel->rd_rel->relnamespace));
+
+	if (HeapTupleIsValid(tp))
+	{
+		Form_pg_namespace nsptup = (Form_pg_namespace) GETSTRUCT(tp);
+		nspname = pstrdup(NameStr(nsptup->nspname));
+		ReleaseSysCache(tp);
+	} else {
+		elog(ERROR, "yezzey: failed to get namescape name of relation %s", aoInsertDesc->aoi_rel->rd_rel->relname.data);
+	}
+
+
 	AppendOnlyStorageWrite_Init(
 								&aoInsertDesc->storageWrite,
 								NULL,
 								aoInsertDesc->usableBlockSize,
-								RelationGetRelationName(aoInsertDesc->aoi_rel),
+								nspname,
+								aoInsertDesc->from_aoi_rel ? RelationGetRelationName(aoInsertDesc->from_aoi_rel) : RelationGetRelationName(aoInsertDesc->aoi_rel),
+								aoInsertDesc->from_aoi_rel ? RelationGetRelid(aoInsertDesc->from_aoi_rel) : RelationGetRelid(aoInsertDesc->aoi_rel),
 								aoInsertDesc->title,
 								&aoInsertDesc->storageAttributes,
 								XLogIsNeeded() && RelationNeedsWAL(aoInsertDesc->aoi_rel));
+
+	pfree(nspname);
 
 	aoInsertDesc->storageWrite.compression_functions = fns;
 	aoInsertDesc->storageWrite.compressionState = cs;
@@ -3135,6 +3308,9 @@ appendonly_insert_init(Relation rel, int segno, int64 num_rows)
 	aoInsertDesc->toast_tuple_target = maxtupsize / 4;
 
 	/* open our current relation file segment for write */
+	if (seginfo != NULL) {
+		aoInsertDesc->fsInfo = seginfo;
+	}
 	SetCurrentFileSegForWrite(aoInsertDesc);
 
 	Assert(aoInsertDesc->tempSpaceLen > 0);

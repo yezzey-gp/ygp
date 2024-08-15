@@ -98,6 +98,7 @@ BufferedAppendInit(BufferedAppend *bufferedAppend,
 	 * File level members.
 	 */
 	bufferedAppend->file = -1;
+	bufferedAppend->smgr = smgrao();
 	bufferedAppend->filePathName = NULL;
 	bufferedAppend->fileLen = 0;
 }
@@ -163,7 +164,7 @@ BufferedAppendWrite(BufferedAppend *bufferedAppend, bool needsWAL)
 		if (track_io_timing)
 			INSTR_TIME_SET_CURRENT(io_start);
 
-		byteswritten = FileWrite(bufferedAppend->file,
+		byteswritten = bufferedAppend->smgr->smgr_FileWrite(bufferedAppend->file,
 								 (char *) largeWriteMemory + bytestotal,
 								 bytesleft,
 								 bufferedAppend->largeWritePosition + bytestotal,

@@ -514,6 +514,17 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		1024
 	},
+	{YezzeyDistribRelationId,	/* YEZZEYDISTRIBID */
+		YezzeyDistribRelOidIndexId,
+		1,
+		{
+			Anum_yezzey_distrib_reloid,
+			0,
+			0,
+			0
+		},
+		1024
+	},
 	{IndexRelationId,			/* INDEXRELID */
 		IndexRelidIndexId,
 		1,

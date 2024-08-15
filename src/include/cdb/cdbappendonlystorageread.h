@@ -19,8 +19,10 @@
 #include "cdb/cdbappendonlystorage.h"
 #include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbbufferedread.h"
+#include "storage/relfilenode.h"
 #include "utils/palloc.h"
-#include "storage/fd.h"
+// #include "storage/fd.h"
+#include "storage/smgr.h"
 
 
 /*
@@ -123,10 +125,13 @@ typedef struct AppendOnlyStorageRead
 	 */
 	int32		largeReadLen;
 
+
+	char	   *relationNamespace;
 	/*
 	 * Name of the relation to use in system logging and error messages.
 	 */
 	char	   *relationName;
+	Oid        relationOid;
 
 	/*
 	 * A phrase that better describes the purpose of the this open.
@@ -148,7 +153,8 @@ typedef struct AppendOnlyStorageRead
 	/*
 	 * The handle to the current open segment file.
 	 */
-	File		file;
+	SMGRFile		file;
+	const struct f_smgr_ao * smgr;
 
 	/*
 	 * The byte length of the current segment file being read.
@@ -187,22 +193,27 @@ typedef struct AppendOnlyStorageRead
 	int			blocksize;		/* For AO or CO uncompresed block size			*/
 	PGFunction *compression_functions;	/* For AO or CO compression function
 										 * pointers. The array index
-										 * corresponds to COMP_FUNC_*	*/
-
+										 * corresponds to COMP_FUNC_*	*/	
+	yezzeyScanTuple **ytups;
+	int numYtups;
 } AppendOnlyStorageRead;
 
 extern void AppendOnlyStorageRead_Init(AppendOnlyStorageRead *storageRead,
+						   Oid reloid,
 						   MemoryContext memoryContext,
 						   int32 maxBufferLen,
+						   char * relationNamespace,
 						   char *relationName, char *title,
-						   AppendOnlyStorageAttributes *storageAttributes);
+						   AppendOnlyStorageAttributes *storageAttributes,
+						   yezzeyScanTuple **ytup,
+						   int numYtup);
 
 extern char *AppendOnlyStorageRead_RelationName(AppendOnlyStorageRead *storageRead);
 extern char *AppendOnlyStorageRead_SegmentFileName(AppendOnlyStorageRead *storageRead);
 extern void AppendOnlyStorageRead_FinishSession(AppendOnlyStorageRead *storageRead);
 
 extern void AppendOnlyStorageRead_OpenFile(AppendOnlyStorageRead *storageRead,
-							   char *filePathName, int version, int64 logicalEof);
+							   char *filePathName, int version, int64 logicalEof, RelFileNode relFileNode);
 extern bool AppendOnlyStorageRead_TryOpenFile(AppendOnlyStorageRead *storageRead,
 								  char *filePathName, int version, int64 logicalEof);
 extern void AppendOnlyStorageRead_SetTemporaryRange(AppendOnlyStorageRead *storageRead,

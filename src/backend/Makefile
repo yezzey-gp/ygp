@@ -24,6 +24,7 @@ SUBDIRS = access bootstrap catalog parser commands executor foreign lib libpq \
 	jit
 
 SUBDIRS += fts cdb
+SUBDIRS += yezzey
 ifeq ($(enable_orca),yes)
 SUBDIRS += gporca gpopt
 endif

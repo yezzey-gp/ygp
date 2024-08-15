@@ -634,7 +634,7 @@ transientrel_startup(DestReceiver *self, int operation, TupleDesc typeinfo)
 	myState->processed = 0;
 
 	if (myState->transientrel->rd_tableam)
-		table_dml_init(myState->transientrel);
+		table_dml_init(myState->transientrel, 0, NULL);
 
 	/* Not using WAL requires smgr_targblock be initially invalid */
 	Assert(RelationGetTargetBlock(transientrel) == InvalidBlockNumber);

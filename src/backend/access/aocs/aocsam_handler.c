@@ -249,7 +249,7 @@ remove_dml_state(const Oid relationOid)
  * the course of the current DML or DML-like command, for the given relation.
  */
 void
-aoco_dml_init(Relation relation)
+aoco_dml_init(Relation relation, int segfile_count, FileSegInfo** seginfo)
 {
 	init_aoco_dml_states();
 	init_dml_state(RelationGetRelid(relation));
@@ -977,7 +977,7 @@ aocs_index_fetch_tuple_visible(struct IndexFetchTableData *scan,
 
 static void
 aoco_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
-                        int options, BulkInsertState bistate)
+                        int options, BulkInsertState bistate, int logical_blkno)
 {
 
 	AOCSInsertDesc          insertDesc;
@@ -1038,7 +1038,7 @@ aoco_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 {
 	(void) get_or_create_aoco_insert_descriptor(relation, ntuples);
 	for (int i = 0; i < ntuples; i++)
-		aoco_tuple_insert(relation, slots[i], cid, options, bistate);
+		aoco_tuple_insert(relation, slots[i], cid, options, bistate, -1);
 }
 
 static TM_Result
@@ -1900,13 +1900,14 @@ aoco_index_build_range_scan(Relation heapRelation,
 												false));
 			}
 
+			/* FIX this yezzey */
 			/* Push down target list and qual to scan */
 			scan = table_beginscan_es(heapRelation,	/* relation */
 									  snapshot,		/* snapshot */
 									  tlist,		/* targetlist */
 									  qual,			/* qual */
 									  NULL,			/* constraintList */
-									  NULL);
+									  NULL, 0, NULL, 0, NULL);
 		}
 	}
 	else

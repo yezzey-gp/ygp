@@ -1463,7 +1463,8 @@ check_default_partition_contents(Relation parent, Relation default_rel,
 		econtext = GetPerTupleExprContext(estate);
 		snapshot = RegisterSnapshot(GetLatestSnapshot());
 		tupslot = table_slot_create(part_rel, &estate->es_tupleTable);
-		scan = table_beginscan_es(part_rel, snapshot, NULL, NULL, NULL, lappend(NIL, partition_constraint));
+		/* FIX THIS */
+		scan = table_beginscan_es(part_rel, snapshot, NULL, NULL, NULL, lappend(NIL, partition_constraint), 0, NULL, 0, NULL);
 
 		/*
 		 * Switch to per-tuple memory context and reset it for each tuple

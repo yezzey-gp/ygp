@@ -151,6 +151,19 @@ static void outChar(StringInfo str, char c);
 			appendStringInfo(str, " %u", node->fldname[i]); \
 	} while(0)
 
+
+/* Write an INT2 	array  */
+#define WRITE_INT2_ARRAY(fldname, count) \
+	if ( (count) > 0 ) \
+	{ \
+		int i; \
+		for(i = 0; i < (count); i++) \
+		{ \
+			appendBinaryStringInfo(str, (const char *)&node->fldname[i], sizeof(short)); \
+		} \
+	}
+
+
 #define WRITE_INT_ARRAY(fldname, len) \
 	do { \
 		appendStringInfoString(str, " :" CppAsString(fldname) " "); \
@@ -509,6 +522,37 @@ _outScanInfo(StringInfo str, const Scan *node)
 	_outPlanInfo(str, (const Plan *) node);
 
 	WRITE_UINT_FIELD(scanrelid);
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
+
+	WRITE_UINT_FIELD(segfile_count);
+
+	for (int i = 0; i < node->segfile_count; ++ i) {
+		WRITE_UINT64_FIELD(seginfo[i]->segno);
+		WRITE_UINT64_FIELD(seginfo[i]->total_tupcount);
+		WRITE_UINT64_FIELD(seginfo[i]->varblockcount);
+		WRITE_UINT64_FIELD(seginfo[i]->modcount);
+		WRITE_UINT64_FIELD(seginfo[i]->eof);
+		WRITE_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		WRITE_INT_FIELD(seginfo[i]->formatversion);
+		WRITE_INT_FIELD(seginfo[i]->state);
+	}
+
+	WRITE_INT_FIELD(numYezzeyChunkMetadata);
+
+	for (int i = 0; i < node->numYezzeyChunkMetadata; ++ i) {
+		WRITE_OID_FIELD(yezzeyChunkMetadata[i]->reloid);
+		WRITE_OID_FIELD(yezzeyChunkMetadata[i]->relfileoid);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->blkno);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->start_offset);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->finish_offset);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->encrypted);
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i]->reused);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->modcount);
+		WRITE_UINT64_FIELD(yezzeyChunkMetadata[i]->lsn);
+		WRITE_STRING_FIELD(yezzeyChunkMetadata[i]->x_path);
+	}
 }
 
 /*
@@ -546,6 +590,9 @@ _outResult(StringInfo str, const Result *node)
 	WRITE_INT_FIELD(numHashFilterCols);
 	WRITE_ATTRNUMBER_ARRAY(hashFilterColIdx, node->numHashFilterCols);
 	WRITE_OID_ARRAY(hashFilterFuncs, node->numHashFilterCols);
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzey_key_ranges, node->numYezzeyKeyRanges);
 }
 
 static void
@@ -586,6 +633,23 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
 	WRITE_NODE_FIELD(exclRelTlist);
 	WRITE_NODE_FIELD(isSplitUpdates);
 	WRITE_BOOL_FIELD(forceTupleRouting);
+
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
+
+	WRITE_UINT_FIELD(segfile_count);
+
+	for (int i = 0; i < node->segfile_count; ++ i) {
+		WRITE_UINT64_FIELD(seginfo[i]->segno);
+		WRITE_UINT64_FIELD(seginfo[i]->total_tupcount);
+		WRITE_UINT64_FIELD(seginfo[i]->varblockcount);
+		WRITE_UINT64_FIELD(seginfo[i]->modcount);
+		WRITE_UINT64_FIELD(seginfo[i]->eof);
+		WRITE_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		WRITE_INT_FIELD(seginfo[i]->formatversion);
+		WRITE_INT_FIELD(seginfo[i]->state);
+	}
 }
 
 static void
@@ -1354,6 +1418,8 @@ _outMotion(StringInfo str, const Motion *node)
 	WRITE_INT_FIELD(segidColIdx);
 
 	WRITE_INT_FIELD(numHashSegments);
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
+	WRITE_INT_ARRAY(yezzeyKeyRanges, node->numYezzeyKeyRanges);
 
 	/* senderSliceInfo is intentionally omitted. It's only used during planning */
 
@@ -1373,9 +1439,11 @@ _outSplitUpdate(StringInfo str, const SplitUpdate *node)
 	WRITE_NODE_FIELD(deleteColIdx);
 
 	WRITE_INT_FIELD(numHashSegments);
+	WRITE_INT_FIELD(numYezzeyKeyRanges);
 	WRITE_INT_FIELD(numHashAttrs);
 	WRITE_ATTRNUMBER_ARRAY(hashAttnos, node->numHashAttrs);
 	WRITE_OID_ARRAY(hashFuncs, node->numHashAttrs);
+	WRITE_INT_ARRAY(yezzey_key_ranges, node->numYezzeyKeyRanges);
 
 	_outPlanInfo(str, (Plan *) node);
 }

@@ -772,5 +772,7 @@ WriteTempFileBlock(BufFile *file, long blknum, void *ptr)
 {
 	if (BufFileSeekBlock(file, blknum) != 0)
 		elog(ERROR, "could not seek to block %ld in temporary file", blknum);
+
+	/* Use custom smgr here? will that make a sence? */
 	BufFileWrite(file, ptr, BLCKSZ);
 }

@@ -20,6 +20,9 @@
 #include "storage/block.h"
 #include "storage/relfilenode.h"
 #include "storage/dbdirnode.h"
+#include "fd.h"
+
+#include "yezzey/yezzey_base.h"
 
 typedef enum SMgrImplementation
 {
@@ -75,8 +78,9 @@ typedef struct SMgrRelationData
 	 * Fields below here are intended to be private to smgr.c and its
 	 * submodules.  Do not touch them from elsewhere.
 	 */
-
 	const struct f_smgr * storageManager;
+	const struct f_smgr_ao * storageManagerAO;
+	/* Obsolete storage manager selector, should not be used for any particular purpose */
 	SMgrImpl smgr_which;
 
 	/*
@@ -121,9 +125,40 @@ typedef struct f_smgr
 
 #define SmgrIsTemp(smgr) \
 	RelFileNodeBackendIsTemp((smgr)->smgr_rnode)
+/* Yezzey path */
+typedef int SMGRFile;
+
+typedef struct f_smgr_ao {
+	int64       (*smgr_NonVirtualCurSeek) (SMGRFile file);
+	int64 		(*smgr_FileSeek) (SMGRFile file, int64 offset, int whence);
+	void 		(*smgr_FileClose)(SMGRFile file);
+	int         (*smgr_FileTruncate) (SMGRFile file, int64 offset, uint32 wait_event_info);
+	int         (*smgr_FileWrite)(SMGRFile file, char *buffer, int amount, off_t offset, uint32 wait_event_info);
+    int         (*smgr_FileRead)(SMGRFile file, char *buffer, int amount,off_t offset, uint32 wait_event_info );
+	SMGRFile    (*smgr_AORelOpenSegFile) (
+		Oid reloid,
+		char * nspname, 
+		char * relname,
+		const char * fileName,
+		int fileFlags,
+		int64 modcount,
+		yezzeyScanTuple **ytups,
+		int numYtups
+		);
+	int	        (*smgr_FileSync)(SMGRFile file, uint32 wait_event_info);
+	int			(*smgr_FileDiskSize) (SMGRFile file);
+} f_smgr_ao;
+
+
+/* Yezzey path end */
+
 
 typedef void (*smgr_init_hook_type) (void);
+typedef void (*smgrao_init_hook_type) (void);
 typedef void (*smgr_shutdown_hook_type) (void);
+typedef void (*smgrao_shutdown_hook_type) (void);
+
+extern PGDLLIMPORT smgrao_init_hook_type smgrao_init_hook;
 extern PGDLLIMPORT smgr_init_hook_type smgr_init_hook;
 extern PGDLLIMPORT smgr_shutdown_hook_type smgr_shutdown_hook;
 extern void smgr_init_standard(void);
@@ -135,6 +170,12 @@ extern PGDLLIMPORT smgr_hook_type smgr_hook;
 extern const f_smgr *smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which);
 
 extern const f_smgr *smgr(BackendId backend, RelFileNode rnode, SMgrImpl which);
+
+/* Yezzey path begin */
+typedef const f_smgr_ao *(*smgrao_hook_type)();
+extern PGDLLIMPORT smgrao_hook_type smgrao_hook;
+extern const f_smgr_ao *smgrao(void);
+/* Yezzey path end */
 
 extern void smgrinit(void);
 extern SMgrRelation smgropen(RelFileNode rnode, BackendId backend,

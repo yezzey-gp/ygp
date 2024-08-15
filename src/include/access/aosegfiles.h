@@ -117,6 +117,7 @@ typedef struct FileSegTotals
 } FileSegTotals;
 
 extern void InsertInitialSegnoEntry(Relation parentrel, int segno);
+extern void InsertInitialYeneidSegnoEntry(Relation parentrel, int segno, FileSegInfo *fsInfo);
 
 extern void ValidateAppendonlySegmentDataBeforeStorage(int segno);
 
@@ -137,6 +138,15 @@ extern FileSegInfo *GetFileSegInfo(Relation parentrel, Snapshot appendOnlyMetaDa
 extern FileSegInfo **GetAllFileSegInfo(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs, Oid *segrelidptr);
 
 extern void UpdateFileSegInfo(Relation parentrel,
+				  int segno,
+				  int64 eof,
+				  int64 eof_uncompressed,
+				  int64 tuples_added,
+				  int64 varblocks_added,
+				  int64 modcount_added,
+				  FileSegInfoState newState);
+
+extern void UpdateYeneidFileSegInfo(Relation parentrel, FileSegInfo *fsInfo,
 				  int segno,
 				  int64 eof,
 				  int64 eof_uncompressed,

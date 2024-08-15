@@ -421,7 +421,7 @@ extern AOCSWriteColumnDesc aocs_writecol_init(Relation rel, List *newvals, AOCSW
 extern void aocs_writecol_add(Oid relid, List *newvals, List *constraints, TupleDesc oldDesc);
 extern void aocs_writecol_rewrite(Oid relid, List *newvals, TupleDesc oldDesc);
 
-extern void aoco_dml_init(Relation relation);
+extern void aoco_dml_init(Relation relation, int segfile_count, FileSegInfo** seginfo);
 extern void aoco_dml_finish(Relation relation);
 
 extern bool aocs_positionscan(AOCSScanDesc aoscan,

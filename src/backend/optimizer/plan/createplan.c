@@ -65,6 +65,10 @@
 #include "rewrite/rewriteManip.h"
 #include "utils/guc.h"
 
+#include "utils/snapmgr.h"
+
+#include "yezzey/yezzey.h"
+
 /*
  * Flag bits that can appear in the flags argument of create_plan_recurse().
  * These can be OR-ed together.
@@ -200,7 +204,10 @@ static void copy_generic_path_info(Plan *dest, Path *src);
 static void copy_plan_costsize(Plan *dest, Plan *src);
 static void label_sort_with_costsize(PlannerInfo *root, Sort *plan,
 									 double limit_tuples);
-static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid);
+static SeqScan *make_seqscan(
+	List *qptlist, List *qpqual, Index scanrelid, 
+	int segfile_count, FileSegInfo **seginfo, 
+	int numYezzeyChunkMetadata, yezzeyScanTuple **tuples);
 static SampleScan *make_samplescan(List *qptlist, List *qpqual, Index scanrelid,
 								   TableSampleClause *tsc);
 static IndexScan *make_indexscan(List *qptlist, List *qpqual, Index scanrelid,
@@ -2949,6 +2956,39 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 			Oid			reloid = planner_rt_fetch(idx, root)->relid;
 			GpPolicy   *policy = GpPolicyFetch(reloid);
 
+			int2vector *yezzey_key_ranges;
+			int        *yezzeyKeyRanges;
+			int i;
+
+			FileSegInfo ** seginfo;
+			int segfile_count;
+			Relation parentrel;
+
+			parentrel = relation_open(reloid, AccessShareLock);
+
+			if (parentrel->rd_yezzey_distribution) {
+				seginfo = GetAllFileSegInfo(parentrel,
+											SnapshotSelf, &segfile_count, NULL);
+
+				plan->segfile_count = segfile_count;
+				plan->seginfo = seginfo;
+			}
+
+			relation_close(parentrel, AccessShareLock);
+
+			yezzey_key_ranges = RelationGetYezzeyKeyByRelid(reloid);
+			if (yezzey_key_ranges != NULL) {
+				plan->numYezzeyKeyRanges = yezzey_key_ranges->dim1;
+				plan->yezzeyKeyRanges = palloc(yezzey_key_ranges->dim1 * sizeof(int));
+							
+				for (i = 0; i < yezzey_key_ranges->dim1; i ++) {
+					plan->yezzeyKeyRanges[i] = yezzey_key_ranges->values[i];
+				}
+			} else {
+				plan->numYezzeyKeyRanges = 0;
+				plan->yezzeyKeyRanges = NULL;
+			}
+
 			/*
 			 * We cannot update tables on segments and on the entry DB in the
 			 * same process.
@@ -2980,6 +3020,8 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
 			isfirst = false;
 		}
 	}
+
+	/* YezzeyDistribRelationId */
 
 	return plan;
 }
@@ -3151,12 +3193,12 @@ create_motion_plan(PlannerInfo *root, CdbMotionPath *path)
 		case CdbLocusType_Hashed:
 		case CdbLocusType_HashedOJ:
 		case CdbLocusType_Strewn:
+		case CdbLocusType_Yezzey:
 			// might be writer, set already
 			//sendSlice->gangType == GANGTYPE_PRIMARY_READER;
 			sendSlice->numsegments = subpath->locus.numsegments;
 			sendSlice->segindex = 0;
 			break;
-
 		default:
 			elog(ERROR, "unknown locus type %d", subpath->locus.locustype);
 	}
@@ -3340,6 +3382,9 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 	Assert(scan_relid > 0);
 	Assert(best_path->parent->rtekind == RTE_RELATION);
 
+
+	RangeTblEntry *rte = planner_rt_fetch(scan_relid, root);
+
 	/* Sort clauses into best execution order */
 	scan_clauses = order_qual_clauses(root, scan_clauses);
 
@@ -3353,9 +3398,31 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 			replace_nestloop_params(root, (Node *) scan_clauses);
 	}
 
-	scan_plan = make_seqscan(tlist,
-							 scan_clauses,
-							 scan_relid);
+	if (best_path->parent->yezzey_key_ranges == NULL) {
+		scan_plan = make_seqscan(tlist,
+								scan_clauses,
+								scan_relid, 0, NULL, 0, NULL);
+	} else {
+		FileSegInfo ** seginfo;
+		int segfile_count;
+
+		Relation relation;
+
+		relation = relation_open(rte->relid, AccessShareLock);
+
+		seginfo = GetAllFileSegInfo(relation,
+									SnapshotSelf, &segfile_count, NULL);
+		
+
+		scan_plan = make_seqscan(tlist,
+								scan_clauses,
+								scan_relid, segfile_count, seginfo, 0, NULL);
+
+		YezzeyPopulateScanMetadata(relation, scan_plan);
+
+
+		relation_close(relation, AccessShareLock);
+	}
 
 	copy_generic_path_info(&scan_plan->plan, best_path);
 
@@ -6168,7 +6235,8 @@ label_sort_with_costsize(PlannerInfo *root, Sort *plan, double limit_tuples)
 static SeqScan *
 make_seqscan(List *qptlist,
 			 List *qpqual,
-			 Index scanrelid)
+			 Index scanrelid, int segfile_count, FileSegInfo **seginfo,
+			 int numYezzeyChunkMetadata, yezzeyScanTuple **tuples)
 {
 	SeqScan    *node = makeNode(SeqScan);
 	Plan	   *plan = &node->plan;
@@ -6178,6 +6246,13 @@ make_seqscan(List *qptlist,
 	plan->lefttree = NULL;
 	plan->righttree = NULL;
 	node->scanrelid = scanrelid;
+
+	node->segfile_count = segfile_count;
+	node->seginfo = seginfo;
+
+	/* null-out some yezzey-related fields */
+	node->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
+	node->yezzeyChunkMetadata = tuples;
 
 	return node;
 }
@@ -7257,6 +7332,9 @@ make_motion(PlannerInfo *root, Plan *lefttree,
 	node->collations = collations;
 	node->nullsFirst = nullsFirst;
 
+	node->yezzeyKeyRanges = NULL;
+	node->numYezzeyKeyRanges = 0;
+
 #ifdef USE_ASSERT_CHECKING
 	/*
 	 * If the child node was a Sort, then surely the order the caller gave us
@@ -7741,8 +7819,10 @@ make_result(List *tlist,
 	node->resconstantqual = resconstantqual;
 
 	node->numHashFilterCols = 0;
+	node->numYezzeyKeyRanges = 0;
 	node->hashFilterColIdx = NULL;
 	node->hashFilterFuncs = NULL;
+	node->yezzey_key_ranges = NULL;
 
 	return node;
 }
@@ -8090,7 +8170,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 		motion = make_hashed_motion(subplan,
 									hashExprs,
 									hashOpfamilies,
-									numHashSegments);
+									numHashSegments, path->path.locus.numykr, path->path.locus.ykr);
 	}
 	else if (CdbPathLocus_IsOuterQuery(path->path.locus))
 	{
@@ -8161,7 +8241,8 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 
 	/* Hashed redistribution to all QEs in gang above... */
 	else if (CdbPathLocus_IsHashed(path->path.locus) ||
-			 CdbPathLocus_IsHashedOJ(path->path.locus))
+			 CdbPathLocus_IsHashedOJ(path->path.locus) || 
+			 CdbPathLocus_IsYezzey(path->path.locus))
 	{
 		List	   *hashExprs;
 		List	   *hashOpfamilies;
@@ -8176,7 +8257,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
         motion = make_hashed_motion(subplan,
 									hashExprs,
 									hashOpfamilies,
-									numHashSegments);
+									numHashSegments, path->path.locus.numykr, path->path.locus.ykr);
     }
 	/* Hashed redistribution to all QEs in gang above... */
 	else if (CdbPathLocus_IsStrewn(path->path.locus))
@@ -8184,7 +8265,7 @@ cdbpathtoplan_create_motion_plan(PlannerInfo *root,
 		motion = make_hashed_motion(subplan,
 									NIL,
 									NIL,
-									numHashSegments);
+									numHashSegments, 0, NULL);
 	}
 	else
 		elog(ERROR, "unexpected target locus type %d for Motion node", path->path.locus.locustype);

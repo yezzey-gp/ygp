@@ -23,6 +23,13 @@
 #include "utils/guc.h"
 #include "utils/rel.h"
 #include "utils/snapshot.h"
+#include "cdb/cdbhash.h"
+
+#include "cdb/cdbvars.h"
+
+#include "access/aosegfiles.h"
+
+#include "yezzey/yezzey_base.h"
 
 
 #define DEFAULT_TABLE_ACCESS_METHOD	"heap"
@@ -233,7 +240,15 @@ typedef struct TableAmRoutine
 								 int nkeys, struct ScanKeyData *key,
 								 ParallelTableScanDesc pscan,
 								 uint32 flags);
-
+	/*
+	 * Yeneid: ugly hack
+	 */
+	TableScanDesc (*scan_begin_y)(Relation relation,
+					 Snapshot snapshot,
+					 int nkeys, struct ScanKeyData *key,
+					 ParallelTableScanDesc pscan,
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo,
+					 int numYezzeyChunkMetadata, yezzeyScanTuple ** yezzeyChunkMetadata);
 	/*
 	 * GPDB: Extract columns for scan from either a projection array
 	 * or a targetlist and quals. This is currently used for AOCO
@@ -415,7 +430,7 @@ typedef struct TableAmRoutine
 	 * GPDB: DML state manipulation functions
 	 * ------------------------------------------------------------------------
 	 */
-	void		(*dml_init) (Relation rel);
+	void		(*dml_init) (Relation rel, int segfile_count, FileSegInfo** segfiles);
 
 	void		(*dml_finish) (Relation rel);
 
@@ -427,7 +442,7 @@ typedef struct TableAmRoutine
 	/* see table_tuple_insert() for reference about parameters */
 	void		(*tuple_insert) (Relation rel, TupleTableSlot *slot,
 								 CommandId cid, int options,
-								 struct BulkInsertStateData *bistate);
+								 struct BulkInsertStateData *bistate, int logical_segindx);
 
 	/* see table_tuple_insert_speculative() for reference about parameters */
 	void		(*tuple_insert_speculative) (Relation rel,
@@ -870,7 +885,10 @@ table_beginscan(Relation rel, Snapshot snapshot,
  */
 static inline TableScanDesc
 table_beginscan_es(Relation rel, Snapshot snapshot,
-				   List *targetList, List *qual, bool *proj, List *constraintList)
+				   List *targetList, List *qual, bool *proj, List *constraintList,
+				   int segfile_count, FileSegInfo **seginfo,
+				   int numYezzeyChunkMetadata,
+				   yezzeyScanTuple **yezzeyChunkMetadata)
 {
 	uint32		flags = SO_TYPE_SEQSCAN |
 	SO_ALLOW_STRAT | SO_ALLOW_SYNC | SO_ALLOW_PAGEMODE;
@@ -879,6 +897,11 @@ table_beginscan_es(Relation rel, Snapshot snapshot,
 		return rel->rd_tableam->scan_begin_extractcolumns(rel, snapshot,
 														  targetList, qual, proj, constraintList,
 														  flags);
+	if (rel->rd_tableam->scan_begin_y && rel->rd_yezzey_distribution != NULL) {
+		return rel->rd_tableam->scan_begin_y(rel, snapshot,
+									   0, NULL,
+									   NULL, flags, segfile_count, seginfo, numYezzeyChunkMetadata, yezzeyChunkMetadata);
+	}
 
 	return rel->rd_tableam->scan_begin(rel, snapshot,
 									   0, NULL,
@@ -1297,9 +1320,9 @@ table_compute_xid_horizon_for_tuples(Relation rel,
  * command's execution.
  */
 static inline void
-table_dml_init(Relation rel)
+table_dml_init(Relation rel, int segfile_count, FileSegInfo** segfiles)
 {
-	rel->rd_tableam->dml_init(rel);
+	rel->rd_tableam->dml_init(rel, segfile_count, segfiles);
 }
 
 /*
@@ -1361,8 +1384,45 @@ static inline void
 table_tuple_insert(Relation rel, TupleTableSlot *slot, CommandId cid,
 				   int options, struct BulkInsertStateData *bistate)
 {
+	int logical_segindx;
+
+	if (rel->rd_yezzey_distribution != NULL) {
+		CdbHash  *hash;
+		GpPolicy *policy = rel->rd_cdbpolicy;
+
+		/* Skip randomly and replicated distributed relation */
+		Assert(GpPolicyIsHashPartitioned(policy));
+
+		hash = makeCdbHashForRelation(rel);
+
+		cdbhashinit(hash);
+
+		/* Add every attribute in the distribution policy to the hash */
+		for (int i = 0; i < policy->nattrs; i++)
+		{
+			int			attnum = policy->attrs[i];
+			bool		isNull;
+			Datum		attr;
+
+			attr = slot_getattr(slot, attnum, &isNull);
+
+			cdbhash(hash, i + 1, attr, isNull);
+		}
+
+		logical_segindx = hash->hash % hash->yezzey_key_ranges_sz;
+
+		if (hash->yezzey_key_ranges[logical_segindx] == GpIdentity.segindex) {
+			rel->rd_tableam->tuple_insert(rel, slot, cid, options,
+										bistate, logical_segindx);
+		}
+
+		freeCdbHash(hash);
+
+		return;
+	}
+
 	rel->rd_tableam->tuple_insert(rel, slot, cid, options,
-								  bistate);
+								  bistate, -1);
 }
 
 /*

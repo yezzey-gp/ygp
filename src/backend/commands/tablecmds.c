@@ -1554,7 +1554,8 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 #define METATRACK_VALIDNAMESPACE(namespaceId) \
 	(namespaceId != PG_TOAST_NAMESPACE &&	\
 	 namespaceId != PG_BITMAPINDEX_NAMESPACE && \
-	 namespaceId != PG_AOSEGMENT_NAMESPACE )
+	 namespaceId != PG_AOSEGMENT_NAMESPACE && \
+	 namespaceId != YEZZEY_AUX_NAMESPACE)
 
 /* check for valid namespace and valid relkind */
 static bool
@@ -6474,12 +6475,12 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 		* combined with ATTACH PARTITION.
 		*/
 		if (tab->partition_constraint && tab->rewrite == 0)
-			scan = table_beginscan_es(oldrel, snapshot, NULL, NULL, NULL, lappend(NIL, tab->partition_constraint));
+			scan = table_beginscan_es(oldrel, snapshot, NULL, NULL, NULL, lappend(NIL, tab->partition_constraint), 0, NULL, 0, NULL);
 		else
 			scan = table_beginscan(oldrel, snapshot, 0, NULL);
 
 		if (newrel && newrel->rd_tableam)
-			table_dml_init(newrel);
+			table_dml_init(newrel, 0, NULL);
 
 		/*
 		 * Switch to per-tuple memory context and reset it for each tuple
@@ -6754,6 +6755,7 @@ ATSimplePermissions(Relation rel, int allowed_targets)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_AOVISIMAP:
+		case RELKIND_YEZZEYINDEX:
 			/*
 			 * Allow ALTER TABLE operations in standard alone mode on
 			 * AO segment tables.
@@ -15214,6 +15216,19 @@ ATExecSetTableSpace(Oid tableOid, Oid newTableSpace, LOCKMODE lockmode)
 		return;
 	}
 
+	/* Yezzey pathes */
+
+	if (newTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move to this tablespace. Use yezzey SQL API");
+	}
+
+	if (oldTableSpace == YEZZEYTABLESPACE_OID) {
+		elog(ERROR, "cannot move from this tablespace. Use yezzey SQL API");
+	}
+
+
+	/* Yezzey pathes end */
+
 	/*
 	 * We cannot support moving mapped relations into different tablespaces.
 	 * (In particular this eliminates all shared catalogs.)
@@ -15699,6 +15714,7 @@ index_copy_data(Relation rel, RelFileNode newrnode)
 	 * holding exclusive lock on the rel.
 	 */
 	FlushRelationBuffers(rel);
+
 
 	/*
 	 * Create and copy all forks of the relation, and schedule unlinking of

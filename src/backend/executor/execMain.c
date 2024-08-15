@@ -109,6 +109,8 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbendpoint.h"
 
+#include "yezzey/yezzey.h"
+
 #define IS_PARALLEL_RETRIEVE_CURSOR(queryDesc)	(queryDesc->ddesc &&	\
 										queryDesc->ddesc->parallelCursorName &&	\
 										strlen(queryDesc->ddesc->parallelCursorName) > 0)
@@ -2198,7 +2200,15 @@ CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
 						 errmsg("cannot change AO visibility map relation \"%s\"",
 								RelationGetRelationName(resultRel))));
 			break;
-
+		
+		/* Yezzey additions */
+		case RELKIND_YEZZEYINDEX:
+			if (!allowSystemTableMods)
+				ereport(ERROR,
+						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+						 errmsg("cannot change yezzey index map relation \"%s\"",
+								RelationGetRelationName(resultRel))));
+			break;
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),

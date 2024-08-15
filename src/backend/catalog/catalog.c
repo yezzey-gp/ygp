@@ -308,6 +308,11 @@ IsAoSegmentNamespace(Oid namespaceId)
 	return namespaceId == PG_AOSEGMENT_NAMESPACE;
 }
 
+bool 
+IsYezzeyNamespace(Oid namespaceId){
+	return namespaceId == YEZZEY_AUX_NAMESPACE;
+}
+
 /*
  * IsReservedName
  *		True iff name starts with the pg_ prefix.

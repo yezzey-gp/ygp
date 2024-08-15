@@ -73,6 +73,8 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno, AOVacuumRelStats
 	char		filenamepath[MAXPGPATH];
 	int32		fileSegNo;
 	File		fd;
+	char		*relname;
+	char 		*nspname;
 
 	Assert(RelationStorageIsAoRows(aorel));
 
@@ -82,11 +84,20 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno, AOVacuumRelStats
 	/* Open and truncate the relation segfile */
 	MakeAOSegmentFileName(aorel, segno, InvalidFileNumber, &fileSegNo, filenamepath);
 
-	fd = OpenAOSegmentFile(filenamepath, 0);
+	relname = RelationGetRelationName(aorel);
+
+	nspname = get_namespace_name(RelationGetNamespace(aorel));
+
+	RelationOpenSmgr(aorel);
+
+	fd = OpenAOSegmentFile(aorel, nspname, filenamepath, 0, -1, 0, NULL);
+
+
+	pfree(nspname);
 	if (fd >= 0)
 	{
 		TruncateAOSegmentFile(fd, aorel, fileSegNo, 0, vacrelstats);
-		CloseAOSegmentFile(fd);
+		CloseAOSegmentFile(aorel, fd);
 	}
 	else
 	{
@@ -99,6 +110,8 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno, AOVacuumRelStats
 		elog(LOG, "could not truncate segfile %s, because it does not exist", filenamepath);
 		Assert(false);
 	}
+
+	RelationCloseSmgr(aorel);
 }
 
 /*
@@ -228,6 +241,7 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel, int segno, int64 segeof, AOVa
 	File		fd;
 	int32		fileSegNo;
 	char		filenamepath[MAXPGPATH];
+	char  *nspname;
 
 	Assert(RelationStorageIsAoRows(aorel));
 
@@ -236,24 +250,28 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel, int segno, int64 segeof, AOVa
 	/* Open and truncate the relation segfile to its eof */
 	MakeAOSegmentFileName(aorel, segno, InvalidFileNumber, &fileSegNo, filenamepath);
 
+	nspname = get_namespace_name(RelationGetNamespace(aorel));
+
 	elogif(Debug_appendonly_print_compaction, LOG,
 		   "Opening AO relation \"%s.%s\", relation id %u, relfilenode %u (physical segment file #%d, logical EOF " INT64_FORMAT ")",
-		   get_namespace_name(RelationGetNamespace(aorel)),
+		   nspname,
 		   relname,
 		   aorel->rd_id,
 		   aorel->rd_node.relNode,
 		   segno,
 		   segeof);
 
-	fd = OpenAOSegmentFile(filenamepath, segeof);
+	RelationOpenSmgr(aorel);
+
+	fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1, NULL, 0);
 	if (fd >= 0)
 	{
 		TruncateAOSegmentFile(fd, aorel, fileSegNo, segeof, vacrelstats);
-		CloseAOSegmentFile(fd);
+		CloseAOSegmentFile(aorel, fd);
 
 		elogif(Debug_appendonly_print_compaction, LOG,
 			   "Successfully truncated AO ROW relation \"%s.%s\", relation id %u, relfilenode %u (physical segment file #%d, logical EOF " INT64_FORMAT ")",
-			   get_namespace_name(RelationGetNamespace(aorel)),
+			   nspname,
 			   relname,
 			   aorel->rd_id,
 			   aorel->rd_node.relNode,
@@ -264,13 +282,18 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel, int segno, int64 segeof, AOVa
 	{
 		elogif(Debug_appendonly_print_compaction, LOG,
 			   "No gp_relation_node entry for AO ROW relation \"%s.%s\", relation id %u, relfilenode %u (physical segment file #%d, logical EOF " INT64_FORMAT ")",
-			   get_namespace_name(RelationGetNamespace(aorel)),
+			   nspname,
 			   relname,
 			   aorel->rd_id,
 			   aorel->rd_node.relNode,
 			   segno,
 			   segeof);
 	}
+
+
+	RelationCloseSmgr(aorel);
+
+	pfree(nspname);
 }
 
 static void
@@ -818,7 +841,7 @@ AppendOnlyCompact(Relation aorel,
 			 * Note: since we don't know how many rows will actually be inserted,
 			 * we provide the default number of rows to bump gp_fastsequence by.
 			 */
-			insertDesc = appendonly_insert_init(aorel, *insert_segno, NUM_FAST_SEQUENCES);
+			insertDesc = appendonly_insert_init(aorel, *insert_segno, NUM_FAST_SEQUENCES, NULL);
 			AppendOnlySegmentFileFullCompaction(aorel,
 												insertDesc,
 												fsinfo,

@@ -73,6 +73,7 @@ typedef enum
  * local functions
  */
 static int choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode);
+static void prepare_logical_segno_internal(Relation rel, int blkno, choose_segno_mode mode, FileSegInfo *fsInfo);
 static int choose_new_segfile(Relation rel, bool *used, List *avoid_segnos);
 static void get_aoseg_fields(Relation rel, Relation pg_aoseg_rel, HeapTuple tuple,
 							 int32 *segno, int64 *tupcount, int16 *state, int16 *formatversion);
@@ -225,7 +226,9 @@ LockSegnoForWrite(Relation rel, int segno)
 	if (!found)
 	{
 		/* create it! */
-		if (RelationIsAoRows(rel))
+		if (RelationIsYeneid(rel))
+			InsertInitialYeneidSegnoEntry(rel, segno, NULL);
+		else if (RelationIsAoRows(rel))
 			InsertInitialSegnoEntry(rel, segno);
 		else
 			InsertInitialAOCSFileSegInfo(rel, segno,
@@ -293,6 +296,20 @@ ChooseSegnoForWrite(Relation rel)
 				 (errmsg("could not find segment file to use for inserting into relation \"%s\"",
 						 RelationGetRelationName(rel)))));
 	return chosen_segno;
+}
+
+
+int
+PrepareLogicalSegnoForWrite(Relation rel, int logical_blkno, FileSegInfo *fsInfo)
+{
+	if (Debug_appendonly_print_segfile_choice)
+		ereport(LOG,
+				(errmsg("PrepareLogicalSegnoForWrite: Choosing a segfile for relation \"%s\"",
+						RelationGetRelationName(rel))));
+
+	prepare_logical_segno_internal(rel, logical_blkno, CHOOSE_MODE_WRITE, fsInfo);
+
+	return 0;
 }
 
 /*
@@ -485,7 +502,7 @@ choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode)
 			 * Nowadays, segment 0 is also used for CTAS and alter table
 			 * rewrite commands.
 			 */
-			if (Gp_role != GP_ROLE_UTILITY && segno == RESERVED_SEGNO)
+			if (Gp_role != GP_ROLE_UTILITY)
 				continue;
 
 			/*
@@ -602,6 +619,52 @@ choose_segno_internal(Relation rel, List *avoid_segnos, choose_segno_mode mode)
 	heap_close(pg_aoseg_rel, AccessShareLock);
 
 	return chosen_segno;
+}
+
+static int
+choose_new_logical_yezzey_segno(Relation rel, int chosen_segno, FileSegInfo *fsInfo)
+{
+	Assert(RelationStorageIsAO(rel));
+
+	/* If can't create a new one because MAX_AOREL_CONCURRENCY was reached */
+	if (chosen_segno != -1)
+	{
+		if (Debug_appendonly_print_segfile_choice)
+			elog(LOG, "choose_new_segfile: creating new segfile %d",
+				 chosen_segno);
+
+		if (RelationIsAoRows(rel))
+			InsertInitialYeneidSegnoEntry(rel, chosen_segno, fsInfo);
+		else
+		{
+			Oid segrelid;
+			Snapshot appendOnlyMetaDataSnapshot;
+
+			appendOnlyMetaDataSnapshot = RegisterSnapshot(GetCatalogSnapshot(InvalidOid));
+			GetAppendOnlyEntryAuxOids(rel,
+									  &segrelid, NULL, NULL);
+			UnregisterSnapshot(appendOnlyMetaDataSnapshot);
+
+			InsertInitialAOCSFileSegInfo(rel, chosen_segno,
+										 RelationGetNumberOfAttributes(rel), segrelid);
+		}
+	}
+	else
+	{
+		if (Debug_appendonly_print_segfile_choice)
+			elog(LOG, "choose_new_segfile: could not create segfile, all segfiles are in use");
+	}
+
+	return chosen_segno;
+}
+
+
+static void
+prepare_logical_segno_internal(Relation rel, int logical_blkno, choose_segno_mode mode, FileSegInfo *fsInfo)
+{
+	if (fsInfo == NULL || fsInfo->eof == 0) {
+		choose_new_logical_yezzey_segno(rel, logical_blkno, fsInfo);
+	}
 }
 
 static int

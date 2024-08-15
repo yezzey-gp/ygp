@@ -1510,6 +1510,7 @@ ExecHashJoinSaveTuple(PlanState *ps, MinimalTuple tuple, uint32 hashvalue,
 		MemoryContextSwitchTo(oldcxt);
 	}
 
+	/* Use custom smgr here? will that make a sence? */
 	written = BufFileWrite(file, (void *) &hashvalue, sizeof(uint32));
 	if (written != sizeof(uint32))
 	{
@@ -1518,6 +1519,8 @@ ExecHashJoinSaveTuple(PlanState *ps, MinimalTuple tuple, uint32 hashvalue,
 				 errmsg("could not write to temporary file: %m")));
 	}
 
+
+	/* Use custom smgr here? will that make a sence? */
 	written = BufFileWrite(file, (void *) tuple, tuple->t_len);
 	if (written != tuple->t_len)
 	{

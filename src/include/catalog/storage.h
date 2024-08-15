@@ -38,4 +38,13 @@ extern void AtSubCommit_smgr(void);
 extern void AtSubAbort_smgr(void);
 extern void PostPrepare_smgr(void);
 
-#endif							/* STORAGE_H */
+
+/* yezzey patch */
+extern void RelationDropStoragePure(Relation rel);
+
+/* Hook for yezzey meta-related logic */
+typedef void (*TrackDropObject_hook_type) (Relation);
+
+extern PGDLLIMPORT TrackDropObject_hook_type TrackDropObject_hook;
+
+#endif   /* STORAGE_H */

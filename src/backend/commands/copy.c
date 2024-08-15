@@ -3206,7 +3206,8 @@ CopyTo(CopyState cstate)
 							fmgr_info(out_func_oid, &cstate->out_functions[attnum - 1]);
 						}
 					}
-					scandesc = table_beginscan_es(rel, GetActiveSnapshot(), 0, NULL, proj, NULL);
+					/* yeneid todo: fix */
+					scandesc = table_beginscan_es(rel, GetActiveSnapshot(), 0, NULL, proj, NULL, 0, NULL, 0, NULL);
 					slot = table_slot_create(rel, NULL);
 
 					while (table_scan_getnextslot(scandesc, ForwardScanDirection, slot))
@@ -4323,7 +4324,7 @@ CopyFrom(CopyState cstate)
 	CopyInitDataParser(cstate);
 
 	if (resultRelInfo->ri_RelationDesc->rd_tableam)
-		table_dml_init(resultRelInfo->ri_RelationDesc);
+		table_dml_init(resultRelInfo->ri_RelationDesc, 0, NULL);
 
 	for (;;)
 	{

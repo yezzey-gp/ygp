@@ -2525,6 +2525,8 @@ _readResult(void)
 	READ_INT_FIELD(numHashFilterCols);
 	READ_ATTRNUMBER_ARRAY(hashFilterColIdx, local_node->numHashFilterCols);
 	READ_OID_ARRAY(hashFilterFuncs, local_node->numHashFilterCols);
+	READ_INT_FIELD(numYezzeyKeyRanges);
+	READ_INT_ARRAY(yezzey_key_ranges, local_node->numYezzeyKeyRanges);
 
 	READ_DONE();
 }
@@ -2575,6 +2577,31 @@ _readModifyTable(void)
 	READ_NODE_FIELD(exclRelTlist);
 	READ_NODE_FIELD(isSplitUpdates);
 	READ_BOOL_FIELD(forceTupleRouting);
+
+	READ_INT_FIELD(numYezzeyKeyRanges);
+
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
+	READ_UINT_FIELD(segfile_count);
+
+	local_node->seginfo = palloc0(sizeof(FileSegInfo*) * local_node->numYezzeyKeyRanges);
+
+	for (int i = 0; i < local_node->segfile_count; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+
+		READ_UINT64_FIELD(seginfo[i]->segno);
+		READ_UINT64_FIELD(seginfo[i]->total_tupcount);
+		READ_UINT64_FIELD(seginfo[i]->varblockcount);
+		READ_UINT64_FIELD(seginfo[i]->modcount);
+		READ_UINT64_FIELD(seginfo[i]->eof);
+		READ_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		READ_INT_FIELD(seginfo[i]->formatversion);
+		READ_INT_FIELD(seginfo[i]->state);
+	}
+	
+	for (int i = local_node->segfile_count; i < local_node->numYezzeyKeyRanges; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+	}
 
 	READ_DONE();
 }
@@ -2682,6 +2709,51 @@ ReadCommonScan(Scan *local_node)
 	ReadCommonPlan(&local_node->plan);
 
 	READ_UINT_FIELD(scanrelid);
+
+	READ_INT_FIELD(numYezzeyKeyRanges);
+
+	READ_INT_ARRAY(yezzeyKeyRanges, local_node->numYezzeyKeyRanges);
+
+	READ_UINT_FIELD(segfile_count);
+
+	local_node->seginfo = palloc0(sizeof(FileSegInfo*) * local_node->segfile_count);
+
+	for (int i = 0; i < local_node->segfile_count; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+
+		READ_UINT64_FIELD(seginfo[i]->segno);
+		READ_UINT64_FIELD(seginfo[i]->total_tupcount);
+		READ_UINT64_FIELD(seginfo[i]->varblockcount);
+		READ_UINT64_FIELD(seginfo[i]->modcount);
+		READ_UINT64_FIELD(seginfo[i]->eof);
+		READ_UINT64_FIELD(seginfo[i]->eof_uncompressed);
+		READ_INT_FIELD(seginfo[i]->formatversion);
+		READ_INT_FIELD(seginfo[i]->state);
+	}
+
+
+	for (int i = local_node->segfile_count; i < local_node->numYezzeyKeyRanges; ++ i) {
+		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
+	}
+
+	READ_INT_FIELD(numYezzeyChunkMetadata);
+
+
+	local_node->yezzeyChunkMetadata = palloc0(sizeof(yezzeyScanTuple*) * local_node->numYezzeyChunkMetadata);
+
+	for (int i = 0; i < local_node->numYezzeyChunkMetadata; ++ i) {
+		local_node->yezzeyChunkMetadata[i] = palloc0(sizeof(yezzeyScanTuple));
+		READ_OID_FIELD(yezzeyChunkMetadata[i]->reloid);
+		READ_OID_FIELD(yezzeyChunkMetadata[i]->relfileoid);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->blkno);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->start_offset);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->finish_offset);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->encrypted);
+		READ_INT_FIELD(yezzeyChunkMetadata[i]->reused);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->modcount);
+		READ_UINT64_FIELD(yezzeyChunkMetadata[i]->lsn);
+		READ_STRING_FIELD(yezzeyChunkMetadata[i]->x_path);
+	}
 }
 
 /*

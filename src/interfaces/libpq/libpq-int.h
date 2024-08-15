@@ -190,6 +190,12 @@ typedef enum PGExtraType {
 	PGExtraTypeTableStats		/* Table stats collected for statement from QEs */
 } PGExtraType;
 
+typedef struct pg_res_tuple 
+{
+	int         len;
+    char       *data;
+} pg_res_tuple;
+
 struct pg_result
 {
 	int			ntups;
@@ -360,6 +366,14 @@ typedef struct pg_conn_host
 								 * found in password file. */
 } pg_conn_host;
 
+typedef struct yeneid_tup {
+	Oid  relOid;
+	int segrelid;
+	int optype;
+	int len;
+	char * data;
+} yeneid_tup;
+
 /*
  * PGconn stores all the state data associated with a single connection
  * to a backend.
@@ -512,6 +526,14 @@ struct pg_conn
 	PGresult   *result;			/* result being constructed */
 	PGresult   *next_result;	/* next result (used in single-row mode) */
 
+	/* Yezzey result */
+	int             nTuples;
+	pg_res_tuple   *Tuples;
+
+	/* Yeneid result */
+	int             AOnTuples;
+	yeneid_tup     *AOTuples;
+
 	char		wrote_xlog;
 
 	/* Assorted state for SASL, SSL, GSS, etc */
@@ -662,6 +684,22 @@ extern void pqSaveParameterStatus(PGconn *conn, const char *name,
 								  const char *value);
 extern int	pqRowProcessor(PGconn *conn, const char **errmsgp);
 extern bool PQsendQueryStart(PGconn *conn);
+
+/* yezzey */
+inline int PQgetYezzeyTupleCount(PGconn *conn) {
+	return conn->nTuples;
+}
+inline pg_res_tuple* PQgetYezzeyTupleBufPtr(PGconn *conn) {
+	return conn->Tuples;
+}
+
+/* yeneid */
+inline int PQgetYeneidTupleCount(PGconn *conn) {
+	return conn->AOnTuples;
+}
+inline yeneid_tup* PQgetYeneidTupleBufPtr(PGconn *conn) {
+	return conn->AOTuples;
+}
 
 /* === in fe-protocol2.c === */
 

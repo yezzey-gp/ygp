@@ -34,6 +34,7 @@
 #include "nodes/tidbitmap.h"
 #include "storage/condition_variable.h"
 
+#include "access/aosegfiles.h"
 
 struct PlanState;				/* forward references in this file */
 struct PartitionRoutingInfo;
@@ -1303,6 +1304,9 @@ typedef struct ModifyTableState
 
 	/* Per plan map for tuple conversion from child to root */
 	TupleConversionMap **mt_per_subplan_tupconv_maps;
+
+	int segfile_count;
+	FileSegInfo **seginfo;
 } ModifyTableState;
 
 /* ----------------
@@ -1492,6 +1496,14 @@ typedef struct SeqScanState
 {
 	ScanState	ss;				/* its first field is NodeTag */
 	Size		pscan_len;		/* size of parallel heap scan descriptor */
+
+	/* yeneid segments */
+	int segfile_count;
+	FileSegInfo **seginfo;
+
+	
+	int numYezzeyChunkMetadata;
+	yezzeyScanTuple **yezzeyChunkMetadata;
 } SeqScanState;
 
 /* ----------------

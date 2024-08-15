@@ -682,7 +682,7 @@ ExecInitMotion(Motion *node, EState *estate, int eflags)
 
 	Assert(node->motionID > 0);
 	Assert(node->motionID < sliceTable->numSlices);
-	AssertImply(node->motionType == MOTIONTYPE_HASH, node->numHashSegments > 0);
+	AssertImply(node->motionType == MOTIONTYPE_HASH, node->numHashSegments > 0 || node->yezzeyKeyRanges != NULL);
 
 	parentIndex = estate->currentSliceId;
 	estate->currentSliceId = node->motionID;
@@ -806,7 +806,7 @@ ExecInitMotion(Motion *node, EState *estate, int eflags)
 	{
 		int			nkeys;
 
-		Assert(node->numHashSegments > 0);
+		Assert(node->numHashSegments > 0 || node->yezzeyKeyRanges != NULL);
 		Assert(node->numHashSegments <= recvSlice->planNumSegments);
 		nkeys = list_length(node->hashExprs);
 
@@ -819,7 +819,7 @@ ExecInitMotion(Motion *node, EState *estate, int eflags)
 		 */
 		motionstate->cdbhash = makeCdbHash(motionstate->numHashSegments,
 										   nkeys,
-										   node->hashFuncs);
+										   node->hashFuncs, node->yezzeyKeyRanges, node->numYezzeyKeyRanges);
 	}
 
 	/*
@@ -1175,7 +1175,7 @@ doSendTuple(Motion *motion, MotionState *node, TupleTableSlot *outerTupleSlot)
 		uint32		hval = 0;
 
 		econtext->ecxt_outertuple = outerTupleSlot;
-
+		
 		hval = evalHashKey(econtext, node->hashExprs, node->cdbhash);
 
 #ifdef USE_ASSERT_CHECKING

@@ -154,6 +154,11 @@ TablespaceCreateDbspace(Oid spcNode, Oid dbNode, bool isRedo)
 	if (spcNode == GLOBALTABLESPACE_OID)
 		return;
 
+	/* yezzey tablespace not persisted on-disk */
+	if (spcNode == YEZZEYTABLESPACE_OID) {
+		return;
+	}
+
 	Assert(OidIsValid(spcNode));
 	Assert(OidIsValid(dbNode));
 
@@ -376,6 +381,13 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 		elog(WARNING, "tablespaces created by regression test cases should have names starting with \"regress_\"");
 #endif
 
+	// if (!allowSystemTableMods && stmt->tablespacename != "yezzey")
+	// 	ereport(ERROR,
+	// 			(errcode(ERRCODE_RESERVED_NAME),
+	// 			 errmsg("unacceptable tablespace name \"%s\"",
+	// 					stmt->tablespacename),
+	// 	errdetail("In yezzey-engined installation tablespace support are dropped.")));
+
 	/*
 	 * Check that there is no other tablespace by this name.  (The unique
 	 * index would catch this anyway, but might as well give a friendlier
@@ -399,7 +411,14 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	tablespaceoid = GetNewOidForTableSpace(rel, TablespaceOidIndexId,
 										   Anum_pg_tablespace_oid,
 										   stmt->tablespacename);
-	values[Anum_pg_tablespace_oid - 1] = ObjectIdGetDatum(tablespaceoid);
+
+	// assign pre-defined oid to yezzey tablespace
+	if (strcmp(stmt->tablespacename, "yezzey") == 0) {
+		values[Anum_pg_tablespace_oid - 1] = YEZZEYTABLESPACE_OID;
+	} else {
+		values[Anum_pg_tablespace_oid - 1] = ObjectIdGetDatum(tablespaceoid);
+	}
+
 	values[Anum_pg_tablespace_spcname - 1] =
 		DirectFunctionCall1(namein, CStringGetDatum(stmt->tablespacename));
 	values[Anum_pg_tablespace_spcowner - 1] =
@@ -417,6 +436,7 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 		nulls[Anum_pg_tablespace_spcoptions - 1] = true;
 
 	tuple = heap_form_tuple(rel->rd_att, values, nulls);
+
 
 	CatalogTupleInsert(rel, tuple);
 

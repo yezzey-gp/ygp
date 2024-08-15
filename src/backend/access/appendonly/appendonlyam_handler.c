@@ -47,6 +47,8 @@
 #include "utils/sampling.h"
 #include "utils/tuplesort.h"
 
+#include "utils/syscache.h"
+
 #define IS_BTREE(r) ((r)->rd_rel->relam == BTREE_AM_OID)
 
 static void reset_state_cb(void *arg);
@@ -59,9 +61,14 @@ static const TableAmRoutine ao_row_methods;
 typedef struct AppendOnlyDMLState
 {
 	Oid relationOid;
-	AppendOnlyInsertDesc	insertDesc;
+	/* array of insert desc. In case of regular AOCS contains exacly one elem */ 
+	int                     nInsertDesc;
+	AppendOnlyInsertDesc	*insertDesc;
 	AppendOnlyDeleteDesc	deleteDesc;
 	AppendOnlyUniqueCheckDesc uniqueCheckDesc;
+
+	int				segfile_count;
+	FileSegInfo** 	seginfo;
 } AppendOnlyDMLState;
 
 
@@ -130,7 +137,7 @@ init_appendonly_dml_states()
  * Should be called exactly once per relation.
  */
 static inline void
-init_dml_state(const Oid relationOid)
+init_dml_state(const Oid relationOid, int segfile_count, FileSegInfo** seginfo)
 {
 	AppendOnlyDMLState *state;
 	bool				found;
@@ -147,6 +154,9 @@ init_dml_state(const Oid relationOid)
 	state->insertDesc = NULL;
 	state->deleteDesc = NULL;
 	state->uniqueCheckDesc = NULL;
+
+	state->segfile_count = segfile_count;
+	state->seginfo = seginfo;
 
 	appendOnlyDMLStates.last_used_state = state;
 }
@@ -207,7 +217,7 @@ remove_dml_state(const Oid relationOid)
  * the course of the current DML or DML-like command, for the given relation.
  */
 void
-appendonly_dml_init(Relation relation)
+appendonly_dml_init(Relation relation, int segfile_count, FileSegInfo** seginfo)
 {
 	/*
 	 * Initialize the repository of per-relation states, if not done already for
@@ -215,7 +225,7 @@ appendonly_dml_init(Relation relation)
 	 */
 	init_appendonly_dml_states();
 	/* initialize the per-relation state */
-	init_dml_state(RelationGetRelid(relation));
+	init_dml_state(RelationGetRelid(relation), segfile_count, seginfo);
 }
 
 /*
@@ -257,8 +267,12 @@ appendonly_dml_finish(Relation relation)
 
 	if (state->insertDesc)
 	{
-		Assert(state->insertDesc->aoi_rel == relation);
-		appendonly_insert_finish(state->insertDesc);
+		for (int i = 0; i < state->nInsertDesc; ++i) {
+			Assert(state->insertDesc[i] == NULL || state->insertDesc[i]->aoi_rel == relation);
+			if (state->insertDesc[i]) {
+				appendonly_insert_finish(state->insertDesc[i]);
+			}
+		}
 		state->insertDesc = NULL;
 	}
 
@@ -308,7 +322,7 @@ reset_state_cb(void *arg)
  * 'num_rows': Number of rows to be inserted. (NUM_FAST_SEQUENCES if we don't
  * know it beforehand). This arg is not used if the descriptor already exists.
  */
-static AppendOnlyInsertDesc
+static AppendOnlyInsertDesc*
 get_or_create_ao_insert_descriptor(const Relation relation, int64 num_rows)
 {
 	AppendOnlyDMLState *state;
@@ -318,12 +332,49 @@ get_or_create_ao_insert_descriptor(const Relation relation, int64 num_rows)
 	if (state->insertDesc == NULL)
 	{
 		MemoryContext oldcxt;
-		AppendOnlyInsertDesc insertDesc;
+		AppendOnlyInsertDesc *insertDesc;
 
 		oldcxt = MemoryContextSwitchTo(appendOnlyDMLStates.stateCxt);
-		insertDesc = appendonly_insert_init(relation,
-											ChooseSegnoForWrite(relation),
-											num_rows);
+
+		int segno;
+
+		if (relation->rd_yezzey_distribution != NULL) {
+			bool	isNull;
+			int2vector *distribution;
+			
+			distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, relation->rd_ydtuple,
+							Anum_yezzey_distrib_y_key_distriubtion,
+							&isNull)); 
+
+			insertDesc = palloc(distribution->dim1 * sizeof(AppendOnlyInsertDesc*));
+			state->nInsertDesc = distribution->dim1;
+
+			for (int i = 0 ; i < distribution->dim1 ; ++ i) {
+				if (distribution->values[i] ==  GpIdentity.segindex) {
+
+					// init blkno for write operation
+					PrepareLogicalSegnoForWrite(relation, i, state->seginfo[i]);
+
+					insertDesc[i] = appendonly_insert_init(relation,
+											i,
+											num_rows, state->seginfo[i]);
+				} else {
+					insertDesc[i] = NULL;
+				}
+			}
+
+		} else {
+			insertDesc = palloc(1 * sizeof(AppendOnlyInsertDesc*));
+			segno = ChooseSegnoForWrite(relation);
+
+			insertDesc[0] = appendonly_insert_init(relation,
+											segno,
+											num_rows, NULL);
+			state->nInsertDesc = 1;
+		}
+
+
+
 		/*
 		 * If we have a unique index, insert a placeholder block directory row
 		 * to entertain uniqueness checks from concurrent inserts. See
@@ -331,11 +382,12 @@ get_or_create_ao_insert_descriptor(const Relation relation, int64 num_rows)
 		 */
 		if (relationHasUniqueIndex(relation))
 		{
-			int64 firstRowNum = insertDesc->lastSequence + 1;
-			BufferedAppend *bufferedAppend = &insertDesc->storageWrite.bufferedAppend;
+			/* should not be yezzey */
+			int64 firstRowNum = insertDesc[0]->lastSequence + 1;
+			BufferedAppend *bufferedAppend = &insertDesc[0]->storageWrite.bufferedAppend;
 			int64 fileOffset = BufferedAppendNextBufferPosition(bufferedAppend);
 
-			AppendOnlyBlockDirectory_InsertPlaceholder(&insertDesc->blockDirectory,
+			AppendOnlyBlockDirectory_InsertPlaceholder(&insertDesc[0]->blockDirectory,
 													   firstRowNum,
 													   fileOffset,
 													   0);
@@ -568,7 +620,8 @@ appendonly_index_fetch_tuple(struct IndexFetchTableData *scan,
 		aoscan->aofetch =
 			appendonly_fetch_init(aoscan->xs_base.rel,
 								  snapshot,
-								  appendOnlyMetaDataSnapshot);
+								  appendOnlyMetaDataSnapshot,
+								  NULL, 0);
 	}
 	/*
 	 * There is no reason to expect changes on snapshot between tuple
@@ -825,8 +878,9 @@ appendonly_compute_xid_horizon_for_tuples(Relation rel,
 
 static void
 appendonly_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
-					int options, BulkInsertState bistate)
+					int options, BulkInsertState bistate, int logical_blkno)
 {
+	AppendOnlyInsertDesc    *insertDescs;
 	AppendOnlyInsertDesc    insertDesc;
 	MemTuple				mtuple;
 
@@ -836,7 +890,14 @@ appendonly_tuple_insert(Relation relation, TupleTableSlot *slot, CommandId cid,
 	 * don't know how many rows are visible), we provide the default number of
 	 * rows to bump gp_fastsequence by.
 	 */
-	insertDesc = get_or_create_ao_insert_descriptor(relation, NUM_FAST_SEQUENCES);
+	insertDescs = get_or_create_ao_insert_descriptor(relation, NUM_FAST_SEQUENCES);
+	if (relation->rd_yezzey_distribution == NULL) {
+		insertDesc = insertDescs[0];
+	} else {
+		// else yezzey
+		Assert(logical_blkno >= 0);
+		insertDesc = insertDescs[logical_blkno];
+	}
 	mtuple = appendonly_form_memtuple(slot, insertDesc->mt_bind);
 
 	/* Update the tuple with table oid */
@@ -894,7 +955,7 @@ appendonly_multi_insert(Relation relation, TupleTableSlot **slots, int ntuples,
 {
 	(void) get_or_create_ao_insert_descriptor(relation, ntuples);
 	for (int i = 0; i < ntuples; i++)
-		appendonly_tuple_insert(relation, slots[i], cid, options, bistate);
+		appendonly_tuple_insert(relation, slots[i], cid, options, bistate, -1);
 }
 
 static TM_Result
@@ -931,6 +992,7 @@ appendonly_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slo
 					bool wait, TM_FailureData *tmfd,
 					LockTupleMode *lockmode, bool *update_indexes)
 {
+	AppendOnlyInsertDesc	*insertDescs;
 	AppendOnlyInsertDesc	insertDesc;
 	AppendOnlyDeleteDesc	deleteDesc;
 	MemTuple				mtuple;
@@ -941,7 +1003,14 @@ appendonly_tuple_update(Relation relation, ItemPointer otid, TupleTableSlot *slo
 	 * don't know how many rows are visible), we provide the default number of
 	 * rows to bump gp_fastsequence by.
 	 */
-	insertDesc = get_or_create_ao_insert_descriptor(relation, NUM_FAST_SEQUENCES);
+	insertDescs = get_or_create_ao_insert_descriptor(relation, NUM_FAST_SEQUENCES);
+	if (relation->rd_yezzey_distribution == NULL) {
+		insertDesc = insertDescs[0];
+	} else {
+		// else yezzey
+		Assert(false);
+	}
+
 	deleteDesc = get_or_create_delete_descriptor(relation, true);
 
 	/* Update the tuple with table oid */
@@ -1329,7 +1398,7 @@ appendonly_relation_cluster_internals(Relation OldHeap, Relation NewHeap,
 	SIMPLE_FAULT_INJECTOR("cluster_ao_write_begin");
 	write_seg_no = ChooseSegnoForWrite(NewHeap);
 
-	aoInsertDesc = appendonly_insert_init(NewHeap, write_seg_no, (int64) *num_tuples);
+	aoInsertDesc = appendonly_insert_init(NewHeap, write_seg_no, (int64) *num_tuples, NULL);
 
 	/* Insert sorted heap tuples into new storage */
 	for (;;)
@@ -2214,7 +2283,8 @@ appendonly_scan_bitmap_next_tuple(TableScanDesc scan,
 		aoscan->aofetch =
 			appendonly_fetch_init(aoscan->rs_base.rs_rd,
 			                      aoscan->snapshot,
-			                      aoscan->appendOnlyMetaDataSnapshot);
+			                      aoscan->appendOnlyMetaDataSnapshot,
+								  aoscan->yezzeyChunkMetadata, aoscan->numYezzeyChunkMetadata);
 
 	}
 
@@ -2396,6 +2466,7 @@ static const TableAmRoutine ao_row_methods = {
 	.slot_callbacks = appendonly_slot_callbacks,
 
 	.scan_begin = appendonly_beginscan,
+	.scan_begin_y = appendonly_beginscan_y,
 	.scan_end = appendonly_endscan,
 	.scan_rescan = appendonly_rescan,
 	.scan_getnextslot = appendonly_getnextslot,

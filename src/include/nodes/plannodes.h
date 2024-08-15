@@ -24,6 +24,9 @@
 #include "nodes/primnodes.h"
 #include "parsenodes.h"
 
+#include "access/aosegfiles.h"
+#include "yezzey/yezzey_base.h"
+
 typedef struct DirectDispatchInfo
 {
 	/*
@@ -353,6 +356,8 @@ typedef struct Result
 	int			numHashFilterCols;
 	AttrNumber *hashFilterColIdx;
 	Oid		   *hashFilterFuncs;
+	int			numYezzeyKeyRanges;
+	int      *yezzey_key_ranges;
 } Result;
 
 /* ----------------
@@ -408,6 +413,12 @@ typedef struct ModifyTable
 	List	   *isSplitUpdates;
 
 	bool		forceTupleRouting; /* dynamic scans require tuple routing */
+
+	int numYezzeyKeyRanges;
+	int *yezzeyKeyRanges; /* yezzey */
+
+	int           segfile_count;
+	FileSegInfo** seginfo;
 } ModifyTable;
 
 struct PartitionPruneInfo;		/* forward reference to struct below */
@@ -526,6 +537,7 @@ typedef struct BitmapOr
 	List	   *bitmapplans;
 } BitmapOr;
 
+
 /*
  * ==========
  * Scan nodes
@@ -535,6 +547,17 @@ typedef struct Scan
 {
 	Plan		plan;
 	Index		scanrelid;		/* relid is index into the range table */
+
+
+	int numYezzeyKeyRanges;
+	int *yezzeyKeyRanges; /* yezzey */
+
+	/* yeneid segments */
+	int segfile_count;
+	FileSegInfo **seginfo;
+
+	int numYezzeyChunkMetadata;
+	yezzeyScanTuple **yezzeyChunkMetadata;
 } Scan;
 
 /* ----------------
@@ -1503,6 +1526,8 @@ typedef struct Motion
 	List		*hashExprs;			/* list of hash expressions */
 	Oid			*hashFuncs;			/* corresponding hash functions */
 	int         numHashSegments;	/* the module number of the hash function */
+	int         numYezzeyKeyRanges;	/* number of yezzey key ranges */
+	int         *yezzeyKeyRanges;   /* yezzey key ranges if any for this relation */
 
 	/* For Explicit */
 	AttrNumber segidColIdx;			/* index of the segid column in the target list */
@@ -1539,6 +1564,8 @@ typedef struct SplitUpdate
 	AttrNumber *hashAttnos;
 	Oid		   *hashFuncs;			/* corresponding hash functions */
 	int			numHashSegments;	/* # of segs to use in hash computation */
+	int         numYezzeyKeyRanges;
+	int        *yezzey_key_ranges;
 } SplitUpdate;
 
 /*

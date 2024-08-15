@@ -88,6 +88,28 @@ static const f_smgr smgrsw[] = {
 	}
 };
 
+SMGRFile AORelOpenSegFile(
+	Oid reloid, char * nspname, 
+	char * relname, const char * fileName, 
+	int fileFlags, int64 modcount,
+	yezzeyScanTuple **ytups,
+	int numYtups) {
+	return PathNameOpenFile(fileName, fileFlags);
+}
+
+static const f_smgr_ao smgrswao[] = {
+	/* regular file */
+	{
+		.smgr_FileClose = FileClose,
+		.smgr_FileTruncate = FileTruncate,
+		.smgr_AORelOpenSegFile = AORelOpenSegFile,
+		.smgr_FileWrite = FileWrite,
+		.smgr_FileRead = FileRead,
+		.smgr_FileSync = FileSync,
+		.smgr_FileDiskSize = FileDiskSize,
+	},
+};
+
 static const int NSmgr = lengthof(smgrsw);
 
 /*
@@ -160,7 +182,9 @@ smgrshutdown(int code, Datum arg)
 
 /* Hooks for plugins to get control in smgr */
 smgr_hook_type smgr_hook = NULL;
+smgrao_hook_type smgrao_hook = NULL;
 smgr_init_hook_type smgr_init_hook = NULL;
+smgrao_init_hook_type smgrao_init_hook = NULL;
 smgr_shutdown_hook_type smgr_shutdown_hook = NULL;
 
 const f_smgr *
@@ -168,6 +192,14 @@ smgr_standard(BackendId backend, RelFileNode rnode, SMgrImpl which)
 {
 	// for md.c 
 	return &smgrsw[which];
+}
+
+
+const f_smgr_ao *
+smgrao_standard()
+{
+	// for md.c 
+	return &smgrswao[0];
 }
 
 const f_smgr *
@@ -185,6 +217,25 @@ smgr(BackendId backend, RelFileNode rnode, SMgrImpl which)
 	return result;
 }
 
+
+
+const f_smgr_ao *
+smgrao(void)
+{
+	const f_smgr_ao *result;
+
+	if (smgrao_hook)
+ 	{
+		result = (*smgrao_hook)();
+ 	}
+	else
+		result = smgrao_standard();
+
+	return result;
+}
+
+
+
 /*
  *	smgropen() -- Return an SMgrRelation object, creating it if need be.
  *
@@ -199,6 +250,7 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which)
 
 	/* GPDB: don't support MyBackendId as a possible backend. */
 	Assert(backend == InvalidBackendId || backend == TempRelBackendId);
+	Assert(which == SMGR_AO || which == SMGR_MD);
 
 	if (SMgrRelationHash == NULL)
 	{
@@ -232,6 +284,7 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which)
 		reln->smgr_vm_nblocks = InvalidBlockNumber;
 		reln->smgr_which = which;
 		reln->storageManager = smgr(backend, rnode, which);
+		reln->storageManagerAO = smgrao();
 
 		/* mark it not open */
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
@@ -243,6 +296,7 @@ smgropen(RelFileNode rnode, BackendId backend, SMgrImpl which)
 
 	return reln;
 }
+
 
 /*
  * smgrsetowner() -- Establish a long-lived reference to an SMgrRelation object
@@ -325,7 +379,7 @@ smgrclose(SMgrRelation reln)
 	if (hash_search(SMgrRelationHash,
 					(void *) &(reln->smgr_rnode),
 					HASH_REMOVE, NULL) == NULL)
-		elog(ERROR, "SMgrRelation hashtable corrupted");
+		elog(WARNING, "SMgrRelation hashtable corrupted");
 
 	/*
 	 * Unhook the owner pointer, if any.  We do this last since in the remote
