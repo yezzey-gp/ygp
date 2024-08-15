@@ -65,7 +65,7 @@ static void UpdateFileSegInfo_internal(Relation parentrel,
 						   int64 varblocks_added,
 						   int64 modcount_added,
 						   FileSegInfoState newState);
-static FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(char *relationName, Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs);
+static FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(char *relationName, Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs, int exp_size);
 
 
 /* ------------------------------------------------------------------------
@@ -453,6 +453,10 @@ GetAllFileSegInfo(Relation parentrel,
 	FileSegInfo **result;
 	Oid segrelid;
 
+	int2vector *distribution;
+	bool isNull;
+	int exp_size = 0;
+
 	GetAppendOnlyEntryAuxOids(parentrel, &segrelid, NULL, NULL);
 
 	if (segrelid == InvalidOid)
@@ -464,10 +468,21 @@ GetAllFileSegInfo(Relation parentrel,
 
 	pg_aoseg_rel = table_open(segrelid, AccessShareLock);
 
+
+	
+	distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, parentrel->rd_ydtuple,
+					Anum_yezzey_distrib_y_key_distriubtion,
+					&isNull)); 
+
+	if (!isNull) {
+		exp_size = distribution->dim1;
+	}
+
+
 	result = GetAllFileSegInfo_pg_aoseg_rel(RelationGetRelationName(parentrel),
 											pg_aoseg_rel,
 											appendOnlyMetaDataSnapshot,
-											totalsegs);
+											totalsegs, exp_size);
 
 	table_close(pg_aoseg_rel, AccessShareLock);
 
@@ -497,7 +512,7 @@ static FileSegInfo **
 GetAllFileSegInfo_pg_aoseg_rel(char *relationName,
 							   Relation pg_aoseg_rel,
 							   Snapshot appendOnlyMetaDataSnapshot,
-							   int *totalsegs)
+							   int *totalsegs, int expected_size)
 {
 	TupleDesc	pg_aoseg_dsc;
 	HeapTuple	tuple;
@@ -517,6 +532,11 @@ GetAllFileSegInfo_pg_aoseg_rel(char *relationName,
 
 	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
+	if (expected_size != 0) {
+		seginfo_slot_no = expected_size;
+	}
+
+
 	/*
 	 * MPP-16407: Initialize the segment file information array, we first
 	 * allocate 8 slot for the array, then array will be dynamically expanded
@@ -524,6 +544,20 @@ GetAllFileSegInfo_pg_aoseg_rel(char *relationName,
 	 */
 	allseginfo = (FileSegInfo **) palloc0(sizeof(FileSegInfo *) * seginfo_slot_no);
 	seginfo_no = 0;
+
+
+	if (expected_size != 0) {
+		for (int i = 0; i < expected_size; ++i) {
+			allseginfo[i] = (FileSegInfo *) palloc0(sizeof(FileSegInfo));
+			allseginfo[i]->segno = i;
+			allseginfo[i]->state = AOSEG_STATE_DEFAULT;
+
+			/* New segments are always created in the latest format */
+			allseginfo[i]->formatversion = AOSegfileFormatVersion_GetLatest();
+		}
+		seginfo_no = expected_size;
+	}
+
 
 	/*
 	 * Now get the actual segfile information
@@ -540,14 +574,21 @@ GetAllFileSegInfo_pg_aoseg_rel(char *relationName,
 
 		FileSegInfo *oneseginfo;
 
-		allseginfo[seginfo_no] = (FileSegInfo *) palloc0(sizeof(FileSegInfo));
-		oneseginfo = allseginfo[seginfo_no];
 
 		segno = fastgetattr(tuple, Anum_pg_aoseg_segno, pg_aoseg_dsc, &isNull);
 		if (isNull)
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("got invalid segno value: NULL")));
+
+		if (expected_size == 0) {
+			allseginfo[seginfo_no] = (FileSegInfo *) palloc0(sizeof(FileSegInfo));
+			oneseginfo = allseginfo[seginfo_no];
+		} else {
+			oneseginfo = allseginfo[segno];
+		}
+
+
 		oneseginfo->segno = DatumGetInt32(segno);
 
 		/* get the eof */
@@ -621,7 +662,10 @@ GetAllFileSegInfo_pg_aoseg_rel(char *relationName,
 			   oneseginfo->segno,
 			   oneseginfo->eof,
 			   relationName);
-		seginfo_no++;
+
+		if (expected_size == 0) {
+			seginfo_no++;
+		}
 
 		CHECK_FOR_INTERRUPTS();
 	}
@@ -1359,7 +1403,7 @@ gp_aoseg_history(PG_FUNCTION_ARGS)
 										   RelationGetRelationName(aocsRel),
 										   pg_aoseg_rel,
 										   SnapshotAny, //Get ALL tuples from pg_aoseg_ % including aborted and in - progress ones.
-										   & context->totalAoSegFiles);
+										   & context->totalAoSegFiles, 0);
 
 		table_close(pg_aoseg_rel, AccessShareLock);
 		table_close(aocsRel, AccessShareLock);
@@ -1512,7 +1556,7 @@ gp_aoseg(PG_FUNCTION_ARGS)
 			GetAllFileSegInfo_pg_aoseg_rel(RelationGetRelationName(aocsRel),
 										   pg_aoseg_rel,
 										   snapshot,
-										   &context->totalAoSegFiles);
+										   &context->totalAoSegFiles, 0);
 		UnregisterSnapshot(snapshot);
 
 		table_close(pg_aoseg_rel, AccessShareLock);

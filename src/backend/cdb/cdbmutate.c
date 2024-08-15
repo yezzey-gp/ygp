@@ -1856,10 +1856,9 @@ cdbpathtoplan_create_sri_plan(RangeTblEntry *rte, PlannerInfo *subroot, Path *su
 	/* Suppose caller already hold proper locks for relation. */
 	rel = relation_open(rte->relid, NoLock);
 	targetPolicy = rel->rd_cdbpolicy;
-	if (rel->rd_node.spcNode == YEZZEYTABLESPACE_OID) {
-		// !!!! fix this
-		yezzey_key_ranges = RelationGetYezzeyKey(rel);
-	}
+	
+	yezzey_key_ranges = RelationGetYezzeyKeyByRelid(rte->relid);
+
 	hashExprs = getExprListFromTargetList(resultplan->plan.targetlist,
 										  targetPolicy->nattrs,
 										  targetPolicy->attrs);

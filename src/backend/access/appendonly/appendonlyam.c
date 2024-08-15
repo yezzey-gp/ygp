@@ -1967,7 +1967,11 @@ appendonly_beginscan_y(Relation relation,
 	distribution = DatumGetPointer(SysCacheGetAttr(YEZZEYDISTRIBID, relation->rd_ydtuple,
 					Anum_yezzey_distrib_y_key_distriubtion,
 					&isNull)); 
-
+					
+	if (distribution->dim1 != segfile_count) {
+		elog(ERROR, "corrupted yezzey metadata");
+	}
+	
 	for (int i = 0 ; i < distribution->dim1; ++ i) {
 		if (distribution->values[i] == GpIdentity.segindex) {
 			++local_segfile_count;
@@ -1980,9 +1984,7 @@ appendonly_beginscan_y(Relation relation,
 
 	for (int i = 0 ; i < distribution->dim1 ; ++ i) {
 		if (distribution->values[i] == GpIdentity.segindex) {
-			if (i < segfile_count) {
 				local_seginfo[local_segfile_count++] = seginfo[i];
-			}
 		}
 	}
 
