@@ -80,7 +80,7 @@ SeqNext(SeqScanState *node)
 									node->ss.ps.plan->targetlist,
 									node->ss.ps.plan->qual,
 									NULL,
-									NULL, node->segfile_count, node->seginfo);
+									NULL, node->segfile_count, node->seginfo, node->numYezzeyChunkMetadata, node->yezzeyChunkMetadata);
 		
 		node->ss.ss_currentScanDesc = scandesc;
 	}
@@ -166,6 +166,9 @@ ExecInitSeqScanForPartition(SeqScan *node, EState *estate,
 	
 	scanstate->seginfo = node->seginfo;
 	scanstate->segfile_count = node->segfile_count;
+
+	scanstate->numYezzeyChunkMetadata = node->numYezzeyChunkMetadata;
+	scanstate->yezzeyChunkMetadata = node->yezzeyChunkMetadata;
 	/*
 	 * Miscellaneous initialization
 	 *

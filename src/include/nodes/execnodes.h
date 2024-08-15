@@ -1500,6 +1500,10 @@ typedef struct SeqScanState
 	/* yeneid segments */
 	int segfile_count;
 	FileSegInfo **seginfo;
+
+	
+	int numYezzeyChunkMetadata;
+	yezzeyScanTuple *yezzeyChunkMetadata;
 } SeqScanState;
 
 /* ----------------

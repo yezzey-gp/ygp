@@ -17,4 +17,6 @@
 void YezzeyPopulateMetadataRelation(EState *estate);
 void YeneidPopulateMetadataRelation(EState *estate);
 
+void YezzeyPopulateScanMetadata(Relation relation, Scan *scan);
+
 #endif /* GP_YEZZEY_H */

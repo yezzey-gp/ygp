@@ -538,6 +538,13 @@ _outScanInfo(StringInfo str, const Scan *node)
 		WRITE_INT_FIELD(seginfo[i]->formatversion);
 		WRITE_INT_FIELD(seginfo[i]->state);
 	}
+
+	WRITE_INT_FIELD(numYezzeyChunkMetadata);
+
+	for (int i = 0; i < node->numYezzeyChunkMetadata; ++ i) {
+		WRITE_INT_FIELD(yezzeyChunkMetadata[i].len);
+		WRITE_STRING_FIELD(yezzeyChunkMetadata[i].payload);
+	}
 }
 
 /*

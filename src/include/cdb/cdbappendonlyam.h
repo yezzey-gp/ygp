@@ -284,6 +284,10 @@ typedef struct AppendOnlyScanDescData
 	 * to comply with the TSM API).
 	 */
 	int64 		sampleTargetBlk;
+
+
+	yezzeyScanTuple *yezzeyChunkMetadata;
+	int numYezzeyChunkMetadata;
 }	AppendOnlyScanDescData;
 
 typedef AppendOnlyScanDescData *AppendOnlyScanDesc;
@@ -470,7 +474,8 @@ extern TableScanDesc appendonly_beginscan_y(Relation relation,
 					 Snapshot snapshot,
 					 int nkeys, struct ScanKeyData *key,
 					 ParallelTableScanDesc pscan,
-					 uint32 flags, int segfile_count, FileSegInfo **seginfo);
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo, 
+					 int numYezzeyChunkMetadata, yezzeyScanTuple *yezzeyChunkMetadata);
 
 extern void appendonly_rescan(TableScanDesc scan, ScanKey key,
 								bool set_params, bool allow_strat,

@@ -1900,13 +1900,14 @@ aoco_index_build_range_scan(Relation heapRelation,
 												false));
 			}
 
+			/* FIX this yezzey */
 			/* Push down target list and qual to scan */
 			scan = table_beginscan_es(heapRelation,	/* relation */
 									  snapshot,		/* snapshot */
 									  tlist,		/* targetlist */
 									  qual,			/* qual */
 									  NULL,			/* constraintList */
-									  NULL, 0, NULL);
+									  NULL, 0, NULL, 0, NULL);
 		}
 	}
 	else

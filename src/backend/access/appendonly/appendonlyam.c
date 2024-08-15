@@ -1745,6 +1745,8 @@ appendonly_beginrangescan_internal(Relation relation,
 								   Snapshot appendOnlyMetaDataSnapshot,
 								   FileSegInfo **seginfo,
 								   int segfile_count,
+								   yezzeyScanTuple *yezzeyChunkMetadata,
+								   int numYezzeyChunkMetadata,
 								   int nkeys,
 								   ScanKey key,
 								   ParallelTableScanDesc parallel_scan,
@@ -1757,6 +1759,9 @@ appendonly_beginrangescan_internal(Relation relation,
 	int32		blocksize = -1;
 	int16		compresslevel = 0;
 	NameData	compresstype;
+
+	scan->yezzeyChunkMetadata = yezzeyChunkMetadata;
+	scan->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
 
 	GetAppendOnlyEntryAttributes(relation->rd_id, &blocksize, &compresslevel, &checksum, &compresstype);
 
@@ -1916,6 +1921,8 @@ appendonly_beginrangescan(Relation relation,
 											  appendOnlyMetaDataSnapshot,
 											  seginfo,
 											  segfile_count,
+											  NULL,
+											  0,
 											  nkeys,
 											  keys,
 											  NULL,
@@ -1933,7 +1940,8 @@ appendonly_beginscan_y(Relation relation,
 					 Snapshot snapshot,
 					 int nkeys, struct ScanKeyData *key,
 					 ParallelTableScanDesc pscan,
-					 uint32 flags, int segfile_count, FileSegInfo **seginfo)
+					 uint32 flags, int segfile_count, FileSegInfo **seginfo,
+					 int numYezzeyChunkMetadata, yezzeyScanTuple * yezzeyChunkMetadata)
 {
 	Snapshot	appendOnlyMetaDataSnapshot;
 	AppendOnlyScanDesc aoscan;
@@ -1993,6 +2001,8 @@ appendonly_beginscan_y(Relation relation,
 												appendOnlyMetaDataSnapshot,
 												local_seginfo,
 												local_segfile_count,
+												yezzeyChunkMetadata,
+												numYezzeyChunkMetadata,
 												nkeys,
 												key,
 												pscan,
@@ -2040,6 +2050,8 @@ appendonly_beginscan(Relation relation,
 												appendOnlyMetaDataSnapshot,
 												seginfo,
 												segfile_count,
+												NULL,
+												0,
 												nkeys,
 												key,
 												pscan,

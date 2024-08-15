@@ -18,13 +18,99 @@
 #include "access/heapam.h"
 #include "utils/fmgroids.h"
 
+#include "utils/snapmgr.h"
+
 void YezzeyPopulateMetadataRelation(EState *estate);
 void YeneidPopulateMetadataRelation(EState *estate);
 
+void YezzeyPopulateScanMetadata(Relation relation, Scan *scan);
 
 /* TODO: move somewhere */
 #define Natts_yezzey_virtual_index 10
 #define YEZZEY_TEMP_INDEX_RELATION 8500
+#define Anum_yezzey_virtual_index_reloid 1
+
+
+void YezzeyPopulateScanMetadata(Relation relation, Scan *scan) {
+
+    MemTupleBinding * mt_bind;
+    Relation yandxrel;
+
+    bool nulls[Natts_yezzey_virtual_index];
+    Datum values[Natts_yezzey_virtual_index];
+
+    Relation yrel;
+
+    /* Yezzey metadata relation has fixed OID  */
+
+    /* SELECT external_path
+    * FROM yezzey.yezzey_virtual_index_<oid>
+    * WHERE segno = .. and filenode = ..
+    * <>; */
+    HeapTuple tuple;
+    Snapshot snap;
+    TableScanDesc desc;
+
+    int itemLen;
+
+
+/* Update this settings if where clause expr changes */
+#define YezzeyVirtualIndexScanCols 1
+
+    ScanKeyData skey[YezzeyVirtualIndexScanCols];
+
+
+//   std::vector<ChunkInfo> res;
+    yrel = table_open(YEZZEY_TEMP_INDEX_RELATION, RowExclusiveLock);
+
+	TupleDesc	tupdesc = RelationGetDescr(yrel);
+
+    mt_bind = create_memtuple_binding(
+      tupdesc, RelationGetNumberOfAttributes(yrel));
+    
+    snap = RegisterSnapshot(GetTransactionSnapshot());
+
+    ScanKeyInit(&skey[0], Anum_yezzey_virtual_index_reloid,
+                BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(RelationGetRelid(relation)));
+    
+    /* TBD: Read index */
+    desc = table_beginscan(yrel, snap, YezzeyVirtualIndexScanCols, skey);
+
+    /* some random initial number*/
+    int chunkSz = 100;
+
+    scan->yezzeyChunkMetadata = (yezzeyScanTuple *) palloc0(sizeof(yezzeyScanTuple) * chunkSz);
+
+    while (HeapTupleIsValid(tuple = heap_getnext(desc, ForwardScanDirection))) {
+        if (scan->numYezzeyChunkMetadata >= chunkSz) {
+            chunkSz *= 2;
+            scan->yezzeyChunkMetadata = (yezzeyScanTuple *) repalloc(scan->yezzeyChunkMetadata, sizeof(yezzeyScanTuple) * chunkSz);
+        }
+        MemTuple memtup;
+    
+		/* Break down the tuple into fields */
+		heap_deform_tuple(tuple, tupdesc, values, nulls);
+
+        memtup = memtuple_form(mt_bind, values, nulls);
+
+        /*
+        * get space to insert our next item (tuple)
+        */
+        itemLen = memtuple_get_size(memtup);
+
+        scan->yezzeyChunkMetadata[scan->numYezzeyChunkMetadata].len = itemLen;
+        scan->yezzeyChunkMetadata[scan->numYezzeyChunkMetadata].payload = memtup;
+
+        scan->numYezzeyChunkMetadata++;
+    }
+
+    table_endscan(desc);
+    table_close(yrel, RowExclusiveLock);
+
+    UnregisterSnapshot(snap);
+
+    pfree(mt_bind);
+}
 
 void YezzeyPopulateMetadataRelation(EState *estate) {
     MemTupleBinding * mt_bind;

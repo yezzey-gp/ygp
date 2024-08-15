@@ -3207,7 +3207,7 @@ CopyTo(CopyState cstate)
 						}
 					}
 					/* yeneid todo: fix */
-					scandesc = table_beginscan_es(rel, GetActiveSnapshot(), 0, NULL, proj, NULL, 0, NULL);
+					scandesc = table_beginscan_es(rel, GetActiveSnapshot(), 0, NULL, proj, NULL, 0, NULL, 0, NULL);
 					slot = table_slot_create(rel, NULL);
 
 					while (table_scan_getnextslot(scandesc, ForwardScanDirection, slot))

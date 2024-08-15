@@ -67,6 +67,8 @@
 
 #include "utils/snapmgr.h"
 
+#include "yezzey/yezzey.h"
+
 /*
  * Flag bits that can appear in the flags argument of create_plan_recurse().
  * These can be OR-ed together.
@@ -202,7 +204,7 @@ static void copy_generic_path_info(Plan *dest, Path *src);
 static void copy_plan_costsize(Plan *dest, Plan *src);
 static void label_sort_with_costsize(PlannerInfo *root, Sort *plan,
 									 double limit_tuples);
-static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid, int segfile_count, FileSegInfo **seginfo);
+static SeqScan *make_seqscan(List *qptlist, List *qpqual, Index scanrelid, int segfile_count, FileSegInfo **seginfo, int numYezzeyChunkMetadata, yezzeyScanTuple *tuples);
 static SampleScan *make_samplescan(List *qptlist, List *qpqual, Index scanrelid,
 								   TableSampleClause *tsc);
 static IndexScan *make_indexscan(List *qptlist, List *qpqual, Index scanrelid,
@@ -3396,7 +3398,7 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 	if (best_path->parent->yezzey_key_ranges == NULL) {
 		scan_plan = make_seqscan(tlist,
 								scan_clauses,
-								scan_relid, 0, NULL);
+								scan_relid, 0, NULL, 0, NULL);
 	} else {
 		FileSegInfo ** seginfo;
 		int segfile_count;
@@ -3407,10 +3409,13 @@ create_seqscan_plan(PlannerInfo *root, Path *best_path,
 
 		seginfo = GetAllFileSegInfo(relation,
 									SnapshotSelf, &segfile_count, NULL);
+		
 
 		scan_plan = make_seqscan(tlist,
 								scan_clauses,
-								scan_relid, segfile_count, seginfo);
+								scan_relid, segfile_count, seginfo, 0, NULL);
+
+		YezzeyPopulateScanMetadata(relation, scan_plan);
 
 
 		relation_close(relation, AccessShareLock);
@@ -6227,7 +6232,8 @@ label_sort_with_costsize(PlannerInfo *root, Sort *plan, double limit_tuples)
 static SeqScan *
 make_seqscan(List *qptlist,
 			 List *qpqual,
-			 Index scanrelid, int segfile_count, FileSegInfo **seginfo)
+			 Index scanrelid, int segfile_count, FileSegInfo **seginfo,
+			 int numYezzeyChunkMetadata, yezzeyScanTuple *tuples)
 {
 	SeqScan    *node = makeNode(SeqScan);
 	Plan	   *plan = &node->plan;
@@ -6240,6 +6246,10 @@ make_seqscan(List *qptlist,
 
 	node->segfile_count = segfile_count;
 	node->seginfo = seginfo;
+
+	/* null-out some yezzey-related fields */
+	node->numYezzeyChunkMetadata = numYezzeyChunkMetadata;
+	node->yezzeyChunkMetadata = tuples;
 
 	return node;
 }

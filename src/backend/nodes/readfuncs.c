@@ -2735,6 +2735,16 @@ ReadCommonScan(Scan *local_node)
 	for (int i = local_node->segfile_count; i < local_node->numYezzeyKeyRanges; ++ i) {
 		local_node->seginfo[i] = palloc0(sizeof(FileSegInfo));
 	}
+
+	READ_INT_FIELD(numYezzeyChunkMetadata);
+
+
+	local_node->yezzeyChunkMetadata = palloc0(sizeof(yezzeyScanTuple) * local_node->numYezzeyChunkMetadata);
+
+	for (int i = 0; i < local_node->numYezzeyChunkMetadata; ++ i) {
+		READ_INT_FIELD(yezzeyChunkMetadata[i].len);
+		READ_STRING_FIELD(yezzeyChunkMetadata[i].payload);
+	}
 }
 
 /*

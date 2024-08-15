@@ -6475,7 +6475,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap, LOCKMODE lockmode)
 		* combined with ATTACH PARTITION.
 		*/
 		if (tab->partition_constraint && tab->rewrite == 0)
-			scan = table_beginscan_es(oldrel, snapshot, NULL, NULL, NULL, lappend(NIL, tab->partition_constraint), 0, NULL);
+			scan = table_beginscan_es(oldrel, snapshot, NULL, NULL, NULL, lappend(NIL, tab->partition_constraint), 0, NULL, 0, NULL);
 		else
 			scan = table_beginscan(oldrel, snapshot, 0, NULL);
 

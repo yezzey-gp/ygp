@@ -536,6 +536,11 @@ typedef struct BitmapOr
 	List	   *bitmapplans;
 } BitmapOr;
 
+typedef struct yezzeyScanTuple {
+	int len;
+	char * payload;
+} yezzeyScanTuple;
+
 /*
  * ==========
  * Scan nodes
@@ -553,6 +558,9 @@ typedef struct Scan
 	/* yeneid segments */
 	int segfile_count;
 	FileSegInfo **seginfo;
+
+	int numYezzeyChunkMetadata;
+	yezzeyScanTuple *yezzeyChunkMetadata;
 } Scan;
 
 /* ----------------
