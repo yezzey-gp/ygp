@@ -7673,8 +7673,15 @@ StartupXLOG(void)
 	 * completed successfully. Otherwise we'd not retry if any of the post
 	 * end-of-recovery steps fail.
 	 */
-	if (InRecovery)
+	if (InRecovery) {
+		/*
+		 * Clean up once again, because in recover process new unlogged
+		 * relations might be created and initialized. So try to initialize
+		 * it once again lead to file exists error
+		 */
+		ResetUnloggedRelations(UNLOGGED_RELATION_CLEANUP);
 		ResetUnloggedRelations(UNLOGGED_RELATION_INIT);
+	}
 
 	/*
 	 * We don't need the latch anymore. It's not strictly necessary to disown
