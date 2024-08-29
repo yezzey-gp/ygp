@@ -260,11 +260,7 @@ mdunlink_ao(RelFileNodeBackend rnode, ForkNumber forkNumber, bool isRedo)
 		ao_foreach_extent_file(mdunlink_ao_perFile, &unlinkFiles);
 
 		pfree(segPath);
-	} else if (forkNumber == YEZZEY_FORKNUM) {
-		/* YEZZEY_FORKNUM logic here, TBD */
-
 	}
-
 	pfree((void *) path);
 }
 

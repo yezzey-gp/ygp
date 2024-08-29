@@ -37,7 +37,6 @@ const char *const forkNames[] = {
 	"fsm",						/* FSM_FORKNUM */
 	"vm",						/* VISIBILITYMAP_FORKNUM */
 	"init",						/* INIT_FORKNUM */
-	"yezzey"					/* YEZZEY_FORKNUM */
 };
 
 StaticAssertDecl(lengthof(forkNames) == (MAX_FORKNUM + 1),

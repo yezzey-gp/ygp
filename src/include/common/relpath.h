@@ -57,8 +57,6 @@ typedef enum ForkNumber
 	 */
 	INIT_FORKNUM,
 
-	YEZZEY_FORKNUM
-
 	/*
 	 * NOTE: if you add a new fork, change MAX_FORKNUM and possibly
 	 * FORKNAMECHARS below, and update the forkNames array in
@@ -66,9 +64,9 @@ typedef enum ForkNumber
 	 */
 } ForkNumber;
 
-#define MAX_FORKNUM		YEZZEY_FORKNUM
+#define MAX_FORKNUM		INIT_FORKNUM
 
-#define FORKNAMECHARS	8		/* max chars for a fork name */
+#define FORKNAMECHARS	4		/* max chars for a fork name */
 
 extern const char *const forkNames[];
 
