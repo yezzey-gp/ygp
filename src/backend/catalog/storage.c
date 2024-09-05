@@ -162,7 +162,7 @@ RelationDropStorage(Relation rel)
 	pendingDeletes = pending;
 
 
-	/* if yezzey relation, we nned to update relation expire lsn */
+	/* if yezzey relation, we need to update relation expire lsn */
 	/*
 	 * Set expiration of the relation's external files.
 	 */
