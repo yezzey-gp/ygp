@@ -581,7 +581,6 @@ intorel_initplan(struct QueryDesc *queryDesc, int eflags)
 	bool		is_matview;
 	char		relkind;
 	List	   *attrList;
-	CreateStmt *create;
 	ObjectAddress intoRelationAddr;
 	Relation	intoRelationDesc;
 	RangeTblEntry *rte;
