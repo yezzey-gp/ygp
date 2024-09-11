@@ -1545,6 +1545,7 @@ _tarWriteDir(const char *pathbuf, int basepathlen, struct stat * statbuf,
 #else
 	if (pgwin32_is_junction(pathbuf))
 #endif
+		;
 
 	_tarWriteHeader(pathbuf + basepathlen + 1, NULL, statbuf);
 	return 512;
