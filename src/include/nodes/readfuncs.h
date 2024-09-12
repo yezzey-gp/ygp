@@ -17,6 +17,7 @@
 #define READFUNCS_H
 
 #include "nodes/nodes.h"
+#include "nodes/plannodes.h"
 
 /*
  * prototypes for functions in read.c (the lisp token parser)
@@ -24,7 +25,8 @@
 extern char *pg_strtok(int *length);
 extern char *debackslash(char *token, int length);
 extern void *nodeRead(char *token, int tok_len);
-
+PlannedStmt *
+_readPlannedStmt(void);
 /*
  * nodeReadSkip
  *    Skips next item (a token, list or subtree).
