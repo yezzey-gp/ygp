@@ -277,6 +277,21 @@ ExplainQuery(ExplainStmt *stmt, const char *queryString,
 	pfree(es.str->data);
 }
 
+// sr_plan needs
+ExplainState *
+NewExplainState(void)
+{
+	ExplainState *es = (ExplainState *) palloc0(sizeof(ExplainState));
+
+	/* Set default options (most fields can be left as zeroes). */
+	es->costs = true;
+	/* Prepare output buffer. */
+	es->str = makeStringInfo();
+
+	return es;
+}
+
+
 /*
  * Initialize ExplainState.
  */
