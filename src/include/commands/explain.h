@@ -85,7 +85,7 @@ extern void ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into,
 			   ExplainState *es, const char *queryString,
 			   ParamListInfo params, const instr_time *planduration,
 			   int cursorOptions);
-
+extern ExplainState * NewExplainState(void);
 extern void ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc);
 extern void ExplainPrintTriggers(ExplainState *es, QueryDesc *queryDesc);
 extern void ExplainParallelRetrieveCursor(ExplainState *es, QueryDesc* queryDesc);
