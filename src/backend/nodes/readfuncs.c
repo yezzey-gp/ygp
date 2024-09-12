@@ -3071,6 +3071,8 @@ parseNodeString(void)
 		return_value = _readNotifyStmt();
 	else if (MATCH("DECLARECURSOR", 13))
 		return_value = _readDeclareCursorStmt();
+	else if (MATCH("PLANNEDSTMT",11))
+		return_value = _readPlannedStmt();
 
 	/* GPDB additions */
 	else if (MATCHX("A_ARRAYEXPR"))
