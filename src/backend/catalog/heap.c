@@ -1442,13 +1442,15 @@ heap_create_with_catalog(const char *relname,
 									 stdRdOptions->checksum,
 									 relkind,
 									 stdRdOptions->columnstore);
-		if(appendOnlyRel)
+		if (appendOnlyRel)
 		{
-			if(stdRdOptions->columnstore)
-				relstorage = RELSTORAGE_AOCOLS;
-			else
-				relstorage = RELSTORAGE_AOROWS;
-			reloptions = transformAOStdRdOptions(stdRdOptions, reloptions);
+			if (relid >= FirstNormalObjectId) {
+				if (stdRdOptions->columnstore)
+					relstorage = RELSTORAGE_AOCOLS;
+				else
+					relstorage = RELSTORAGE_AOROWS;
+				reloptions = transformAOStdRdOptions(stdRdOptions, reloptions);
+			}
 		}
 	}
 	else
