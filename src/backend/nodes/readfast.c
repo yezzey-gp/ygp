@@ -1344,7 +1344,7 @@ _readPlannerParamItem(void)
 /*
  * _readPlannedStmt
  */
-static PlannedStmt *
+PlannedStmt *
 _readPlannedStmt(void)
 {
 	READ_LOCALS(PlannedStmt);
