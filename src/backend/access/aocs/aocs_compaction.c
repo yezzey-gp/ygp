@@ -57,13 +57,16 @@ AOCSCompaction_DropSegmentFile(Relation aorel,
 
 	Assert(RelationIsAoCols(aorel));
 
+	char * relname;
+	char *nspname;
+	relname = RelationGetRelationName(aorel);
+	nspname = get_namespace_name(RelationGetNamespace(aorel));
+
 	for (col = 0; col < RelationGetNumberOfAttributes(aorel); col++)
 	{
 		char		filenamepath[MAXPGPATH];
 		int			pseudoSegNo;
 		File		fd;
-		char * relname;
-		char *nspname;
 
 		/* Open and truncate the relation segfile */
 		MakeAOSegmentFileName(aorel, segno, col, &pseudoSegNo, filenamepath);
@@ -73,13 +76,8 @@ AOCSCompaction_DropSegmentFile(Relation aorel,
 			   "segno %d",
 			   pseudoSegNo);
 
-		relname = RelationGetRelationName(aorel);
-		nspname = get_namespace_name(RelationGetNamespace(aorel));
-
-		RelationOpenSmgr(aorel);
 
 		fd = OpenAOSegmentFile(aorel, nspname, filenamepath, 0, -1);
-		pfree(nspname);
 		if (fd >= 0)
 		{
 			TruncateAOSegmentFile(fd, aorel, pseudoSegNo, 0);
@@ -93,8 +91,9 @@ AOCSCompaction_DropSegmentFile(Relation aorel,
 			 */
 			elog(DEBUG1, "could not truncate segfile %s, because it does not exist", filenamepath);
 		}
-		RelationCloseSmgr(aorel);
 	}
+
+	pfree(nspname);
 }
 
 /*
@@ -115,6 +114,8 @@ AOCSSegmentFileTruncateToEOF(Relation aorel,
 	Assert(fsinfo);
 	Assert(RelationIsAoCols(aorel));
 
+	char 		*nspname;
+	nspname = get_namespace_name(RelationGetNamespace(aorel));
 	segno = fsinfo->segno;
 
 	for (j = 0; j < fsinfo->vpinfo.nEntry; ++j)
@@ -124,12 +125,10 @@ AOCSSegmentFileTruncateToEOF(Relation aorel,
 		AOCSVPInfoEntry *entry;
 		File		fd;
 		int32		fileSegNo;
-		char 		*nspname;
 
 		entry = getAOCSVPEntry(fsinfo, j);
 		segeof = entry->eof;
 
-		nspname = get_namespace_name(RelationGetNamespace(aorel));
 		/* Open and truncate the relation segfile to its eof */
 		MakeAOSegmentFileName(aorel, segno, j, &fileSegNo, filenamepath);
 
@@ -144,9 +143,7 @@ AOCSSegmentFileTruncateToEOF(Relation aorel,
 			   fileSegNo,
 			   segeof);
 
-		relname = RelationGetRelationName(aorel);
 
-		RelationOpenSmgr(aorel);
 
 		fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1);
 		if (fd >= 0)
@@ -179,8 +176,8 @@ AOCSSegmentFileTruncateToEOF(Relation aorel,
 				   segeof);
 		}
 		RelationCloseSmgr(aorel);
-		pfree(nspname);
 	}
+	pfree(nspname);
 }
 
 /*

@@ -80,10 +80,7 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno)
 
 	nspname = get_namespace_name(RelationGetNamespace(aorel));
 
-	RelationOpenSmgr(aorel);
-
 	fd = OpenAOSegmentFile(aorel, nspname, filenamepath, 0, -1);
-
 
 	pfree(nspname);
 	if (fd >= 0)
@@ -102,8 +99,6 @@ AppendOnlyCompaction_DropSegmentFile(Relation aorel, int segno)
 		elog(LOG, "could not truncate segfile %s, because it does not exist", filenamepath);
 		Assert(false);
 	}
-
-	RelationCloseSmgr(aorel);
 }
 
 /*
@@ -256,7 +251,6 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel,
 		   segno,
 		   segeof);
 
-	RelationOpenSmgr(aorel);
 
 	fd = OpenAOSegmentFile(aorel, nspname, filenamepath, segeof, -1);
 	if (fd >= 0)
@@ -284,9 +278,6 @@ AppendOnlySegmentFileTruncateToEOF(Relation aorel,
 			   segno,
 			   segeof);
 	}
-
-
-	RelationCloseSmgr(aorel);
 
 	pfree(nspname);
 }

@@ -350,7 +350,7 @@ smgrclose(SMgrRelation reln)
 	if (hash_search(SMgrRelationHash,
 					(void *) &(reln->smgr_rnode),
 					HASH_REMOVE, NULL) == NULL)
-		elog(WARNING, "SMgrRelation hashtable corrupted");
+		elog(ERROR, "SMgrRelation hashtable corrupted");
 
 	/*
 	 * Unhook the owner pointer, if any.  We do this last since in the remote
