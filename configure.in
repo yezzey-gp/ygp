@@ -866,6 +866,21 @@ AS_IF([test "$enable_yezzey" = yes],
   AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory])
 ]) # fi
 
+
+#
+# sr_plan, enabled by default
+#
+PGAC_ARG_BOOL(enable, sr_plan, yes, [disable sr_plan support],
+              [AC_DEFINE([USE_SR_PLAN], 1,
+                [Define to 1 to build with yezzey (--enable-sr-plan)])])
+AC_MSG_RESULT([checking whether to build with yezzey... $enable_sr_plan])
+AC_SUBST(enable_sr_plan)
+
+AS_IF([test "$enable_sr_plan" = yes],
+[ # then
+  AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory])
+]) # fi
+
 #
 # ic-proxy
 #
