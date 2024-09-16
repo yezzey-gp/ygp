@@ -1,0 +1,80 @@
+CREATE SCHEMA plan;
+CREATE EXTENSION sr_plan SCHEMA plan;
+CREATE SCHEMA test;
+CREATE TABLE test.test_table(test_attr1 int, test_attr2 int);
+INSERT INTO test.test_table SELECT i, i + 1 FROM generate_series(1, 1000) i;
+CREATE INDEX i1 ON test.test_table(test_attr1);
+SET enable_seqscan=off;
+SET sr_plan.write_mode = true;
+SELECT * FROM test.test_table WHERE test_attr1 = plan._p(10);
+ test_attr1 | test_attr2 
+------------+------------
+         10 |         11
+(1 row)
+
+SELECT * FROM test.test_table WHERE test_attr1 = 10;
+ test_attr1 | test_attr2 
+------------+------------
+         10 |         11
+(1 row)
+
+SET sr_plan.write_mode = false;
+UPDATE plan.sr_plans SET enable = TRUE;
+SELECT enable, query FROM plan.sr_plans ORDER BY length(query);
+ enable |                             query                             
+--------+---------------------------------------------------------------
+ t      | SELECT * FROM test.test_table WHERE test_attr1 = 10;
+ t      | SELECT * FROM test.test_table WHERE test_attr1 = plan._p(10);
+(2 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.test_table WHERE test_attr1 = plan._p(10);
+              QUERY PLAN              
+--------------------------------------
+ Seq Scan on test_table
+   Filter: (test_attr1 = plan._p(10))
+(2 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM test.test_table WHERE test_attr1 = 10;
+              QUERY PLAN               
+---------------------------------------
+ Bitmap Heap Scan on test_table
+   Recheck Cond: (test_attr1 = 10)
+   ->  Bitmap Index Scan on i1
+         Index Cond: (test_attr1 = 10)
+(4 rows)
+
+DROP INDEX test.i1;
+SELECT enable, query FROM plan.sr_plans ORDER BY length(query);
+ enable |                             query                             
+--------+---------------------------------------------------------------
+ t      | SELECT * FROM test.test_table WHERE test_attr1 = plan._p(10);
+(1 row)
+
+SELECT * FROM test.test_table WHERE test_attr1 = plan._p(10);
+ test_attr1 | test_attr2 
+------------+------------
+         10 |         11
+(1 row)
+
+SELECT * FROM test.test_table WHERE test_attr1 = plan._p(20);
+ test_attr1 | test_attr2 
+------------+------------
+         20 |         21
+(1 row)
+
+SELECT * FROM test.test_table WHERE test_attr1 = 10;
+ test_attr1 | test_attr2 
+------------+------------
+         10 |         11
+(1 row)
+
+DROP SCHEMA plan CASCADE;
+NOTICE:  drop cascades to extension sr_plan
+SELECT * FROM test.test_table WHERE test_attr1 = 10;
+ test_attr1 | test_attr2 
+------------+------------
+         10 |         11
+(1 row)
+
+DROP SCHEMA test CASCADE;
+NOTICE:  drop cascades to table test.test_table
