@@ -1444,7 +1444,7 @@ heap_create_with_catalog(const char *relname,
 									 stdRdOptions->columnstore);
 		if (appendOnlyRel)
 		{
-			if (relid >= FirstNormalObjectId) {
+			if (relid == 0 || relid >= FirstNormalObjectId) {
 				if (stdRdOptions->columnstore)
 					relstorage = RELSTORAGE_AOCOLS;
 				else
