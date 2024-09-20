@@ -4850,28 +4850,45 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* ATTACH and DETACH will process in ATExecAttachPartition function */
 			if (!recursing)
 			{
-				Assert(IsA(cmd->def, Integer));
+				Assert(IsA(cmd->def, ExpandStmtSpec) || IsA(cmd->def, Integer));
+				Oid relid = RelationGetRelid(rel);
+				PartStatus ps = rel_part_status(relid);
+				int numseg;
+				
+				if (IsA(cmd->def, ExpandStmtSpec)) { 
+					numseg = ((ExpandStmtSpec*)(cmd->def))->numseg;
+				} else {
+					numseg = intVal(cmd->def);
+				}
+
 				if (Gp_role == GP_ROLE_DISPATCH &&
-					rel->rd_cdbpolicy->numsegments <= intVal(cmd->def))
+					rel->rd_cdbpolicy->numsegments <= numseg)
 					ereport(ERROR,
 							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 							 errmsg("cannot shrink table \"%s\"",
 									RelationGetRelationName(rel)),
-							 errdetail("table numsegments \"%d\", shrink size \"%d\" " ,rel->rd_cdbpolicy->numsegments, intVal(cmd->def))));
+							 errdetail("table numsegments \"%d\", shrink size \"%d\" " ,rel->rd_cdbpolicy->numsegments, numseg)));
 
-				if (rel->rd_rel->relispartition)
+				switch (ps)
 				{
-					ereport(ERROR,
-							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-							 errmsg("cannot shrink leaf or interior partition \"%s\"",
-									RelationGetRelationName(rel)),
-							 errdetail("Root/leaf/interior partitions need to have same numsegments"),
-							 errhint("Call ALTER TABLE SHRINK TABLE on the root table instead")));
-				}
+					case PART_STATUS_NONE:
+					case PART_STATUS_ROOT:
+						break;
 
+					case PART_STATUS_INTERIOR:
+					case PART_STATUS_LEAF:
+						ereport(ERROR,
+								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							     errmsg("cannot shrink leaf or interior partition \"%s\"",
+									RelationGetRelationName(rel)),
+								 errdetail("root/leaf/interior partitions need to have same numsegments"),
+								 errhint("use \"ALTER TABLE %s SHRINK TABLE\" instead",
+										 get_rel_name(rel_partition_get_master(relid)))));
+						break;
+				}
 			}
 
-			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode, context);
+			ATSimpleRecursion(wqueue, rel, cmd, recurse, lockmode);
 			pass = AT_PASS_MISC;
 			break;
 
@@ -5558,6 +5575,9 @@ ATRewriteCatalogs(List **wqueue, LOCKMODE lockmode)
 				/* ATExecExpandTable() may close the relation temporarily */
 				else if (atc->subtype == AT_ExpandTable)
 					rel = relation_open(tab->relid, NoLock);
+				/* ATExecExpandTable() may close the relation temporarily */		
+				else if (atc->subtype == AT_ShrinkTable)
+					rel = relation_open(tab->relid, NoLock);
 			}
 
 			/*
@@ -5841,7 +5861,7 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation *rel_p,
 		case AT_ExpandPartitionTablePrepare:	/* EXPAND PARTITION PREPARE */
 			ATExecExpandPartitionTablePrepare(rel, getgpsegmentCount());
 			break;
-		case AT_ShrinkTable:	/* EXPAND TABLE */
+		case AT_ShrinkTable:	/* SHRINK TABLE */
 			ATExecExpandTable(wqueue, rel, cmd, intVal(cmd->def));
 			break;
 			/* CDB: Partitioned Table commands */
@@ -15350,8 +15370,16 @@ ATExecExpandTable(List **wqueue, Relation rel, AlterTableCmd *cmd, int numsegmen
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		/* only rootCmd is dispatched to QE, we can store */
-		if (rootCmd == cmd)
-			rootCmd->def = (Node*)makeNode(ExpandStmtSpec);
+		if (rootCmd == cmd) {
+			ExpandStmtSpec *spec;
+			
+			spec = makeNode(ExpandStmtSpec);
+
+			if (rootCmd->def != NULL && IsA(rootCmd->def, Integer)) {
+				spec->numseg = intVal((A_Const*) rootCmd->def);
+			}
+			rootCmd->def = (Node*) spec;
+		}
 	}
 
 	if (RelationIsExternal(rel))
@@ -20569,6 +20597,10 @@ char *alterTableCmdString(AlterTableType subtype)
 
 		case AT_ExpandTable:
 			cmdstring = pstrdup("expand table data on");
+			break;
+
+		case AT_ShrinkTable:
+			cmdstring = pstrdup("shrink table data on");
 			break;
 
 		case AT_PartAdd: /* Add */

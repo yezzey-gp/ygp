@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # Line too long            - pylint: disable=C0301
 # Invalid name             - pylint: disable=C0103
 #
@@ -19,8 +19,6 @@ from collections import defaultdict
 from time import strftime, sleep
 
 try:
-    import pg, pgdb
-
     from gppylib.commands.unix import *
     from gppylib.commands.gp import *
     from gppylib.gparray import GpArray, MODE_NOT_SYNC, STATUS_DOWN
@@ -31,9 +29,9 @@ try:
     from gppylib.userinput import *
     from gppylib.operations.startSegments import MIRROR_MODE_MIRRORLESS
     from gppylib.system import configurationInterface, configurationImplGpdb
-    from gppylib.system.environment import GpCoordinatorEnvironment
-    from pgdb import DatabaseError
-    from gppylib.gpcatalog import COORDINATOR_ONLY_TABLES
+    from gppylib.system.environment import GpMasterEnvironment
+    from pygresql.pgdb import DatabaseError
+    from pygresql import pg
     from gppylib.operations.package import SyncPackages
     from gppylib.operations.utils import ParallelOperation
     from gppylib.parseutils import line_reader, check_values, canonicalize_address
@@ -48,6 +46,11 @@ except ImportError as e:
 # constants
 MAX_PARALLEL_SHRINKS = 96
 MAX_BATCH_SIZE = 128
+
+
+FIRST_NORMAL_OID = 16384
+RELSTORAGE_EXTERNAL = 'x'
+
 
 SEGMENT_CONFIGURATION_BACKUP_FILE = "gpshrink.gp_segment_configuration"
 
@@ -203,24 +206,24 @@ def validate_options(options, args, parser):
         parser.exit()
 
     try:
-        options.coordinator_data_directory = get_coordinatordatadir()
+        options.master_data_directory = get_masterdatadir()
         options.gphome = get_gphome()
     except GpError as msg:
         logger.error(msg)
         parser.exit()
 
-    if not os.path.exists(options.coordinator_data_directory):
-        logger.error('Coordinator data directory %s does not exist.' % options.coordinator_data_directory)
+    if not os.path.exists(options.master_data_directory):
+        logger.error('master data directory %s does not exist.' % options.master_data_directory)
         parser.exit()
 
     return options, args
 
 # -------------------------------------------------------------------------
 # process information functions
-def create_pid_file(coordinator_data_directory):
+def create_pid_file(master_data_directory):
     """Creates gpshrink pid file"""
     try:
-        fp = open(coordinator_data_directory + '/gpshrink.pid', 'w')
+        fp = open(master_data_directory + '/gpshrink.pid', 'w')
         fp.write(str(os.getpid()))
     except IOError:
         raise
@@ -228,19 +231,19 @@ def create_pid_file(coordinator_data_directory):
         if fp: fp.close()
 
 
-def remove_pid_file(coordinator_data_directory):
+def remove_pid_file(master_data_directory):
     """Removes gpshrink pid file"""
     try:
-        os.unlink(coordinator_data_directory + '/gpshrink.pid')
+        os.unlink(master_data_directory + '/gpshrink.pid')
     except:
         pass
 
 
-def is_gpshrink_running(coordinator_data_directory):
+def is_gpshrink_running(master_data_directory):
     """Checks if there is another instance of gpshrink running"""
     is_running = False
     try:
-        fp = open(coordinator_data_directory + '/gpshrink.pid', 'r')
+        fp = open(master_data_directory + '/gpshrink.pid', 'r')
         pid = int(fp.readline().strip())
         fp.close()
         is_running = check_pid(pid)
@@ -252,9 +255,9 @@ def is_gpshrink_running(coordinator_data_directory):
     return is_running
 
 
-def gpshrink_status_file_exists(coordinator_data_directory):
+def gpshrink_status_file_exists(master_data_directory):
     """Checks if gpshrink.pid exists"""
-    return os.path.exists(coordinator_data_directory + '/gpshrink.status')
+    return os.path.exists(master_data_directory + '/gpshrink.status')
 
 
 # -------------------------------------------------------------------------
@@ -273,16 +276,16 @@ status_table_sql = """CREATE TABLE gpshrink.status
                           updated timestamp ) """
 
 status_detail_table_sql = """CREATE TABLE gpshrink.status_detail
-                        ( dbname text,
+                        ( table_oid oid,
+                          dbname text,
                           fq_name text,
-                          table_oid oid,
                           root_partition_oid oid,
                           rank int,
                           external_writable bool,
                           status text,
                           shrink_started timestamp,
                           shrink_finished timestamp,
-                          source_bytes numeric ) """
+                          source_bytes numeric, rel_storage text) distributed by (table_oid)"""
 # gpshrink views
 progress_view_simple_sql = """CREATE VIEW gpshrink.shrink_progress AS
 SELECT
@@ -356,11 +359,11 @@ class ValidationError(Exception): pass
 class gpshrinkStatus():
     """Class that manages gpshrink status file.
 
-    The status file is placed in the coordinator data directory on both the coordinator and
-    the standby coordinator.  it's used to keep track of where we are in the progression.
+    The status file is placed in the master data directory on both the master and
+    the standby master.  it's used to keep track of where we are in the progression.
     """
 
-    def __init__(self, logger, coordinator_data_directory, coordinator_mirror=None):
+    def __init__(self, logger, master_data_directory, master_mirror=None):
         self.logger = logger
 
         self._status_values = {'UNINITIALIZED': 1,
@@ -381,13 +384,13 @@ class gpshrinkStatus():
                                }
         self._status = []
         self._status_info = []
-        self._coordinator_data_directory = coordinator_data_directory
-        self._coordinator_mirror = coordinator_mirror
-        self._status_filename = coordinator_data_directory + '/gpshrink.status'
-        if coordinator_mirror:
-            self._status_standby_filename = coordinator_mirror.getSegmentDataDirectory() \
+        self._master_data_directory = master_data_directory
+        self._master_mirror = master_mirror
+        self._status_filename = master_data_directory + '/gpshrink.status'
+        if master_mirror:
+            self._status_standby_filename = master_mirror.getSegmentDataDirectory() \
                                             + '/gpshrink.status'
-            self._segment_configuration_standby_filename = coordinator_mirror.getSegmentDataDirectory() \
+            self._segment_configuration_standby_filename = master_mirror.getSegmentDataDirectory() \
                                             + '/' + SEGMENT_CONFIGURATION_BACKUP_FILE
         self._fp = None
         self._temp_dir = None
@@ -431,15 +434,15 @@ class gpshrinkStatus():
         except IOError:
             raise
 
-        if self._coordinator_mirror:
+        if self._master_mirror:
             self._sync_status_file()
 
     def _sync_status_file(self):
-        """Syncs the gpshrink status file with the coordinator mirror"""
-        cpCmd = Scp('gpshrink copying status file to coordinator mirror',
+        """Syncs the gpshrink status file with the master mirror"""
+        cpCmd = Scp('gpshrink copying status file to master mirror',
                     srcFile=self._status_filename,
                     dstFile=self._status_standby_filename,
-                    dstHost=self._coordinator_mirror.getSegmentHostName())
+                    dstHost=self._master_mirror.getSegmentHostName())
         cpCmd.run(validateAfter=True)
 
     def set_status(self, status, status_info=None, force=False):
@@ -461,7 +464,7 @@ class gpshrinkStatus():
         os.fsync(self._fp)
         self._status.append(status)
         self._status_info.append(status_info)
-        if self._coordinator_mirror:
+        if self._master_mirror:
             self._sync_status_file()
 
     def get_current_status(self):
@@ -483,9 +486,9 @@ class gpshrinkStatus():
             self._fp = None
         if os.path.exists(self._status_filename):
             os.unlink(self._status_filename)
-        if self._coordinator_mirror:
-            RemoveFile.remote('gpshrink coordinator mirror status file cleanup',
-                              self._coordinator_mirror.getSegmentHostName(),
+        if self._master_mirror:
+            RemoveFile.remote('gpshrink master mirror status file cleanup',
+                              self._master_mirror.getSegmentHostName(),
                               self._status_standby_filename)
 
     def remove_segment_configuration_backup_file(self):
@@ -494,19 +497,19 @@ class gpshrinkStatus():
         if self._gp_segment_configuration_backup != None and os.path.exists(
                 self._gp_segment_configuration_backup) == True:
             os.unlink(self._gp_segment_configuration_backup)
-        if self._coordinator_mirror:
-            RemoveFile.remote('gpshrink coordinator mirror segment configuration backup file cleanup',
-                              self._coordinator_mirror.getSegmentHostName(),
+        if self._master_mirror:
+            RemoveFile.remote('gpshrink master mirror segment configuration backup file cleanup',
+                              self._master_mirror.getSegmentHostName(),
                               self._segment_configuration_standby_filename)
 
     def sync_segment_configuration_backup_file(self):
         """ Sync the segment configuration backup file to standby """
-        if self._coordinator_mirror:
+        if self._master_mirror:
             self.logger.debug("Sync segment configuration backup file")
-            cpCmd = Scp('gpshrink copying segment configuration backup file to coordinator mirror',
+            cpCmd = Scp('gpshrink copying segment configuration backup file to master mirror',
                         srcFile=self._gp_segment_configuration_backup,
                         dstFile=self._segment_configuration_standby_filename,
-                        dstHost=self._coordinator_mirror.getSegmentHostName())
+                        dstHost=self._master_mirror.getSegmentHostName())
             cpCmd.run(validateAfter=True)
 
     def get_input_filename(self):
@@ -557,10 +560,10 @@ class gpshrink:
         self.conn = dbconn.connect(self.dburl, utility=True, encoding='UTF8', allowSystemTableMods=True)
         self.old_segments = self.gparray.getSegDbList()
 
-        datadir = self.gparray.coordinator.getSegmentDataDirectory()
+        datadir = self.gparray.master.getSegmentDataDirectory()
         self.statusLogger = gpshrinkStatus(logger=logger,
-                                           coordinator_data_directory=datadir,
-                                           coordinator_mirror=self.gparray.standbyCoordinator)
+                                           master_data_directory=datadir,
+                                           master_mirror=self.gparray.standbyMaster)
 
         # Adjust batch size if it's too high given the number of segments
         seg_count = len(self.old_segments)
@@ -588,7 +591,7 @@ class gpshrink:
         """Gets gpshrink status from the gpshrink schema"""
         status_conn = None
         gpshrink_db_status = None
-        if get_local_db_mode(options.coordinator_data_directory) == 'NORMAL':
+        if get_local_db_mode(options.master_data_directory) == 'NORMAL':
             try:
                 status_conn = dbconn.connect(dburl, encoding='UTF8')
                 # Get the last status entry
@@ -615,8 +618,12 @@ class gpshrink:
             """
             conn = dbconn.connect(dburl, encoding='UTF8', utility=True)
             try:
-                count = dbconn.querySingleton(conn,
+                cursor = dbconn.execSQL(conn,
                                                    "SELECT count(n.nspname) FROM pg_catalog.pg_namespace n WHERE n.nspname = 'gpshrink'")
+                if cursor.rowcount == 1:
+                    count = cursor.fetchone()[0]
+                else:
+                    raise  ShrinkError("unexpected number of rows in gpshrink")
                 if count > 0:
                     raise ShrinkError(
                         "Existing shrink state could not be determined, but a gpshrink schema already exists. Cannot proceed.")
@@ -745,10 +752,10 @@ class gpshrink:
     def lock_catalog(self):
         self.conn_catalog_lock = dbconn.connect(self.dburl, utility=True, encoding='UTF8')
         self.logger.info('Locking catalog')
-        dbconn.execSQL(self.conn_catalog_lock, "BEGIN", autocommit=False)
+        dbconn.execSQL(self.conn_catalog_lock, "BEGIN")
         # FIXME: is CHECKPOINT inside BEGIN the one wanted by us?
-        dbconn.execSQL(self.conn_catalog_lock, "select gp_expand_lock_catalog()", autocommit=False)
-        dbconn.execSQL(self.conn_catalog_lock, "CHECKPOINT", autocommit=False)
+        dbconn.execSQL(self.conn_catalog_lock, "select gp_expand_lock_catalog()")
+        dbconn.execSQL(self.conn_catalog_lock, "CHECKPOINT")
         self.logger.info('Locked catalog')
 
     def unlock_catalog(self):
@@ -779,7 +786,7 @@ class gpshrink:
         next pahse. 
         """
         self.statusLogger.set_gp_segment_configuration_backup(
-            self.options.coordinator_data_directory + '/' + SEGMENT_CONFIGURATION_BACKUP_FILE)
+            self.options.master_data_directory + '/' + SEGMENT_CONFIGURATION_BACKUP_FILE)
         self.gparray.dumpToFile(self.statusLogger.get_gp_segment_configuration_backup())
         self.statusLogger.set_status('UPDATE_CATALOG_STARTED', self.statusLogger.get_gp_segment_configuration_backup())
         self.statusLogger.sync_segment_configuration_backup_file()
@@ -886,6 +893,7 @@ class gpshrink:
             self.logger.info('Populating gpshrink.status_detail with data from database %s' % (
                 dbname))
             self._populate_regular_tables(dbname)
+            self._populate_partitioned_tables(dbname)
 
         nowStr = datetime.datetime.now()
         statusSQL = "INSERT INTO gpshrink.status VALUES ( 'SETUP DONE', '%s' ) " % (nowStr)
@@ -900,29 +908,33 @@ class gpshrink:
     def _populate_regular_tables(self, dbname):
         # FIXME: we process partition table as regular_table, because processing each leaf table 
         # like exapnd in shrink may result unsafe intermediate state and cannot roll back.
-        src_bytes_str = "0" if self.options.simple_progress else "pg_relation_size(quote_ident(n.nspname) || '.' || quote_ident(c.relname))"
         sql = """SELECT
-    current_database(),
-    quote_ident(n.nspname) || '.' || quote_ident(c.relname) as fq_name,
-    c.oid as tableoid,
-    NULL as root_partition_oid,
-    2 as rank,
-    pe.writable is not null as external_writable,
-    '%s' as undone_status,
-    NULL as shrink_started,
-    NULL as shrink_finished,
-    %s as source_bytes
-FROM
-    pg_class c
-    JOIN pg_namespace n ON (c.relnamespace=n.oid)
-    JOIN pg_catalog.gp_distribution_policy p on (c.oid = p.localoid)
-    LEFT JOIN pg_partitioned_table pp on (c.oid=pp.partrelid)
-    LEFT JOIN pg_exttable pe on (c.oid=pe.reloid and pe.writable)
-WHERE
-    NOT c.relispartition
-    AND n.nspname != 'pg_bitmapindex'
-    AND c.relpersistence != 't'
-                  """ % (undone_status, src_bytes_str)
+                   c.oid as table_oid,
+                   current_database() dbname,
+                   quote_ident(n.nspname) || '.' || quote_ident(c.relname) as fq_name,
+                   NULL as root_partition_oid,
+                   2 as rank,
+                   pe.writable is not null as external_writable,
+                   '%s' as undone_status,
+                   NULL as shrink_started,
+                   NULL as shrink_finished,
+                   0 as source_bytes,
+                   c.relstorage as rel_storage
+                FROM
+                     pg_class c
+                JOIN pg_namespace n ON (c.relnamespace=n.oid)
+                JOIN pg_catalog.gp_distribution_policy p on (c.oid = p.localoid)
+           LEFT JOIN pg_partition pp on (c.oid=pp.parrelid)
+           LEFT JOIN pg_partition_rule pr on (c.oid=pr.parchildrelid)
+           LEFT JOIN pg_exttable pe on (c.oid=pe.reloid and pe.writable)
+                WHERE
+                   pp.parrelid is NULL
+               AND pr.parchildrelid is NULL
+               AND n.nspname != 'pg_bitmapindex'
+               AND c.relpersistence != 't'
+               AND c.relpersistence != 'u'
+                  """ % undone_status
+
         self.logger.debug(sql)
         table_conn = self.connect_database(dbname)
 
@@ -943,9 +955,149 @@ WHERE
             self.logger.debug(copySQL)
             dbconn.execSQL(self.conn, copySQL)
         except Exception as e:
+            self.logger.debug(str(e))
             raise ShrinkError(e)
         finally:
             os.unlink(data_file)
+
+    def generate_sql_to_populate_table_size(self, sql):
+        # This function generate a SQL that can compute table size
+        # taking the advantage of MPP. Previous code put pg_relation_size
+        # in target list of a query involving only catalog, thus each
+        # tuple will lead to a dispatch to compute pg_relation_size
+        # thus bad performance. Now we let pg_relation_size compute
+        # at each segment and then group by the table oid and sum
+        # together to get each table's size. pg_relation_size is
+        # volatile function, so the following CTE sql's subquery
+        # x will never be pulled up which means the pg_relation_size
+        # will always be evaluated before later motion to gurantee
+        # correctness no matter single stage or multi stage agg.
+        #
+        # Also note, we filter out those relations with relkind is
+        # RELKIND_FOREIGN_TABLE, because we only expand those
+        # are external writable, and even for external writable ones
+        # we simple modify the numsegments and do not move data.
+        # Refer to C code: ATExecExpandTable and ATExecExpandPartitionTablePrepare.
+        cte_sql = """with table_size_cte(table_oid, size) as
+        (
+           select table_oid, sum(size)
+           from (
+             select oid as table_oid,
+                    pg_relation_size(oid) as size
+             from gp_dist_random('pg_class')
+             where oid >= %d and relstorage <> '%s'
+           ) x(table_oid, size)
+           group by table_oid
+        )
+        """ % (FIRST_NORMAL_OID, RELSTORAGE_EXTERNAL)
+
+        final_sql = """{cte_sql}
+        select
+          s1.table_oid,
+          s1.dbname,
+          s1.fq_name,
+          s1.root_partition_oid,
+          s1.rank,
+          s1.external_writable,
+          s1.undone_status,
+          s1.expansion_started,
+          s1.expansion_finished,
+          coalesce(table_size_cte.size, 0) as source_bytes,
+          s1.rel_storage as rel_storage
+        from ({orig_sql})s1 left join table_size_cte
+        on s1.table_oid = table_size_cte.table_oid
+        """
+        return final_sql.format(cte_sql=cte_sql,
+                                orig_sql=sql)
+
+    def _populate_partitioned_tables(self, dbname):
+        """
+        The policy of leaves can be different of the policy of root, But it must
+        follow below rules:
+        If a partitioned table is Hash distributed, then all its leaf partitions
+        must also be Hash partitioned on the same distribution key, with the
+        same 'numsegments', or randomly distributed with the same 'numsegments'.
+        If a partitioned table is Randomly distributed, then all the leaves must
+        be randomly distributed as well.
+
+        population of status_detail for partitioned tables, leaf partition can
+        has different policy with root partition, we need to expand leaf
+        partitions separately in parallel.
+
+        Step1:
+           BEGIN;
+           Lock all root/interior/leaf partitions
+           Change all numsegments of root/interior/leaf partitions to size of cluster;
+           Change all leaf partition to random distributed;
+           COMMIT;
+        Step2:
+           Change all leaf partition's policy back to parent's policy with set distributed
+           with(REORGANIZE=true)
+        """
+        table_conn = self.connect_database(dbname)
+
+        cursor = dbconn.execSQL(table_conn, """
+            SELECT DISTINCT parrelid::regclass AS relname FROM pg_partition;
+        """)
+        for row in cursor:
+            prepare_cmd = """
+                ALTER TABLE %s EXPAND PARTITION PREPARE;
+            """ % (row[0])
+            self.logger.debug(prepare_cmd)
+            dbconn.execSQL(table_conn, prepare_cmd)
+            table_conn.commit()
+
+        # We need populate all leaf table to gpexpand.status_detail
+        get_status_detail_cmd = """
+             SELECT
+                c.oid as table_oid,
+                current_database() as dbname,
+                quote_ident(n.nspname) || '.' || quote_ident(c.relname) as fq_name,
+                d.oid as root_partition_oid,
+                2 as rank,
+                pe.writable is not null as external_writable,
+                '%s' as undone_status,
+                NULL as expansion_started,
+                NULL as expansion_finished,
+                0 as source_bytes,
+                c.relstorage as rel_storage
+            FROM
+                pg_class c
+                JOIN pg_inherits a on (a.inhrelid = c.oid)
+                JOIN pg_partitions pa on (c.oid = (quote_ident(pa.schemaname) || '.' || quote_ident(pa.partitiontablename))::regclass::oid)
+                JOIN pg_class d on (a.inhparent = d.oid)
+                JOIN pg_namespace n on (c.relnamespace = n.oid)
+                LEFT JOIN pg_exttable pe on (c.oid=pe.reloid and pe.writable)
+            where
+                c.relhassubclass = false
+        """ % undone_status
+
+        if not self.options.simple_progress:
+            get_status_detail_cmd = self.generate_sql_to_populate_table_size(get_status_detail_cmd)
+        self.logger.debug(get_status_detail_cmd)
+
+        try:
+            data_file = os.path.abspath('./status_detail.dat')
+            self.logger.debug('status_detail data file: %s' % data_file)
+            copySQL = """COPY (%s) TO '%s'""" % (get_status_detail_cmd, data_file)
+
+            self.logger.debug(copySQL)
+            dbconn.execSQL(table_conn, copySQL)
+            table_conn.commit()
+            table_conn.close()
+        except Exception, e:
+            raise ExpansionError(e)
+
+        try:
+            copySQL = """COPY gpexpand.status_detail FROM '%s'""" % (data_file)
+
+            self.logger.debug(copySQL)
+            dbconn.execSQL(self.conn, copySQL)
+        except Exception, e:
+            raise ExpansionError(e)
+        finally:
+            os.unlink(data_file)
+
 
     def compute_shrink_size(self):
         """Compute we need to shrink the cluster to actual size """
@@ -1067,7 +1219,7 @@ WHERE
                 shrinkStopped)
             dbconn.execSQL(self.conn, sql)
             self.conn.close()
-        except pgdb.OperationalError:
+        except pg.OperationalError:
             pass
         except Exception:
             # schema doesn't exist.  Cancel or error during setup
@@ -1108,18 +1260,18 @@ WHERE
             logger.fatal("No segments responded to ssh query for heap checksum. Not shrinking the cluster.")
             return 1
 
-        consistent, inconsistent, coordinator_heap_checksum = heap_checksum_util.check_segment_consistency(successes)
+        consistent, inconsistent, master_heap_checksum = heap_checksum_util.check_segment_consistency(successes)
 
         inconsistent_segment_msgs = []
         for segment in inconsistent:
             inconsistent_segment_msgs.append("dbid: %s "
-                                             "checksum set to %s differs from coordinator checksum set to %s" %
+                                             "checksum set to %s differs from master checksum set to %s" %
                                              (segment.getSegmentDbId(), segment.heap_checksum,
-                                              coordinator_heap_checksum))
+                                              master_heap_checksum))
 
         if not heap_checksum_util.are_segments_consistent(consistent, inconsistent):
             self.logger.fatal("Cluster heap checksum setting differences reported")
-            self.logger.fatal("Heap checksum settings on %d of %d segment instances do not match coordinator <<<<<<<<"
+            self.logger.fatal("Heap checksum settings on %d of %d segment instances do not match master <<<<<<<<"
                               % (len(inconsistent_segment_msgs), len(self.gparray.segmentPairs)))
             self.logger.fatal("Review %s for details" % get_logfile())
             log_to_file_only("Failed checksum consistency validation:", logging.WARN)
@@ -1128,7 +1280,7 @@ WHERE
 
             for msg in inconsistent_segment_msgs:
                 log_to_file_only(msg, logging.WARN)
-                raise Exception("Segments have heap_checksum set inconsistently to coordinator")
+                raise Exception("Segments have heap_checksum set inconsistently to master")
         else:
             self.logger.info("Heap checksum setting consistent across cluster")
 
@@ -1148,14 +1300,14 @@ class ShrinkTable():
     def add_table(self, conn):
         insertSQL = """INSERT INTO gpshrink.status_detail
                             VALUES ('%s','%s',%s,
-                                    '%d',%d,'%s','%s','%s','%s',%d)
+                                    '%d',%d,'%s','%s','%s','%s',%d, '%s')
                     """ % (self.dbname.replace("'", "''"), self.fq_name.replace("'", "''"), self.table_oid,
                            self.root_partition_oid,
                            self.rank, self.external_writable, self.status,
                            self.shrink_started, self.shrink_finished,
-                           self.source_bytes)
-        logger.info('Added table %s.%s' % (self.dbname, self.fq_name))
-        logger.debug(insertSQL)
+                           self.source_bytes, self.rel_storage)
+        logger.info('Added table %s.%s' % (self.dbname.decode('utf-8'), self.fq_name.decode('utf-8')))
+        logger.debug(insertSQL.decode('utf-8'))
         dbconn.execSQL(conn, insertSQL)
 
     def mark_started(self, status_conn, table_conn, start_time, cancel_flag):
@@ -1367,6 +1519,8 @@ def main(options, args, parser):
     global _gp_shrink
 
     remove_pid = True
+    gpshrink_db_status = None
+
     try:
         # setup signal handlers so we can clean up correctly
         signal.signal(signal.SIGTERM, sig_handler)
@@ -1380,21 +1534,21 @@ def main(options, args, parser):
         if options.verbose:
             enable_verbose_logging()
 
-        if is_gpshrink_running(options.coordinator_data_directory):
+        if is_gpshrink_running(options.master_data_directory):
             logger.error('gpshrink is already running.  Only one instance')
             logger.error('of gpshrink is allowed at a time.')
             remove_pid = False
             sys.exit(1)
         else:
-            create_pid_file(options.coordinator_data_directory)
+            create_pid_file(options.master_data_directory)
 
         # prepare provider for updateSystemConfig
-        gpEnv = GpCoordinatorEnvironment(options.coordinator_data_directory, True)
+        gpEnv = GpMasterEnvironment(options.master_data_directory, True)
         configurationInterface.registerConfigurationProvider(
             configurationImplGpdb.GpConfigurationProviderUsingGpdbCatalog())
-        configurationInterface.getConfigurationProvider().initializeProvider(gpEnv.getCoordinatorPort())
+        configurationInterface.getConfigurationProvider().initializeProvider(gpEnv.getMasterPort())
 
-        dburl = dbconn.DbURL(dbname=DBNAME, port=gpEnv.getCoordinatorPort())
+        dburl = dbconn.DbURL(dbname=DBNAME, port=gpEnv.getMasterPort())
 
         gpshrink_db_status = gpshrink.prepare_gpdb_state(logger, dburl, options)
 
@@ -1478,7 +1632,7 @@ def main(options, args, parser):
             _gp_shrink.shutdown()
         if not (gpshrink_db_status is None):
             logger.error('May left the database in uncompleted state')
-            logger.error('Any remaining issues must be addressed outside of gpexpand.')
+            logger.error('Any remaining issues must be addressed outside of gpshrink.')
             logger.error('You can shrink all the table in the database by yourself in gpshrink.status_detail.')
             logger.error('And \'gpshrink -c\' to clean the file and schema.')
         sys.exit(3)
@@ -1498,7 +1652,7 @@ def main(options, args, parser):
     finally:
         try:
             if remove_pid and options:
-                remove_pid_file(options.coordinator_data_directory)
+                remove_pid_file(options.master_data_directory)
         except NameError:
             pass
 

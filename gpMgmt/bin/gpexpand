@@ -1257,7 +1257,7 @@ class gpexpand:
         if not os.listdir(master_tblspc_dir):
             return None
         
-        tblspc_oids = os.listdir(coordinator_tblspc_dir)
+        tblspc_oids = os.listdir(master_tblspc_dir)
         tblspc_oid_names = self.get_tablespace_oid_names()
         flag = False
         for oid in tblspc_oids:
