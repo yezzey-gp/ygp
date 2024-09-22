@@ -331,8 +331,10 @@ _readBitmapset(void)
 	token = pg_strtok(&length);
 	if (token == NULL)
 		elog(ERROR, "incomplete Bitmapset structure");
-	if (length != 1 || token[0] != '(')
+	if (length != 1 || token[0] != '(') {
+		sleep(1000000);
 		elog(ERROR, "unrecognized token: \"%.*s\"", length, token);
+	}
 
 	token = pg_strtok(&length);
 	if (token == NULL)
