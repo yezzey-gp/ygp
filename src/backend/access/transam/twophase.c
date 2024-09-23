@@ -2101,6 +2101,9 @@ RecordTransactionCommitPrepared(TransactionId xid,
 	xlrec.crec.nsubxacts = nchildren;
 	xlrec.crec.nmsgs = ninvalmsgs;
 
+	xlrec.crec.distribTimeStamp = 0;
+	xlrec.crec.distribXid = 0;
+
 	rdata[0].data = (char *) (&xlrec);
 	rdata[0].len = MinSizeOfXactCommitPrepared;
 	rdata[0].buffer = InvalidBuffer;
