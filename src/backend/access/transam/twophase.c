@@ -516,7 +516,6 @@ MarkAsPreparing(TransactionId xid,
 	proc->mppSessionId = gp_session_id;
 	proc->lwWaiting = false;
 	proc->lwWaitMode = 0;
-	proc->lwWaitLink = NULL;
 	proc->waitLock = NULL;
 	proc->waitProcLock = NULL;
 	proc->serializableIsoLevel = false;

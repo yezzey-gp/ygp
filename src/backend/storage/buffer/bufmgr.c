@@ -2928,7 +2928,7 @@ MarkBufferDirtyHint(Buffer buffer, bool buffer_std)
 			 * lock. Otherwise, we might end up in a deadlock situation
 			 * if mirror is marked down while we are waiting for wal replication
 			 */
-			if (bufHdr->content_lock->exclusive == 0)
+			if (!LWLockIsExclusive(bufHdr->content_lock))
 				wait_to_avoid_large_repl_lag();
 		}
 

@@ -234,7 +234,6 @@ _outBitmapset(StringInfo str, Bitmapset *bms)
 	{
 		appendBinaryStringInfo(str, (char *)&bms->words[i], sizeof(bitmapword));
 	}
-
 }
 
 /*
