@@ -99,7 +99,7 @@ clean:
 	if [ "$(enable_gpcloud)" = "yes" ]; then $(MAKE) -C gpcloud cleanall; fi
 	if [ "$(enable_yezzey)" = "yes" ]; then $(MAKE) -C yezzey cleanall; fi
 	if [ "${enable_orafce}" = "yes" ]; then $(MAKE) -C orafce NO_PGXS=true clean; fi
-	if [ "${enable_sr_plan}" = "yes" ]; then $(MAKE) -C sr_plan USE_PGXS=1 clean; fi
+	if [ "${enable_sr_plan}" = "yes" ]; then $(MAKE) -C sr_plan clean; fi
 
 
 distclean:
