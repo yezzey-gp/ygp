@@ -5,6 +5,8 @@
 # this limits the number of connections needed to run the tests.
 # ----------
 
+test: local_distribution
+
 # mdb admin simple checks
 
 test: mdb_admin
