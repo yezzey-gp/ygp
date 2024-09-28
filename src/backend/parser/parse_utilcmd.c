@@ -1844,7 +1844,7 @@ transformDistributedBy(CreateStmtContext *cxt,
 	ListCell   *lc;
 	int			numsegments;
 
-	if(distributedBy->ptype == POLICYTYPE_LOCAL){
+	if (distributedBy && distributedBy->ptype == POLICYTYPE_LOCAL){
 		return distributedBy;
 	}
 	/*
