@@ -50,7 +50,7 @@ ifeq "$(with_quicklz)" "yes"
 endif
 $(call recurse,all install clean distclean, $(recurse_targets))
 
-all: gpcloud mapreduce orafce yezzey sr_plan
+all: gpcloud mapreduce orafce yezzey sr_plan pgaudit
 
 yezzey:
 	@if [ "$(enable_yezzey)" = "yes" ]; then \
@@ -72,10 +72,17 @@ orafce:
 	@if [ "$(enable_orafce)" = "yes" ]; then \
 		$(MAKE) -C orafce NO_PGXS=true; \
 	fi
+
 sr_plan:
 	@if [ "$(enable_sr_plan)" == "yes" ]; then \
   		$(MAKE) -C sr_plan USE_PGXS=1 && \
   		$(MAKE) -C sr_plan USE_PGXS=1 install; \
+ 	fi
+
+pgaudit:
+	@if [ "$(enable_pgaudit)" == "yes" ]; then \
+  		$(MAKE) -C pgaudit USE_PGXS=1 && \
+  		$(MAKE) -C pgaudit USE_PGXS=1 install; \
  	fi
 
 
@@ -100,6 +107,7 @@ clean:
 	if [ "$(enable_yezzey)" = "yes" ]; then $(MAKE) -C yezzey cleanall; fi
 	if [ "${enable_orafce}" = "yes" ]; then $(MAKE) -C orafce NO_PGXS=true clean; fi
 	if [ "${enable_sr_plan}" = "yes" ]; then $(MAKE) -C sr_plan clean; fi
+	if [ "${enable_pgaudit}" = "yes" ]; then $(MAKE) -C pgaudit clean; fi
 
 
 distclean:
