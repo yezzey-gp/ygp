@@ -53,7 +53,7 @@ building gp-xerces, see the README at the following repository:
 
 ```
 # Configure build environment to install at /usr/local/gpdb
-./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb
+./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb --without-mdblocales
 
 # Compile and install
 make -j8
