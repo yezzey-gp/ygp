@@ -125,8 +125,13 @@ extern void EnableDisableTrigger(Relation rel, const char *tgname,
 					 char fires_when, bool skip_system);
 
 /*cdb: export the following macro and function for nodeRowTrigger.c */
-#define GetModifiedColumns(relinfo, estate) \
-	(rt_fetch((relinfo)->ri_RangeTableIndex, (estate)->es_range_table)->modifiedCols)
+#define GetModifiedColumns(relinfo, estate, res) \
+	do { \
+		RangeTblEntry *rte; \
+		rte = rt_fetch((relinfo)->ri_RangeTableIndex, (estate)->es_range_table); \
+		res = bms_union(rte->insertedCols, rte->updatedCols); \
+	} while (0); 
+
 extern bool TriggerEnabled(EState *estate, ResultRelInfo *relinfo,
 			   Trigger *trigger, TriggerEvent event,
 			   Bitmapset *modifiedCols,
