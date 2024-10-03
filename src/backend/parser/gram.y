@@ -750,6 +750,9 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	WEB WRITABLE
 
+	YEZZEY
+
+
 /*
  * The grammar thinks these are keywords, but they are not in the kwlist.h
  * list and so can never be entered directly.  The filter in parser.c
@@ -11404,6 +11407,7 @@ vacuum_option_elem:
 			| VERBOSE			{ $$ = VACOPT_VERBOSE; }
 			| FREEZE			{ $$ = VACOPT_FREEZE; }
 			| FULL				{ $$ = VACOPT_FULL; }
+			| YEZZEY			{ $$ = VACOPT_YEZZEY; }
 		;
 
 AnalyzeStmt:
@@ -16024,6 +16028,7 @@ unreserved_keyword:
 			| XML_P
 			| YEAR_P
 			| YES_P
+			| YEZZEY
 			| ZONE
 		;
 
