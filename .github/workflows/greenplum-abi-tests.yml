@@ -13,6 +13,9 @@ on:
   push:
     branches:
       - 6X_STABLE
+      - YGP_6.27_STABLE
+      - STABLE
+      - STABLE_6.27
     paths:
       - 'concourse/scripts/**'
       - 'src/**'
