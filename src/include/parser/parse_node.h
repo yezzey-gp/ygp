@@ -15,6 +15,7 @@
 #define PARSE_NODE_H
 
 #include "nodes/parsenodes.h"
+#include "utils/queryenvironment.h"
 #include "utils/relcache.h"
 
 struct HTAB;  /* utils/hsearch.h */
@@ -151,6 +152,9 @@ struct ParseState
 	int			p_next_resno;	/* next targetlist resno to assign */
 	List	   *p_locking_clause;		/* raw FOR UPDATE/FOR SHARE info */
 	Node	   *p_value_substitute;		/* what to replace VALUE with, if any */
+	QueryEnvironment *p_queryEnv; /* curr env, incl refs to enclosing env */
+
+	/* Flags telling about things found in the query: */
 	bool		p_hasAggs;
 	bool		p_hasWindowFuncs;
 	bool		p_hasSubLinks;

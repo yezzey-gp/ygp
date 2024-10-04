@@ -117,7 +117,9 @@ extern void cost_valuesscan(Path *path, PlannerInfo *root,
 				RelOptInfo *baserel, ParamPathInfo *param_info);
 extern void cost_ctescan(Path *path, PlannerInfo *root,
 			 RelOptInfo *baserel, ParamPathInfo *param_info);
-extern void cost_recursive_union(Plan *runion, Plan *nrterm, Plan *rterm);
+extern void cost_namedtuplestorescan(Path *path, PlannerInfo *root,
+			 RelOptInfo *baserel, ParamPathInfo *param_info);
+extern void cost_recursive_union(Path *runion, Path *nrterm, Path *rterm);
 extern void cost_sort(Path *path, PlannerInfo *root,
 		  List *pathkeys, Cost input_cost, double tuples, int width,
 		  Cost comparison_cost, int sort_mem,
@@ -209,6 +211,8 @@ extern void set_rel_width(PlannerInfo *root, RelOptInfo *rel);
 extern void set_values_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_cte_size_estimates(PlannerInfo *root, RelOptInfo *rel,
 					   Plan *cteplan);
+extern void set_tablefunc_size_estimates(PlannerInfo *root, RelOptInfo *rel);
+extern void set_namedtuplestore_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern void set_foreign_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 
 /* Additional costsize.c prototypes for CDB incremental cost functions. */

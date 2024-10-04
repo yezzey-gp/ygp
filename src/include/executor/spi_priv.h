@@ -14,6 +14,7 @@
 #define SPI_PRIV_H
 
 #include "executor/spi.h"
+#include "utils/queryenvironment.h"
 
 
 #define _SPI_PLAN_MAGIC		569278163
@@ -40,6 +41,7 @@ typedef struct
 	Oid			outer_lastoid;
 	SPITupleTable *outer_tuptable;
 	int			outer_result;
+	QueryEnvironment *queryEnv; /* query environment setup for SPI level */
 } _SPI_connection;
 
 /*

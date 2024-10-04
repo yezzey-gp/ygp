@@ -465,7 +465,7 @@ refresh_matview_datafill(DestReceiver *dest, Query *query,
 	/* Create a QueryDesc, redirecting output to our tuple receiver */
 	queryDesc = CreateQueryDesc(plan, queryString,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, NULL, 0);
+								dest, NULL, NULL, 0);
 
 	if (gp_enable_gpperfmon && Gp_role == GP_ROLE_DISPATCH)
 	{

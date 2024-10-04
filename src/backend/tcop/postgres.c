@@ -817,7 +817,8 @@ pg_parse_query(const char *query_string)
  */
 List *
 pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
-					   Oid *paramTypes, int numParams)
+					   Oid *paramTypes, int numParams,
+					   QueryEnvironment *queryEnv)
 {
 	Query	   *query;
 	List	   *querytree_list;
@@ -830,7 +831,8 @@ pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
 	if (log_parser_stats)
 		ResetUsage();
 
-	query = parse_analyze(parsetree, query_string, paramTypes, numParams);
+	query = parse_analyze(parsetree, query_string, paramTypes, numParams,
+						  queryEnv);
 
 	if (log_parser_stats)
 		ShowUsage("PARSE ANALYSIS STATISTICS");
@@ -854,7 +856,8 @@ List *
 pg_analyze_and_rewrite_params(Node *parsetree,
 							  const char *query_string,
 							  ParserSetupHook parserSetup,
-							  void *parserSetupArg)
+							  void *parserSetupArg,
+							  QueryEnvironment *queryEnv)
 {
 	ParseState *pstate;
 	Query	   *query;
@@ -872,6 +875,7 @@ pg_analyze_and_rewrite_params(Node *parsetree,
 
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = query_string;
+	pstate->p_queryEnv = queryEnv;
 	(*parserSetup) (pstate, parserSetupArg);
 
 	query = transformTopLevelStmt(pstate, parsetree);
@@ -1771,7 +1775,7 @@ exec_simple_query(const char *query_string)
 		oldcontext = MemoryContextSwitchTo(MessageContext);
 
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
-												NULL, 0);
+												NULL, 0, NULL);
 
 		plantree_list = pg_plan_queries(querytree_list, 0, NULL);
 
@@ -2072,7 +2076,8 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		 * Create the CachedPlanSource before we do parse analysis, since it
 		 * needs to see the unmodified raw parse tree.
 		 */
-		psrc = CreateCachedPlan(raw_parse_tree, query_string, commandTag);
+		psrc = CreateCachedPlan(raw_parse_tree, query_string, commandTag,
+								NULL);
 
 		/*
 		 * Set up a snapshot if parse analysis will need one.
@@ -2130,7 +2135,8 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		/* Empty input string.  This is legal. */
 		raw_parse_tree = NULL;
 		commandTag = NULL;
-		psrc = CreateCachedPlan(raw_parse_tree, query_string, commandTag);
+		psrc = CreateCachedPlan(raw_parse_tree, query_string, commandTag,
+								NULL);
 		querytree_list = NIL;
 	}
 
@@ -3158,7 +3164,7 @@ exec_describe_statement_message(const char *stmt_name)
 		List	   *tlist;
 
 		/* Get the plan's primary targetlist */
-		tlist = CachedPlanGetTargetList(psrc);
+		tlist = CachedPlanGetTargetList(psrc, NULL);
 
 		SendRowDescriptionMessage(psrc->resultDesc, tlist, NULL);
 	}

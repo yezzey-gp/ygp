@@ -814,6 +814,17 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 					fix_scan_list(root, splan->scan.plan.qual, rtoffset);
 			}
 			break;
+		case T_NamedTuplestoreScan:
+			{
+				NamedTuplestoreScan *splan = (NamedTuplestoreScan *) plan;
+
+				splan->scan.scanrelid += rtoffset;
+				splan->scan.plan.targetlist =
+					fix_scan_list(root, splan->scan.plan.targetlist, rtoffset);
+				splan->scan.plan.qual =
+					fix_scan_list(root, splan->scan.plan.qual, rtoffset);
+			}
+			break;
 		case T_WorkTableScan:
 			{
 				WorkTableScan *splan = (WorkTableScan *) plan;
@@ -2831,6 +2842,11 @@ extract_query_dependencies_walker(Node *node, PlannerInfo *context)
 			if (rte->rtekind == RTE_RELATION)
 				context->glob->relationOids =
 					lappend_oid(context->glob->relationOids, rte->relid);
+			else if (rte->rtekind == RTE_NAMEDTUPLESTORE &&
+					 OidIsValid(rte->relid))
+				context->glob->relationOids =
+					lappend_oid(context->glob->relationOids,
+								rte->relid);
 		}
 
 		/* And recurse into the query's subexpressions */

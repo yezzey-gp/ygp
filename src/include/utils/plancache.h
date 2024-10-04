@@ -18,6 +18,7 @@
 #include "access/tupdesc.h"
 #include "nodes/params.h"
 #include "nodes/parsenodes.h"
+#include "utils/queryenvironment.h"
 
 #define CACHEDPLANSOURCE_MAGIC		195726186
 #define CACHEDPLAN_MAGIC			953717834
@@ -143,7 +144,8 @@ extern void ResetPlanCache(void);
 
 extern CachedPlanSource *CreateCachedPlan(Node *raw_parse_tree,
 				 const char *query_string,
-				 const char *commandTag);
+				 const char *commandTag,
+				 QueryEnvironment *queryEnv);
 extern CachedPlanSource *CreateOneShotCachedPlan(Node *raw_parse_tree,
 						const char *query_string,
 						const char *commandTag);
@@ -168,11 +170,13 @@ extern CachedPlanSource *CopyCachedPlan(CachedPlanSource *plansource);
 
 extern bool CachedPlanIsValid(CachedPlanSource *plansource);
 
-extern List *CachedPlanGetTargetList(CachedPlanSource *plansource);
+extern List *CachedPlanGetTargetList(CachedPlanSource *plansource,
+							QueryEnvironment *queryEnv);
 
 extern CachedPlan *GetCachedPlan(CachedPlanSource *plansource,
 			  ParamListInfo boundParams,
 			  bool useResOwner,
+			   QueryEnvironment *queryEnv,
 			  IntoClause *intoClause);
 extern void ReleaseCachedPlan(CachedPlan *plan, bool useResOwner);
 

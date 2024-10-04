@@ -24,6 +24,7 @@
 #include "nodes/plannodes.h"
 #include "storage/procsignal.h"
 #include "utils/guc.h"
+#include "utils/queryenvironment.h"
 
 
 /* Required daylight between max_stack_depth and the kernel limit, in bytes */
@@ -50,11 +51,12 @@ extern PGDLLIMPORT int log_statement;
 extern List *pg_parse_query(const char *query_string);
 extern List *pg_rewrite_query(Query *query);
 extern List *pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
-					   Oid *paramTypes, int numParams);
+					   Oid *paramTypes, int numParams, QueryEnvironment *queryEnv);
 extern List *pg_analyze_and_rewrite_params(Node *parsetree,
 							  const char *query_string,
 							  ParserSetupHook parserSetup,
-							  void *parserSetupArg);
+							  void *parserSetupArg,
+							  QueryEnvironment *queryEnv);
 extern PlannedStmt *pg_plan_query(Query *querytree, int cursorOptions,
 			  ParamListInfo boundParams);
 extern List *pg_plan_queries(List *querytrees, int cursorOptions,
