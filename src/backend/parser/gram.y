@@ -331,6 +331,9 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <list>	TriggerEvents TriggerOneEvent
 %type <value>	TriggerFuncArg
 %type <node>	TriggerWhen
+%type <str>		TransitionRelName
+%type <boolean>	TransitionRowOrTable TransitionOldOrNew
+%type <node>	TriggerTransition
 
 %type <list>	event_trigger_when_list event_trigger_value_list
 %type <defelt>	event_trigger_when_item
@@ -392,6 +395,8 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 				scatter_clause
 				create_generic_options alter_generic_options
 				relation_expr_list dostmt_opt_list
+				transform_element_list transform_type_list
+				TriggerTransitions TriggerReferencing
 
 %type <node>    table_value_select_clause
 
@@ -659,11 +664,11 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	MAPPING MATCH MATERIALIZED MAXVALUE MEMORY_LIMIT MEMORY_SHARED_QUOTA MEMORY_SPILL_RATIO
 	MINUTE_P MINVALUE MODE MONTH_P MOVE
 
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NONE
+	NAME_P NAMES NATIONAL NATURAL NCHAR NEW NEXT NO NONE
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
 
-	OBJECT_P OF OFF OFFSET OIDS ON ONLY OPERATOR OPTION OPTIONS OR
+	OBJECT_P OF OFF OFFSET OIDS OLD ON ONLY OPERATOR OPTION OPTIONS OR
 	ORDER ORDINALITY OUT_P OUTER_P OVER OVERLAPS OVERLAY OWNED OWNER
 
 	PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS POSITION
@@ -672,9 +677,9 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	QUOTE
 
-	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF REFERENCES REFRESH REINDEX
-	RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
-	RESET RESTART RESTRICT RETURNING RETURNS REVOKE RIGHT ROLE ROLLBACK
+	RANGE READ REAL REASSIGN RECHECK RECURSIVE REF REFERENCES REFERENCING
+	REFRESH REINDEX RELATIVE_P RELEASE RENAME REPEATABLE REPLACE REPLICA
+	RESET RESTART RESTRICT RETURNING RETURNS REVOKE RIGHT ROLE ROLLBACK ROLLUP
 	ROW ROWS RULE
 
 	SAVEPOINT SCHEMA SCROLL SEARCH SECOND_P SECURITY SELECT SEQUENCE SEQUENCES
@@ -740,7 +745,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	QUEUE
 
 	RANDOMLY READABLE READS REJECT_P REPLICATED RESOURCE
-	ROLLUP ROOTPARTITION
+	ROOTPARTITION
 
 	SCATTER SEGMENT SEGMENTS SETS SPLIT SQL SUBPARTITION
 
@@ -6879,19 +6884,20 @@ AlterUserMappingStmt: ALTER USER MAPPING FOR auth_ident SERVER name alter_generi
 
 CreateTrigStmt:
 			CREATE TRIGGER name TriggerActionTime TriggerEvents ON
-			qualified_name TriggerForSpec TriggerWhen
+			qualified_name TriggerReferencing TriggerForSpec TriggerWhen
 			EXECUTE PROCEDURE func_name '(' TriggerFuncArgs ')'
 				{
 					CreateTrigStmt *n = makeNode(CreateTrigStmt);
 					n->trigname = $3;
 					n->relation = $7;
-					n->funcname = $12;
-					n->args = $14;
-					n->row = $8;
+					n->funcname = $13;
+					n->args = $15;
+					n->row = $9;
 					n->timing = $4;
 					n->events = intVal(linitial($5));
 					n->columns = (List *) lsecond($5);
-					n->whenClause = $9;
+					n->whenClause = $10;
+					n->transitionRels = $8;
 					n->isconstraint  = FALSE;
 					n->deferrable	 = FALSE;
 					n->initdeferred  = FALSE;
@@ -6913,6 +6919,7 @@ CreateTrigStmt:
 					n->events = intVal(linitial($6));
 					n->columns = (List *) lsecond($6);
 					n->whenClause = $14;
+					n->transitionRels = NIL;
 					n->isconstraint  = TRUE;
 					processCASbits($10, @10, "TRIGGER",
 								   &n->deferrable, &n->initdeferred, NULL,
@@ -6963,6 +6970,49 @@ TriggerOneEvent:
 				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_UPDATE), $3); }
 			| TRUNCATE
 				{ $$ = list_make2(makeInteger(TRIGGER_TYPE_TRUNCATE), NIL); }
+		;
+
+TriggerReferencing:
+			REFERENCING TriggerTransitions			{ $$ = $2; }
+			| /*EMPTY*/								{ $$ = NIL; }
+		;
+
+TriggerTransitions:
+			TriggerTransition						{ $$ = list_make1($1); }
+			| TriggerTransitions TriggerTransition	{ $$ = lappend($1, $2); }
+		;
+
+TriggerTransition:
+			TransitionOldOrNew TransitionRowOrTable opt_as TransitionRelName
+				{
+					TriggerTransition *n = makeNode(TriggerTransition);
+					n->name = $4;
+					n->isNew = $1;
+					n->isTable = $2;
+					$$ = (Node *)n;
+				}
+		;
+
+TransitionOldOrNew:
+			NEW										{ $$ = TRUE; }
+			| OLD									{ $$ = FALSE; }
+		;
+
+TransitionRowOrTable:
+			TABLE									{ $$ = TRUE; }
+			/*
+			 * According to the standard, lack of a keyword here implies ROW.
+			 * Support for that would require prohibiting ROW entirely here,
+			 * reserving the keyword ROW, and/or requiring AS (instead of
+			 * allowing it to be optional, as the standard specifies) as the
+			 * next token.  Requiring ROW seems cleanest and easiest to
+			 * explain.
+			 */
+			| ROW									{ $$ = FALSE; }
+		;
+
+TransitionRelName:
+			ColId									{ $$ = $1; }
 		;
 
 TriggerForSpec:
@@ -15878,6 +15928,7 @@ unreserved_keyword:
 			| MOVE
 			| NAME_P
 			| NAMES
+			| NEW
 			| NEWLINE
 			| NEXT
 			| NO
@@ -15891,6 +15942,7 @@ unreserved_keyword:
 			| OF
 			| OFF
 			| OIDS
+			| OLD
 			| OPERATOR
 			| OPTION
 			| OPTIONS
@@ -15930,6 +15982,7 @@ unreserved_keyword:
 			| RECHECK
 			| RECURSIVE
 			| REF
+			| REFERENCING
 			| REFRESH
 			| REINDEX
 			| REJECT_P /* gp */
