@@ -65,7 +65,8 @@ explain_get_index_name_hook_type explain_get_index_name_hook = NULL;
 #define X_NOWHITESPACE 4
 
 static void ExplainOneQuery(Query *query, IntoClause *into, ExplainState *es,
-				const char *queryString, ParamListInfo params);
+				const char *queryString, ParamListInfo params,
+				QueryEnvironment *queryEnv);
 static void report_triggers(ResultRelInfo *rInfo, bool show_relname,
 				ExplainState *es);
 
@@ -146,7 +147,7 @@ static void escape_yaml(StringInfo buf, const char *str);
  */
 void
 ExplainQuery(ExplainStmt *stmt, const char *queryString,
-			 ParamListInfo params, DestReceiver *dest)
+			 ParamListInfo params, QueryEnvironment *queryEnv, DestReceiver *dest)
 {
 	ExplainState es;
 	TupOutputState *tstate;
@@ -254,7 +255,7 @@ ExplainQuery(ExplainStmt *stmt, const char *queryString,
 		foreach(l, rewritten)
 		{
 			ExplainOneQuery((Query *) lfirst(l), NULL, &es,
-							queryString, params);
+							queryString, params, queryEnv);
 
 			/* Separate plans with an appropriate separator */
 			if (lnext(l) != NULL)
@@ -393,7 +394,8 @@ ExplainDXL(Query *query, ExplainState *es, const char *queryString,
  */
 static void
 ExplainOneQuery(Query *query, IntoClause *into, ExplainState *es,
-				const char *queryString, ParamListInfo params)
+				const char *queryString, ParamListInfo params, 
+				QueryEnvironment *queryEnv)
 {
 #ifdef USE_ORCA
 	if (es->dxl)
@@ -406,7 +408,8 @@ ExplainOneQuery(Query *query, IntoClause *into, ExplainState *es,
 	/* planner will not cope with utility statements */
 	if (query->commandType == CMD_UTILITY)
 	{
-		ExplainOneUtility(query->utilityStmt, into, es, queryString, params);
+		ExplainOneUtility(query->utilityStmt, into, es, queryString, params,
+						  queryEnv);
 		return;
 	}
 
@@ -435,7 +438,7 @@ ExplainOneQuery(Query *query, IntoClause *into, ExplainState *es,
 			plan->intoClause = copyObject(into);
 
 		/* run it (if needed) and produce output */
-		ExplainOnePlan(plan, into, es, queryString, params, &planduration, 0);
+		ExplainOnePlan(plan, into, es, queryString, params, &planduration, queryEnv, 0);
 	}
 }
 
@@ -452,7 +455,8 @@ ExplainOneQuery(Query *query, IntoClause *into, ExplainState *es,
  */
 void
 ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
-				  const char *queryString, ParamListInfo params)
+				  const char *queryString, ParamListInfo params,
+				  QueryEnvironment *queryEnv)
 {
 	if (utilityStmt == NULL)
 		return;
@@ -471,11 +475,11 @@ ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
 		rewritten = QueryRewrite((Query *) copyObject(ctas->query));
 		Assert(list_length(rewritten) == 1);
 		ExplainOneQuery((Query *) linitial(rewritten), ctas->into, es,
-						queryString, params);
+						queryString, params, queryEnv);
 	}
 	else if (IsA(utilityStmt, ExecuteStmt))
 		ExplainExecuteQuery((ExecuteStmt *) utilityStmt, into, es,
-							queryString, params);
+							queryString, params, queryEnv);
 	else if (IsA(utilityStmt, NotifyStmt))
 	{
 		if (es->format == EXPLAIN_FORMAT_TEXT)
@@ -513,7 +517,7 @@ ExplainOneUtility(Node *utilityStmt, IntoClause *into, ExplainState *es,
 void
 ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 			   const char *queryString, ParamListInfo params,
-			   const instr_time *planduration, int cursorOptions)
+			   QueryEnvironment *queryEnv, const instr_time *planduration, int cursorOptions)
 {
 	DestReceiver *dest;
 	QueryDesc  *queryDesc;
@@ -559,7 +563,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	/* Create a QueryDesc for the query */
 	queryDesc = CreateQueryDesc(plannedstmt, queryString,
 								GetActiveSnapshot(), InvalidSnapshot,
-								dest, params, instrument_option);
+								dest, params, queryEnv, instrument_option);
 
 	if (gp_enable_gpperfmon && Gp_role == GP_ROLE_DISPATCH)
 	{
@@ -1085,6 +1089,7 @@ ExplainPreScanNode(PlanState *planstate, Bitmapset **rels_used)
 		case T_FunctionScan:
 		case T_ValuesScan:
 		case T_CteScan:
+		case T_NamedTuplestoreScan:
 		case T_WorkTableScan:
 		case T_ForeignScan:
 			*rels_used = bms_add_member(*rels_used,
@@ -1411,6 +1416,9 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			break;
 		case T_CteScan:
 			pname = sname = "CTE Scan";
+			break;
+		case T_NamedTuplestoreScan:
+			pname = sname = "Named Tuplestore Scan";
 			break;
 		case T_WorkTableScan:
 			pname = sname = "WorkTable Scan";
@@ -2013,6 +2021,7 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_ExternalScan:
 		case T_ValuesScan:
 		case T_CteScan:
+		case T_NamedTuplestoreScan:
 		case T_WorkTableScan:
 		case T_SubqueryScan:
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
@@ -3071,6 +3080,11 @@ ExplainTargetRel(Plan *plan, Index rti, ExplainState *es)
 			Assert(!rte->self_reference);
 			objectname = rte->ctename;
 			objecttag = "CTE Name";
+			break;
+		case T_NamedTuplestoreScan:
+			Assert(rte->rtekind == RTE_NAMEDTUPLESTORE);
+			objectname = rte->enrname;
+			objecttag = "Tuplestore Name";
 			break;
 		case T_WorkTableScan:
 			/* Assert it's on a self-reference CTE */

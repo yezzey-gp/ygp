@@ -794,6 +794,7 @@ typedef enum RTEKind
 	RTE_VOID,                   /* CDB: deleted RTE */
 	RTE_CTE,					/* common table expr (WITH list element) */
 	RTE_TABLEFUNCTION,          /* CDB: Functions over multiset input */
+	RTE_NAMEDTUPLESTORE			/* tuplestore, e.g. for AFTER triggers */
 } RTEKind;
 
 typedef struct RangeTblEntry
@@ -878,6 +879,9 @@ typedef struct RangeTblEntry
 	 * pseudo-function was specified as modifier in FROM-clause
 	 */
 	bool		forceDistRandom;
+
+	char	   *enrname;		/* name of ephemeral named relation */
+	double		enrtuples;		/* estimated or actual from caller */
 
 	/*
 	 * Fields valid in all RTEs:

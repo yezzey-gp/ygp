@@ -76,7 +76,7 @@ PrepareQuery(PrepareStmt *stmt, const char *queryString)
 	 * to see the unmodified raw parse tree.
 	 */
 	plansource = CreateCachedPlan(stmt->query, queryString,
-								  CreateCommandTag(stmt->query));
+								  CreateCommandTag(stmt->query), NULL);
 
 	/* Transform list of TypeNames to array of type OIDs */
 	nargs = list_length(stmt->argtypes);
@@ -240,7 +240,7 @@ ExecuteQuery(ExecuteStmt *stmt, IntoClause *intoClause,
 									   entry->plansource->query_string);
 
 	/* Replan if needed, and increment plan refcount for portal */
-	cplan = GetCachedPlan(entry->plansource, paramLI, false, intoClause);
+	cplan = GetCachedPlan(entry->plansource, paramLI, false, NULL, intoClause);
 	plan_list = cplan->stmt_list;
 
 	/*
@@ -564,7 +564,7 @@ FetchPreparedStatementTargetList(PreparedStatement *stmt)
 	List	   *tlist;
 
 	/* Get the plan's primary targetlist */
-	tlist = CachedPlanGetTargetList(stmt->plansource);
+	tlist = CachedPlanGetTargetList(stmt->plansource, NULL);
 
 	/* Copy into caller's context in case plan gets invalidated */
 	return (List *) copyObject(tlist);
@@ -642,7 +642,8 @@ DropAllPreparedStatements(void)
  */
 void
 ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into, ExplainState *es,
-					const char *queryString, ParamListInfo params)
+					const char *queryString, ParamListInfo params,
+					QueryEnvironment *queryEnv)
 {
 	PreparedStatement *entry;
 	const char *query_string;
@@ -696,7 +697,7 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into, ExplainState *es,
 	}
 
 	/* Replan if needed, and acquire a transient refcount */
-	cplan = GetCachedPlan(entry->plansource, paramLI, true, into);
+	cplan = GetCachedPlan(entry->plansource, paramLI, true, queryEnv, into);
 
 	plan_list = cplan->stmt_list;
 
@@ -706,9 +707,9 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, IntoClause *into, ExplainState *es,
 		PlannedStmt *pstmt = (PlannedStmt *) lfirst(p);
 
 		if (IsA(pstmt, PlannedStmt))
-			ExplainOnePlan(pstmt, into, es, query_string, paramLI, NULL, 0);
+			ExplainOnePlan(pstmt, into, es, query_string, paramLI, NULL, queryEnv, 0);
 		else
-			ExplainOneUtility((Node *) pstmt, into, es, query_string, paramLI);
+			ExplainOneUtility((Node *) pstmt, into, es, query_string, paramLI, queryEnv);
 
 		/* No need for CommandCounterIncrement, as ExplainOnePlan did it */
 

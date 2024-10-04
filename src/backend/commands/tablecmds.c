@@ -18980,7 +18980,7 @@ ATPExecPartSplit(Relation *rel,
 
 			ats->cmds = list_make1(cmd);
 			/* No transformation happens for this stmt in parse_analyze() */
-			q = parse_analyze((Node *) ats, synthetic_sql, NULL, 0);
+			q = parse_analyze((Node *) ats, synthetic_sql, NULL, 0, NULL);
 
 			heap_close(*rel, NoLock);
 			ProcessUtility((Node *)q->utilityStmt,

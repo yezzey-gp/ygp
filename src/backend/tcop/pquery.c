@@ -53,6 +53,7 @@ static void ProcessQuery(Portal portal, /* Resource queueing need SQL, so we pas
 			 PlannedStmt *stmt,
 			 const char *sourceText,
 			 ParamListInfo params,
+			 QueryEnvironment *queryEnv,
 			 DestReceiver *dest,
 			 char *completionTag);
 static void FillPortalStore(Portal portal, bool isTopLevel);
@@ -87,6 +88,7 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 				Snapshot crosscheck_snapshot,
 				DestReceiver *dest,
 				ParamListInfo params,
+				QueryEnvironment *queryEnv,
 				int instrument_options)
 {
 	QueryDesc  *qd = (QueryDesc *) palloc(sizeof(QueryDesc));
@@ -100,6 +102,7 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	qd->crosscheck_snapshot = RegisterSnapshot(crosscheck_snapshot);
 	qd->dest = dest;			/* output dest */
 	qd->params = params;		/* parameter values passed into query */
+	qd->queryEnv = queryEnv;
 	qd->instrument_options = instrument_options;		/* instrumentation
 														 * wanted? */
 
@@ -208,6 +211,7 @@ ProcessQuery(Portal portal,
 			 PlannedStmt *stmt,
 			 const char *sourceText,
 			 ParamListInfo params,
+			 QueryEnvironment *queryEnv,
 			 DestReceiver *dest,
 			 char *completionTag)
 {
@@ -228,12 +232,12 @@ ProcessQuery(Portal portal,
 	if (portal->sourceTag == T_SelectStmt && gp_select_invisible)
 		queryDesc = CreateQueryDesc(stmt, portal->sourceText,
 									SnapshotAny, InvalidSnapshot,
-									dest, params,
+									dest, params, queryEnv,
 									GP_INSTRUMENT_OPTS);
 	else
 		queryDesc = CreateQueryDesc(stmt, portal->sourceText,
 									GetActiveSnapshot(), InvalidSnapshot,
-									dest, params,
+									dest, params, queryEnv,
 									GP_INSTRUMENT_OPTS);
 	queryDesc->ddesc = portal->ddesc;
 
@@ -664,6 +668,7 @@ PortalStart(Portal portal, ParamListInfo params,
 											InvalidSnapshot,
 											None_Receiver,
 											params,
+											portal->queryEnv,
 											GP_INSTRUMENT_OPTS);
 				queryDesc->ddesc = ddesc;
 
@@ -1398,6 +1403,7 @@ PortalRunUtility(Portal portal, Node *utilityStmt, bool isTopLevel,
 				   portal->sourceText ? portal->sourceText : "(Source text for portal is not available)",
 			   isTopLevel ? PROCESS_UTILITY_TOPLEVEL : PROCESS_UTILITY_QUERY,
 				   portal->portalParams,
+				   portal->queryEnv,
 				   dest,
 				   completionTag);
 
@@ -1489,6 +1495,7 @@ PortalRunMulti(Portal portal, bool isTopLevel,
 				ProcessQuery(portal, pstmt,
 							 portal->sourceText,
 							 portal->portalParams,
+							 portal->queryEnv,
 							 dest, completionTag);
 			}
 			else
@@ -1497,6 +1504,7 @@ PortalRunMulti(Portal portal, bool isTopLevel,
 				ProcessQuery(portal, pstmt,
 							 portal->sourceText,
 							 portal->portalParams,
+							 portal->queryEnv,
 							 altdest, NULL);
 			}
 

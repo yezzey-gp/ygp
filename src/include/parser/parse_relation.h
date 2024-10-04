@@ -28,6 +28,7 @@ extern RangeTblEntry *refnameRangeTblEntry(ParseState *pstate,
 extern CommonTableExpr *scanNameSpaceForCTE(ParseState *pstate,
 					const char *refname,
 					Index *ctelevelsup);
+extern bool scanNameSpaceForENR(ParseState *pstate, const char *refname);
 extern void checkNameSpaceConflicts(ParseState *pstate, List *namespace1,
 						List *namespace2);
 extern int RTERangeTablePosn(ParseState *pstate,
@@ -86,6 +87,9 @@ extern RangeTblEntry *addRangeTableEntryForCTE(ParseState *pstate,
 						 RangeVar *rv,
 						 bool inFromCl);
 extern LockingClause *getLockedRefname(ParseState *pstate, const char *refname);
+extern RangeTblEntry *addRangeTableEntryForENR(ParseState *pstate,
+						 RangeVar *rv,
+						 bool inFromCl);
 extern void addRTEtoQuery(ParseState *pstate, RangeTblEntry *rte,
 			  bool addToJoinList,
 			  bool addToRelNameSpace, bool addToVarNameSpace);

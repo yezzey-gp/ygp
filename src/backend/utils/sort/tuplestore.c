@@ -112,6 +112,7 @@ struct Tuplestorestate
 	bool		truncated;		/* tuplestore_trim has removed tuples? */
 	int64		availMem;		/* remaining memory available, in bytes */
 	int64		allowedMem;		/* total memory allowed, in bytes */
+	int64		tuples;			/* number of tuples added */
 	BufFile    *myfile;			/* underlying file, or NULL if none */
 	MemoryContext context;		/* memory context for holding tuples */
 	ResourceOwner resowner;		/* resowner for holding temp files */
@@ -288,6 +289,7 @@ tuplestore_begin_common(int eflags, bool interXact, int maxKBytes)
 
 	state->memtupdeleted = 0;
 	state->memtupcount = 0;
+	state->tuples = 0;
 
 	/*
 	 * Initial size of array must be more than ALLOCSET_SEPARATE_THRESHOLD;
@@ -455,6 +457,7 @@ tuplestore_clear(Tuplestorestate *state)
 	state->truncated = false;
 	state->memtupdeleted = 0;
 	state->memtupcount = 0;
+	state->tuples = 0;
 	readptr = state->readptrs;
 	for (i = 0; i < state->readptrcount; readptr++, i++)
 	{
@@ -581,6 +584,18 @@ tuplestore_select_read_pointer(Tuplestorestate *state, int ptr)
 	}
 
 	state->activeptr = ptr;
+}
+
+/*
+ * tuplestore_tuple_count
+ *
+ * Returns the number of tuples added since creation or the last
+ * tuplestore_clear().
+ */
+int64
+tuplestore_tuple_count(Tuplestorestate *state)
+{
+	return state->tuples;
 }
 
 /*
@@ -808,6 +823,8 @@ tuplestore_puttuple_common(Tuplestorestate *state, void *tuple)
 	TSReadPointer *readptr;
 	int			i;
 	ResourceOwner oldowner;
+
+	state->tuples++;
 
 	switch (state->status)
 	{
