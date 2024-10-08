@@ -34,7 +34,7 @@ jobs:
     - name: Build 
       run: | 
         ./configure --with-perl --with-python --with-libxml --with-gssapi --disable-orca --prefix=/usr/local/gpdb \
-        --enable-depend --enable-cassert --enable-debug
+        --enable-depend --enable-cassert --enable-debug --without-mdblocales
         export GPHOME=/usr/local/gpdb/
         export PATH=$PATH:/usr/local/gpdb/bin
         make && make install
