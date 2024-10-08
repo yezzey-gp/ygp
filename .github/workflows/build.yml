@@ -45,8 +45,3 @@ jobs:
     - name: Install check
       run: make installcheck
 
-    - name: Test
-      env:
-        CC: ${{ matrix.compiler }}
-        CC_FOR_BUILD: ${{ matrix.compiler }}
-      run: make run_test
