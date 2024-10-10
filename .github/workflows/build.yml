@@ -34,7 +34,7 @@ jobs:
       
     - name: Build 
       run: | 
-        ./configure --with-perl --with-python --with-libxml --with-gssapi --disable-orca --prefix=/usr/local/gpdb \
+        ./configure --with-perl --with-python --with-libxml --disable-orca --prefix=/usr/local/gpdb \
         --enable-depend --enable-cassert --enable-debug --without-mdblocales --without-zstd
 
         export GPHOME=/usr/local/gpdb/
