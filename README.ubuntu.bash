@@ -1,7 +1,7 @@
 #!/bin/bash
 
-apt-get update
-apt-get install -y \
+apt update
+apt install -y \
   bison \
   ccache \
   cmake \
