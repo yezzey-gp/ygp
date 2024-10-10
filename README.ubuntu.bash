@@ -8,8 +8,6 @@ apt install -y \
   curl \
   flex \
   git-core \
-  gcc-8 \
-  g++-8 \
   inetutils-ping \
   krb5-kdc \
   krb5-admin-server \
@@ -33,8 +31,6 @@ apt install -y \
   openssl \
   python2-dev \
   python3-pip \
-  python-psutil \
-  python-yaml \
   zlib1g-dev \
   libpstreams-dev
 
