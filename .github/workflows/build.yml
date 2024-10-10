@@ -29,8 +29,8 @@ jobs:
     - name: Install dependencies
       run: sudo bash README.ubuntu.bash 
     
-    - name: Make version
-      run: make -v
+    - name: Install baggy deps
+      run: sudo apt install libapr1-dev
       
     - name: Build 
       run: | 
