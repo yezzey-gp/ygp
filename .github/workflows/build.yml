@@ -28,9 +28,7 @@ jobs:
 
     - name: Install dependencies
       run: sudo bash README.ubuntu.bash 
-    
-    - name: Install baggy deps
-      run: sudo apt install libapr1-dev
+   
       
     - name: Build 
       run: | 
@@ -39,6 +37,7 @@ jobs:
 
         export GPHOME=/usr/local/gpdb/
         export PATH=$PATH:/usr/local/gpdb/bin
+        make -d
         make && make install
     
     - name: Check

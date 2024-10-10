@@ -10,8 +10,6 @@ include $(PGXS)
 else
 subdir = gpcontrib/jsonlog-gpdb
 top_builddir = ../..
-echo "$(top_builddir)"
-echo "$(top_srcdir)"
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
