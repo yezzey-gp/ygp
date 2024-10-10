@@ -17,8 +17,7 @@ jobs:
     strategy:
         fail-fast: false
         matrix:
-          # os: [ubuntu-latest, ubuntu-18.04]
-          os : [ubuntu-20.04]
+          os: [ubuntu-latest]
           compiler: [gcc]
     runs-on: ${{ matrix.os }}
 
@@ -29,12 +28,15 @@ jobs:
 
     - name: Install dependencies
       run: sudo bash README.ubuntu.bash 
-        
+    
+    - name: Make version
+      run: make -v
       
     - name: Build 
       run: | 
         ./configure --with-perl --with-python --with-libxml --with-gssapi --disable-orca --prefix=/usr/local/gpdb \
-        --enable-depend --enable-cassert --enable-debug --without-mdblocales
+        --enable-depend --enable-cassert --enable-debug --without-mdblocales --without-zstd
+
         export GPHOME=/usr/local/gpdb/
         export PATH=$PATH:/usr/local/gpdb/bin
         make && make install
