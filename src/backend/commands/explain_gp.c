@@ -1902,7 +1902,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 		else {
 			// ExplainOpenGroup("Rows Out", NULL, false, es);
 			ExplainPropertyFloat("Average Rows", avgtuples, 1, es);
-			ExplainPropertyInteger("Segments", ns->ninst, es);
+			ExplainPropertyInteger("Workers", ns->ninst, es);
 			ExplainPropertyFloat("Max Rows", maxtuples, 0, es);
 			ExplainPropertyInteger("Max Rows Segment", maxseg, es);
 			ExplainPropertyFloat("Min Rows", maxtuples, 0, es);
