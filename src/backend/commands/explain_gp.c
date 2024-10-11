@@ -1855,7 +1855,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	 * Print "Rows out"
 	 */
 
-	if (es->analyze && ns->ninst > 1) {
+	if (gp_enable_explain_print_rows_out && es->analyze && ns->ninst > 1) {
 		double alltuples = 0;
 		double maxtuples = ns->insts[0].ntuples;
 		int maxseg = 0;
