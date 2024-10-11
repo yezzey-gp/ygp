@@ -21,7 +21,6 @@
 
 extern void RelationCreateStorage(RelFileNode rnode, char relpersistence, char relstorage);
 extern void RelationDropStorage(Relation rel);
-extern void RelationDropStoragePure(Relation rel);
 extern void RelationPreserveStorage(RelFileNode rnode, bool atCommit);
 extern void RelationTruncate(Relation rel, BlockNumber nblocks);
 /*
@@ -35,10 +34,9 @@ extern void AtSubAbort_smgr(void);
 extern void PostPrepare_smgr(void);
 
 
-/* Hook for yezzey meta-related logic */
-typedef void (*TrackDropObject_hook_type) (Relation);
-
-extern PGDLLIMPORT TrackDropObject_hook_type TrackDropObject_hook;
+/* Hook for yezzey metadata-related logic */
+typedef void (*RelationDropStorage_hook_type) (Relation);
+extern PGDLLIMPORT RelationDropStorage_hook_type RelationDropStorage_hook;
 
 
 #endif   /* STORAGE_H */

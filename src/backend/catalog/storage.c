@@ -63,7 +63,7 @@ typedef struct PendingRelDelete
 
 static PendingRelDelete *pendingDeletes = NULL; /* head of linked list */
 
-TrackDropObject_hook_type TrackDropObject_hook = NULL;
+RelationDropStorage_hook_type RelationDropStorage_hook = NULL;
 
 /*
  * RelationCreateStorage
@@ -164,15 +164,6 @@ RelationDropStorage(Relation rel)
 	pending->next = pendingDeletes;
 	pendingDeletes = pending;
 
-
-	/* if yezzey relation, we need to update relation expire lsn */
-	/*
-	 * Set expiration of the relation's external files.
-	 */
-	if (TrackDropObject_hook) {
-		TrackDropObject_hook(rel);
-	}
-
 	/*
 	 * NOTE: if the relation was created in this transaction, it will now be
 	 * present in the pending-delete list twice, once with atCommit true and
@@ -185,40 +176,6 @@ RelationDropStorage(Relation rel)
 
 	RelationCloseSmgr(rel);
 }
-
-
-void
-RelationDropStoragePure(Relation rel)
-{
-	PendingRelDelete *pending;
-
-	/* Add the relation to the list of stuff to delete at commit */
-	pending = (PendingRelDelete *)
-		MemoryContextAlloc(TopMemoryContext, sizeof(PendingRelDelete));
-	pending->relnode.node = rel->rd_node;
-	if (pending->relnode.node.spcNode == YEZZEYTABLESPACE_OID) {
-		pending->relnode.node.spcNode = DEFAULTTABLESPACE_OID;
-	}
-	pending->relnode.relstorage = rel->rd_rel->relstorage;
-	pending->relnode.isTempRelation = rel->rd_backend == TempRelBackendId;
-	pending->atCommit = true;	/* delete if commit */
-	pending->nestLevel = GetCurrentTransactionNestLevel();
-	pending->next = pendingDeletes;
-	pendingDeletes = pending;
-
-	/*
-	 * NOTE: if the relation was created in this transaction, it will now be
-	 * present in the pending-delete list twice, once with atCommit true and
-	 * once with atCommit false.  Hence, it will be physically deleted at end
-	 * of xact in either case (and the other entry will be ignored by
-	 * smgrDoPendingDeletes, so no error will occur).  We could instead remove
-	 * the existing list entry and delete the physical file immediately, but
-	 * for now I'll keep the logic simple.
-	 */
-
-	RelationCloseSmgr(rel);
-}
-
 
 /*
  * RelationPreserveStorage
