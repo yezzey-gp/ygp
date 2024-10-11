@@ -746,7 +746,7 @@ extern bool gp_eager_preunique;
  *
  */
 
-extern bool gp_enable_explain_print_rows_out;
+extern bool gp_enable_explain_rows_out;
 
 /* May Greenplum dump statistics for all segments as a huge ugly string
  * during EXPLAIN ANALYZE?
