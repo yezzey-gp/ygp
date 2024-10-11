@@ -1905,8 +1905,8 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			ExplainPropertyInteger("Workers", ns->ninst, es);
 			ExplainPropertyFloat("Max Rows", maxtuples, 0, es);
 			ExplainPropertyInteger("Max Rows Segment", maxseg, es);
-			ExplainPropertyFloat("Min Rows", maxtuples, 0, es);
-			ExplainPropertyInteger("Min Rows Segment", maxseg, es);
+			ExplainPropertyFloat("Min Rows", mintuples, 0, es);
+			ExplainPropertyInteger("Min Rows Segment", minseg, es);
 			// ExplainCloseGroup("Rows out", NULL, false, es);
 		}
 	}
