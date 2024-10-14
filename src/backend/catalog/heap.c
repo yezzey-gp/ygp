@@ -2447,6 +2447,9 @@ heap_drop_with_catalog(Oid relid)
 		relkind != RELKIND_FOREIGN_TABLE &&
 		!RelationIsExternal(rel))
 	{
+		if (RelationDropStorage_hook) {
+			(*RelationDropStorage_hook)(rel);
+		}
 		RelationDropStorage(rel);
 	}
 

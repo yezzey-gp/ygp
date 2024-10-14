@@ -1737,6 +1737,9 @@ index_drop(Oid indexId, bool concurrent)
 	/*
 	 * Schedule physical removal of the files
 	 */
+	if (RelationDropStorage_hook) {
+		(*RelationDropStorage_hook)(userIndexRelation);
+	}
 	RelationDropStorage(userIndexRelation);
 
 	/*
