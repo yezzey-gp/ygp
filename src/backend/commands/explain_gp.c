@@ -1855,7 +1855,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	 * Print "Rows out"
 	 */
 
-	if (gp_enable_explain_rows_out && es->analyze && ns->ninst > 1) {
+	if (gp_enable_explain_rows_out && es->analyze && ns->ninst > 0) {
 		double alltuples = 0;
 		double maxtuples = ns->insts[0].ntuples;
 		int maxseg = 0;
@@ -1901,8 +1901,8 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 		}
 		else {
 			// ExplainOpenGroup("Rows Out", NULL, false, es);
+			ExplainPropertyInteger("Workers", ns->ninst, es);
 			ExplainPropertyFloat("Average Rows", avgtuples, 1, es);
-			ExplainPropertyInteger("Segments", ns->ninst, es);
 			ExplainPropertyFloat("Max Rows", maxtuples, 0, es);
 			ExplainPropertyInteger("Max Rows Segment", maxseg, es);
 			ExplainPropertyFloat("Min Rows", mintuples, 0, es);
