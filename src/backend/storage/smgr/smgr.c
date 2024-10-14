@@ -34,6 +34,8 @@
 #include "utils/hsearch.h"
 #include "utils/inval.h"
 
+#include "catalog/pg_tablespace.h"
+
 /*
  * Hook for plugins to collect statistics from storage functions
  * For example, disk quota extension will use these hooks to
@@ -350,7 +352,8 @@ smgrclose(SMgrRelation reln)
 	if (hash_search(SMgrRelationHash,
 					(void *) &(reln->smgr_rnode),
 					HASH_REMOVE, NULL) == NULL)
-		elog(ERROR, "SMgrRelation hashtable corrupted");
+		if (reln->smgr_rnode.node.spcNode != YEZZEYTABLESPACE_OID)
+			elog(ERROR, "SMgrRelation hashtable corrupted");
 
 	/*
 	 * Unhook the owner pointer, if any.  We do this last since in the remote
