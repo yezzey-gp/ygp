@@ -1609,6 +1609,8 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 
 		appendStringInfoSpaces(es->str, ns_spaces);
 		appendStringInfoString(es->str, "StatInsts:\n");
+		appendStringInfoSpaces(es->str, ns_spaces + 2);
+		appendStringInfoString(es->str, "(segN) pstype starttime counter firsttuple startup total ntuples nloops execmemused workmemused workmemwanted workfileCreated firststart peakMemBalance numPartScanned sortMethod sortSpaceType sortSpaceUsed bnotes enotes\n");
 	}
 	else
 		ExplainOpenGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
@@ -1618,90 +1620,23 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 	{
 		CdbExplain_StatInst *nsi = &ns->insts[i];
 
-		// if (INSTR_TIME_IS_ZERO(nsi->firststart))
-		// 	continue;
-
-		// /* Time from start of query on qDisp to worker's first result row */
-		// INSTR_TIME_SET_ZERO(timediff);
-		// INSTR_TIME_ACCUM_DIFF(timediff, nsi->firststart, ctx->querystarttime);
-
 		if (es->format == EXPLAIN_FORMAT_TEXT)
 		{
 			int nsi_spaces = es->indent * 2 + 4;
 
-			appendStringInfoSpaces(es->str, es->indent * 2 + 2);
-			appendStringInfo(es->str, "- (seg%d)\n", ns->segindex0 + i);
-			
-			// NodeTag		pstype;			/* PlanState node type */
 			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "pstype=%d\n", nsi->pstype);
 
-			// instr_time	starttime;		/* Start time of current iteration of node */
-			// instr_time	counter;		/* Accumulated runtime for this node */
-			// double		firsttuple;		/* Time for first tuple of this cycle */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "firsttuple=%.2f\n", nsi->firsttuple);
-
-			// double		startup;		/* Total startup time (in seconds) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "startup=%.2f\n", nsi->startup);
-
-			// double		total;			/* Total total time (in seconds) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "total=%.2f\n", nsi->total);
-
-			// double		ntuples;		/* Total tuples produced */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "ntuples=%.2f\n", nsi->ntuples);
-
-			// double		nloops;			/* # of run cycles for this node */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "nloops=%.2f\n", nsi->nloops);
-
-			// double		execmemused;	/* executor memory used (bytes) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "execmemused=%.2f\n", nsi->execmemused);
-
-			// double		workmemused;	/* work_mem actually used (bytes) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "workmemused=%.2f\n", nsi->workmemused);
-
-			// double		workmemwanted;	/* work_mem to avoid workfile i/o (bytes) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "workmemwanted=%.2f\n", nsi->workmemwanted);
-
-			// bool		workfileCreated;	/* workfile created in this node */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "workfileCreated=%d\n", nsi->workfileCreated);
-
-			// instr_time	firststart;		/* Start time of first iteration of node */
-			// double		peakMemBalance; /* Max mem account balance */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "peakMemBalance=%.2f\n", nsi->peakMemBalance);
-
-			// int			numPartScanned; /* Number of part tables scanned */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "numPartScanned=%d\n", nsi->numPartScanned);
-
-			// ExplainSortMethod sortMethod;	/* Type of sort */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "sortMethod=%d\n", nsi->sortMethod);
-
-			// ExplainSortSpaceType sortSpaceType; /* Sort space type */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "sortSpaceType=%d\n", nsi->sortSpaceType);
-
-			// long		sortSpaceUsed;	/* Memory / Disk used by sort(KBytes) */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "sortSpaceUsed=%d\n", nsi->sortSpaceUsed);
-
-			// int			bnotes;			/* Offset to beginning of node's extra text */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "bnotes=%d\n", nsi->bnotes);
-
-			// int			enotes;			/* Offset to end of node's extra text */
-			appendStringInfoSpaces(es->str, nsi_spaces);
-			appendStringInfo(es->str, "enotes=%d\n", nsi->enotes);
+			appendStringInfo(es->str, "(seg%d) %d %.2f %.2f %.2f %.2f %.2f %.0f %.0f %.0f %.0f %.0f %d %.2f %.0f %d %d %d %ld %d %d\n", 
+				ns->segindex0 + i, 
+				nsi->pstype, 
+				nsi->starttime.tv_sec, nsi->counter.tv_sec, nsi->firsttuple, nsi->startup, nsi->total,
+				nsi->ntuples, nsi->nloops, nsi->execmemused, nsi->workmemused, nsi->workmemwanted,
+				nsi->workfileCreated,
+				nsi->firststart,
+				nsi->peakMemBalance,
+				nsi->numPartScanned, nsi->sortMethod, nsi->sortSpaceType,
+				nsi->sortSpaceUsed,
+				nsi->bnotes, nsi->enotes);
 		}
 		else
 		{
