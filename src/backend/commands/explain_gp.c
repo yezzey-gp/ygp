@@ -1455,6 +1455,44 @@ cdbexplain_formatSeg(char *outbuf, int bufsize, int segindex, int nInst)
 
 
 /*
+ * cdbexplain_formatAgg
+ *	  Convert CdbExplain_Agg to string.
+ *
+ *		outbuf:  		[output] pointer to a char buffer to be filled
+ *		bufsize: 		[input] maximum number of characters to write to outbuf (must be set by the caller)
+ *		CdbExplain_Agg:	[input] pointer to a struct CdbExplain_Agg
+ */
+static void
+cdbexplain_formatAgg(char *outbuf, int bufsize, CdbExplain_Agg agg)
+{
+	Assert(outbuf != NULL && "CDBEXPLAIN: char buffer is null");
+	Assert(bufsize > 0 && "CDBEXPLAIN: size of char buffer is zero");
+	/* check if truncation occurs */
+#ifdef USE_ASSERT_CHECKING
+	int			nchars_written =
+#endif							/* USE_ASSERT_CHECKING */
+	snprintf(outbuf, bufsize, "%10.0f %10.0f %10d %10d", agg.vmax, agg.vsum, agg.vcnt, agg.imax);
+
+	Assert(nchars_written < bufsize &&
+		   "CDBEXPLAIN:  size of char buffer is smaller than the required number of chars");
+}								/* cdbexplain_formatAgg */
+
+
+static void
+ExplainPropertyAgg(const char *qlabel, CdbExplain_Agg agg, ExplainState *es)
+{
+	ExplainOpenGroup(qlabel, qlabel, true, es);
+
+	ExplainPropertyFloat("vmax", agg.vmax, 0, es);
+	ExplainPropertyFloat("vsum", agg.vsum, 0, es);
+	ExplainPropertyInteger("vcnt", agg.vcnt, es);
+	ExplainPropertyInteger("imax", agg.imax, es);
+
+	ExplainCloseGroup(qlabel, qlabel, true, es);
+}
+
+
+/*
  * cdbexplain_showExecStatsBegin
  *	  Called by qDisp process to create a CdbExplain_ShowStatCtx structure
  *	  in which to accumulate overall statistics for a query.
@@ -1525,6 +1563,133 @@ nodeSupportWorkfileCaching(PlanState *planstate)
 			(IsA(planstate, AggState) &&((Agg *) planstate->plan)->aggstrategy == AGG_HASHED) ||
 			IsA(planstate, MaterialState));
 }
+
+void
+cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
+	int			i;
+	char		aggbuf[100];
+	
+	if (es->format == EXPLAIN_FORMAT_TEXT)
+	{
+		/*
+			* create a header for all stats: separate each individual stat by an
+			* underscore, separate the grouped stats for each node by a slash
+			*/
+		appendStringInfoSpaces(es->str, es->indent * 2);
+		appendStringInfoString(es->str, "Node Summary:                  vmax       vsum       vcnt       imax\n");
+
+		int ns_spaces = es->indent * 2 + 2;
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->ntuples);
+		appendStringInfo(es->str, "ntuples:               %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->execmemused);
+		appendStringInfo(es->str, "execmemused:           %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemused);
+		appendStringInfo(es->str, "workmemused:           %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemwanted);
+		appendStringInfo(es->str, "workmemwanted:         %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalWorkfileCreated);
+		appendStringInfo(es->str, "totalWorkfileCreated:  %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->peakMemBalance);
+		appendStringInfo(es->str, "peakMemBalance:        %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
+		appendStringInfo(es->str, "totalPartTableScanned: %s\n", aggbuf);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		appendStringInfo(es->str, "segindex0: %d\n", ns->segindex0);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		appendStringInfo(es->str, "ninst: %d\n", ns->ninst);
+
+		appendStringInfoSpaces(es->str, ns_spaces);
+		appendStringInfoString(es->str, "StatInsts:\n");
+		appendStringInfoSpaces(es->str, ns_spaces + 2);
+		appendStringInfoString(es->str, "(segN) pstype starttime counter firsttuple startup total ntuples nloops execmemused workmemused workmemwanted workfileCreated firststart peakMemBalance numPartScanned sortMethod sortSpaceType sortSpaceUsed bnotes enotes\n");
+	}
+	else {
+		ExplainOpenGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
+
+		ExplainPropertyAgg("ntuples", ns->ntuples, es);
+		ExplainPropertyAgg("execmemused", ns->execmemused, es);
+		ExplainPropertyAgg("workmemused", ns->workmemused, es);
+		ExplainPropertyAgg("workmemwanted", ns->workmemwanted, es);
+		ExplainPropertyAgg("totalWorkfileCreated", ns->totalWorkfileCreated, es);
+		ExplainPropertyAgg("peakMemBalance", ns->peakMemBalance, es);
+		ExplainPropertyAgg("totalPartTableScanned", ns->totalPartTableScanned, es);
+
+		ExplainPropertyInteger("segindex0", ns->segindex0, es);
+		ExplainPropertyInteger("ninst", ns->ninst, es);
+
+		ExplainOpenGroup("CdbExplain_StatInsts", "CdbExplain_StatInsts", false, es);
+	}
+	for (i = 0; i < ns->ninst; i++)
+	{
+		CdbExplain_StatInst *nsi = &ns->insts[i];
+
+		if (es->format == EXPLAIN_FORMAT_TEXT)
+		{
+			int nsi_spaces = es->indent * 2 + 4;
+
+			appendStringInfoSpaces(es->str, nsi_spaces);
+
+			appendStringInfo(es->str, "(seg%d) %d %.2f %.2f %.2f %.2f %.2f %.0f %.0f %.0f %.0f %.0f %d %.2f %.0f %d %d %d %ld %d %d\n", 
+				ns->segindex0 + i, 
+				nsi->pstype, 
+				nsi->starttime.tv_sec, nsi->counter.tv_sec, nsi->firsttuple, nsi->startup, nsi->total,
+				nsi->ntuples, nsi->nloops, nsi->execmemused, nsi->workmemused, nsi->workmemwanted,
+				nsi->workfileCreated,
+				nsi->firststart.tv_sec,
+				nsi->peakMemBalance,
+				nsi->numPartScanned, nsi->sortMethod, nsi->sortSpaceType,
+				nsi->sortSpaceUsed,
+				nsi->bnotes, nsi->enotes);
+		}
+		else
+		{
+			ExplainOpenGroup("CdbExplain_StatInst", NULL, true, es);
+			ExplainPropertyInteger("Segment", ns->segindex0 + i, es);
+			ExplainPropertyInteger("pstype", nsi->pstype, es);
+			ExplainPropertyFloat("starttime", nsi->starttime.tv_sec, 2, es);
+			ExplainPropertyFloat("counter", nsi->counter.tv_sec, 2, es);
+			ExplainPropertyFloat("firsttuple", nsi->firsttuple, 2, es);
+			ExplainPropertyFloat("startup", nsi->startup, 2, es);
+			ExplainPropertyFloat("total", nsi->total, 2, es);
+			ExplainPropertyFloat("ntuples", nsi->ntuples, 0, es);
+			ExplainPropertyFloat("nloops", nsi->nloops, 0, es);
+			ExplainPropertyFloat("execmemused", nsi->execmemused, 0, es);
+			ExplainPropertyFloat("workmemused", nsi->workmemused, 0, es);
+			ExplainPropertyFloat("workmemwanted", nsi->workmemwanted, 0, es);
+			ExplainPropertyInteger("workfileCreated", nsi->workfileCreated, es);
+			ExplainPropertyFloat("firststart", nsi->firststart.tv_sec, 2, es);
+			ExplainPropertyFloat("peakMemBalance", nsi->peakMemBalance, 0, es);
+			ExplainPropertyInteger("numPartScanned", nsi->numPartScanned, es);
+			ExplainPropertyInteger("sortMethod", nsi->sortMethod, es);
+			ExplainPropertyInteger("sortSpaceType", nsi->sortSpaceType, es);
+			ExplainPropertyLong("sortSpaceUsed", nsi->sortSpaceUsed, es);
+			ExplainPropertyInteger("bnotes", nsi->bnotes, es);
+			ExplainPropertyInteger("enotes", nsi->enotes, es);
+			ExplainCloseGroup("CdbExplain_StatInst", NULL, true, es);
+		}
+	}
+
+	if (es->format != EXPLAIN_FORMAT_TEXT) {
+		ExplainCloseGroup("CdbExplain_StatInsts", "CdbExplain_StatInsts", false, es);
+		ExplainCloseGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
+	}
+}								/* cdbexplain_NodeSummary */
 
 /*
  * cdbexplain_showExecStats
@@ -1973,6 +2138,12 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			appendStringInfoString(es->str, "//end\n");
 		else
 			ExplainCloseGroup("Allstat", "Allstat", true, es);
+	}
+	/*
+	 * Dump CdbExplain_NodeSummary
+	 */
+	if (gp_enable_explain_node_summary) {
+		cdbexplain_NodeSummary(es, ns);
 	}
 }								/* cdbexplain_showExecStats */
 
