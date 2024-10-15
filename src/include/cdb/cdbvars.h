@@ -747,6 +747,12 @@ extern bool gp_eager_preunique;
  */
 extern bool gp_enable_explain_allstat;
 
+/* May Greenplum dump node summary from CdbExplain_NodeSummary
+ * during EXPLAIN ANALYZE?
+ *
+ */
+extern bool gp_enable_explain_node_summary;
+
 /* May Greenplum restrict ORDER BY sorts to the first N rows if the ORDER BY
  * is wrapped by a LIMIT clause (where N=OFFSET+LIMIT)?
  *

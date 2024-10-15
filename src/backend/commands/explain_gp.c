@@ -1942,7 +1942,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	/*
 	 * Dump CdbExplain_NodeSummary
 	 */
-	if (gp_enable_explain_allstat) {
+	if (gp_enable_explain_node_summary) {
 		if (es->format == EXPLAIN_FORMAT_TEXT)
 		{
 			/*
@@ -1950,7 +1950,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			 * underscore, separate the grouped stats for each node by a slash
 			 */
 			appendStringInfoSpaces(es->str, es->indent * 2);
-			appendStringInfoString(es->str, "CdbExplain_NodeSummary:\n");
+			appendStringInfoString(es->str, "Node Summary:\n");
 
 			int ns_spaces = es->indent * 2 + 2;
 
@@ -1981,14 +1981,6 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
 			appendStringInfo(es->str, "totalPartTableScanned: %s\n", aggbuf);
-
-			for (int sort_space_type = 0; sort_space_type < NUM_SORT_SPACE_TYPE; sort_space_type++) {
-				for (int sort_method = 0; sort_method < NUM_SORT_METHOD; sort_method++) {
-					appendStringInfoSpaces(es->str, ns_spaces);
-					cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
-					appendStringInfo(es->str, "totalPartTableScanned[%d][%d]: %s\n", sort_space_type, sort_method, aggbuf);
-				}
-			}
 
 			appendStringInfoSpaces(es->str, ns_spaces);
 			appendStringInfo(es->str, "segindex0=%d\n", ns->segindex0);
