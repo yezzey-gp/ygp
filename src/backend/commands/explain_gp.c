@@ -1478,6 +1478,20 @@ cdbexplain_formatAgg(char *outbuf, int bufsize, CdbExplain_Agg agg)
 }								/* cdbexplain_formatAgg */
 
 
+static void
+ExplainPropertyAgg(const char *qlabel, CdbExplain_Agg agg, ExplainState *es)
+{
+	ExplainOpenGroup(qlabel, qlabel, true, es);
+
+	ExplainPropertyFloat("vmax", agg.vmax, 0, es);
+	ExplainPropertyFloat("vsum", agg.vsum, 0, es);
+	ExplainPropertyInteger("vcnt", agg.vcnt, es);
+	ExplainPropertyInteger("imax", agg.imax, es);
+
+	ExplainCloseGroup(qlabel, qlabel, true, es);
+}
+
+
 /*
  * cdbexplain_showExecStatsBegin
  *	  Called by qDisp process to create a CdbExplain_ShowStatCtx structure
@@ -1552,14 +1566,7 @@ nodeSupportWorkfileCaching(PlanState *planstate)
 
 void
 cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
-	instr_time	timediff;
 	int			i;
-
-	char		totalbuf[50];
-	char		avgbuf[50];
-	char		maxbuf[50];
-	char		segbuf[50];
-	char		startbuf[50];
 	char		aggbuf[100];
 	
 	if (es->format == EXPLAIN_FORMAT_TEXT)
@@ -1612,10 +1619,20 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 		appendStringInfoSpaces(es->str, ns_spaces + 2);
 		appendStringInfoString(es->str, "(segN) pstype starttime counter firsttuple startup total ntuples nloops execmemused workmemused workmemwanted workfileCreated firststart peakMemBalance numPartScanned sortMethod sortSpaceType sortSpaceUsed bnotes enotes\n");
 	}
-	else
+	else {
 		ExplainOpenGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
-		/// TODO CdbExplain_NodeSummary
 
+		ExplainPropertyAgg("ntuples", ns->ntuples, es);
+		ExplainPropertyAgg("execmemused", ns->execmemused, es);
+		ExplainPropertyAgg("workmemused", ns->workmemused, es);
+		ExplainPropertyAgg("workmemwanted", ns->workmemwanted, es);
+		ExplainPropertyAgg("totalWorkfileCreated", ns->totalWorkfileCreated, es);
+		ExplainPropertyAgg("peakMemBalance", ns->peakMemBalance, es);
+		ExplainPropertyAgg("totalPartTableScanned", ns->totalPartTableScanned, es);
+
+		ExplainPropertyInteger("segindex0", ns->segindex0, es);
+		ExplainPropertyInteger("ninst", ns->ninst, es);
+	}
 	for (i = 0; i < ns->ninst; i++)
 	{
 		CdbExplain_StatInst *nsi = &ns->insts[i];
