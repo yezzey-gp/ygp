@@ -1455,6 +1455,30 @@ cdbexplain_formatSeg(char *outbuf, int bufsize, int segindex, int nInst)
 
 
 /*
+ * cdbexplain_formatMemory
+ *	  Convert memory size to string from (double) bytes.
+ *
+ *		outbuf:  		[output] pointer to a char buffer to be filled
+ *		bufsize: 		[input] maximum number of characters to write to outbuf (must be set by the caller)
+ *		CdbExplain_Agg:	[input] pointer to a struct CdbExplain_Agg
+ */
+static void
+cdbexplain_formatAgg(char *outbuf, int bufsize, CdbExplain_Agg agg)
+{
+	Assert(outbuf != NULL && "CDBEXPLAIN: char buffer is null");
+	Assert(bufsize > 0 && "CDBEXPLAIN: size of char buffer is zero");
+	/* check if truncation occurs */
+#ifdef USE_ASSERT_CHECKING
+	int			nchars_written =
+#endif							/* USE_ASSERT_CHECKING */
+	snprintf(outbuf, bufsize, "vmax=%f vsum=%f vcnt=%d imax=%d", agg.vmax, agg.vsum, agg.vcnt, agg.imax);
+
+	Assert(nchars_written < bufsize &&
+		   "CDBEXPLAIN:  size of char buffer is smaller than the required number of chars");
+}								/* cdbexplain_formatAgg */
+
+
+/*
  * cdbexplain_showExecStatsBegin
  *	  Called by qDisp process to create a CdbExplain_ShowStatCtx structure
  *	  in which to accumulate overall statistics for a query.
@@ -1550,6 +1574,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	char		maxbuf[50];
 	char		segbuf[50];
 	char		startbuf[50];
+	char		aggbuf[50];
 
 	/* Might not have received stats from qExecs if they hit errors. */
 	if (!ns)
@@ -1913,6 +1938,95 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			appendStringInfoString(es->str, "//end\n");
 		else
 			ExplainCloseGroup("Allstat", "Allstat", true, es);
+	}
+	/*
+	 * Dump CdbExplain_NodeSummary
+	 */
+	if (gp_enable_explain_allstat) {
+		if (es->format == EXPLAIN_FORMAT_TEXT)
+		{
+			/*
+			 * create a header for all stats: separate each individual stat by an
+			 * underscore, separate the grouped stats for each node by a slash
+			 */
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->ntuples);
+			appendStringInfo(es->str, "ntuples: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->execmemused);
+			appendStringInfo(es->str, "execmemused: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemused);
+			appendStringInfo(es->str, "workmemused: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemwanted);
+			appendStringInfo(es->str, "workmemwanted: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalWorkfileCreated);
+			appendStringInfo(es->str, "totalWorkfileCreated: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->peakMemBalance);
+			appendStringInfo(es->str, "peakMemBalance: %s\n", aggbuf);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
+			appendStringInfo(es->str, "totalPartTableScanned: %s\n", aggbuf);
+
+			for (int sort_space_type = 0; sort_space_type < NUM_SORT_SPACE_TYPE; sort_space_type++) {
+				for (int sort_method = 0; sort_method < NUM_SORT_METHOD; sort_method++) {
+					appendStringInfoSpaces(es->str, es->indent * 2);
+					cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
+					appendStringInfo(es->str, "totalPartTableScanned[%d][%d]: %s\n", sort_space_type, sort_method, aggbuf);
+				}
+			}
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfo(es->str, "segindex0=%d\n", ns->segindex0);
+
+			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfo(es->str, "ninst=%d\n", ns->ninst);
+		}
+		else
+			ExplainOpenGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
+			/// TODO CdbExplain_NodeSummary
+
+		for (i = 0; i < ns->ninst; i++)
+		{
+			CdbExplain_StatInst *nsi = &ns->insts[i];
+
+			// if (INSTR_TIME_IS_ZERO(nsi->firststart))
+			// 	continue;
+
+			// /* Time from start of query on qDisp to worker's first result row */
+			// INSTR_TIME_SET_ZERO(timediff);
+			// INSTR_TIME_ACCUM_DIFF(timediff, nsi->firststart, ctx->querystarttime);
+
+			if (es->format == EXPLAIN_FORMAT_TEXT)
+			{
+				// cdbexplain_formatSeconds(startbuf, sizeof(startbuf),
+				// 						 INSTR_TIME_GET_DOUBLE(timediff), true);
+				// cdbexplain_formatSeconds(totalbuf, sizeof(totalbuf),
+				// 						 nsi->total, true);
+				// appendStringInfo(es->str,
+				// 				 "/seg%d_%s_%s_%.0f",
+				// 				 ns->segindex0 + i,
+				// 				 startbuf,
+				// 				 totalbuf,
+				// 				 nsi->ntuples);
+			}
+			else
+			{
+				/// TODO
+			}
+		}
+
+		if (es->format != EXPLAIN_FORMAT_TEXT)
+			ExplainCloseGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
 	}
 }								/* cdbexplain_showExecStats */
 
