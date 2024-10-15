@@ -1632,6 +1632,8 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 
 		ExplainPropertyInteger("segindex0", ns->segindex0, es);
 		ExplainPropertyInteger("ninst", ns->ninst, es);
+
+		ExplainOpenGroup("CdbExplain_StatInsts", "CdbExplain_StatInsts", false, es);
 	}
 	for (i = 0; i < ns->ninst; i++)
 	{
@@ -1649,7 +1651,7 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 				nsi->starttime.tv_sec, nsi->counter.tv_sec, nsi->firsttuple, nsi->startup, nsi->total,
 				nsi->ntuples, nsi->nloops, nsi->execmemused, nsi->workmemused, nsi->workmemwanted,
 				nsi->workfileCreated,
-				nsi->firststart,
+				nsi->firststart.tv_sec,
 				nsi->peakMemBalance,
 				nsi->numPartScanned, nsi->sortMethod, nsi->sortSpaceType,
 				nsi->sortSpaceUsed,
@@ -1657,12 +1659,36 @@ cdbexplain_NodeSummary(ExplainState *es, CdbExplain_NodeSummary *ns) {
 		}
 		else
 		{
-			/// TODO
+			ExplainOpenGroup("CdbExplain_StatInst", NULL, true, es);
+			ExplainPropertyInteger("Segment", ns->segindex0 + i, es);
+			ExplainPropertyInteger("pstype", nsi->pstype, es);
+			ExplainPropertyFloat("starttime", nsi->starttime.tv_sec, 2, es);
+			ExplainPropertyFloat("counter", nsi->counter.tv_sec, 2, es);
+			ExplainPropertyFloat("firsttuple", nsi->firsttuple, 2, es);
+			ExplainPropertyFloat("startup", nsi->startup, 2, es);
+			ExplainPropertyFloat("total", nsi->total, 2, es);
+			ExplainPropertyFloat("ntuples", nsi->ntuples, 0, es);
+			ExplainPropertyFloat("nloops", nsi->nloops, 0, es);
+			ExplainPropertyFloat("execmemused", nsi->execmemused, 0, es);
+			ExplainPropertyFloat("workmemused", nsi->workmemused, 0, es);
+			ExplainPropertyFloat("workmemwanted", nsi->workmemwanted, 0, es);
+			ExplainPropertyInteger("workfileCreated", nsi->workfileCreated, es);
+			ExplainPropertyFloat("firststart", nsi->firststart.tv_sec, 2, es);
+			ExplainPropertyFloat("peakMemBalance", nsi->peakMemBalance, 0, es);
+			ExplainPropertyInteger("numPartScanned", nsi->numPartScanned, es);
+			ExplainPropertyInteger("sortMethod", nsi->sortMethod, es);
+			ExplainPropertyInteger("sortSpaceType", nsi->sortSpaceType, es);
+			ExplainPropertyLong("sortSpaceUsed", nsi->sortSpaceUsed, es);
+			ExplainPropertyInteger("bnotes", nsi->bnotes, es);
+			ExplainPropertyInteger("enotes", nsi->enotes, es);
+			ExplainCloseGroup("CdbExplain_StatInst", NULL, true, es);
 		}
 	}
 
-	if (es->format != EXPLAIN_FORMAT_TEXT)
+	if (es->format != EXPLAIN_FORMAT_TEXT) {
+		ExplainCloseGroup("CdbExplain_StatInsts", "CdbExplain_StatInsts", false, es);
 		ExplainCloseGroup("CdbExplain_NodeSummary", "CdbExplain_NodeSummary", true, es);
+	}
 }								/* cdbexplain_NodeSummary */
 
 /*
@@ -1689,7 +1715,6 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	char		maxbuf[50];
 	char		segbuf[50];
 	char		startbuf[50];
-	char		aggbuf[100];
 
 	/* Might not have received stats from qExecs if they hit errors. */
 	if (!ns)
