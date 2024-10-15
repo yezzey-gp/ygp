@@ -1471,7 +1471,7 @@ cdbexplain_formatAgg(char *outbuf, int bufsize, CdbExplain_Agg agg)
 #ifdef USE_ASSERT_CHECKING
 	int			nchars_written =
 #endif							/* USE_ASSERT_CHECKING */
-	snprintf(outbuf, bufsize, "vmax=%f vsum=%f vcnt=%d imax=%d", agg.vmax, agg.vsum, agg.vcnt, agg.imax);
+	snprintf(outbuf, bufsize, "vmax=%.2f vsum=%.2f vcnt=%d imax=%d", agg.vmax, agg.vsum, agg.vcnt, agg.imax);
 
 	Assert(nchars_written < bufsize &&
 		   "CDBEXPLAIN:  size of char buffer is smaller than the required number of chars");
@@ -1574,7 +1574,7 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 	char		maxbuf[50];
 	char		segbuf[50];
 	char		startbuf[50];
-	char		aggbuf[50];
+	char		aggbuf[100];
 
 	/* Might not have received stats from qExecs if they hit errors. */
 	if (!ns)
@@ -1950,45 +1950,50 @@ cdbexplain_showExecStats(struct PlanState *planstate, ExplainState *es)
 			 * underscore, separate the grouped stats for each node by a slash
 			 */
 			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoString(es->str, "CdbExplain_NodeSummary:\n");
+
+			int ns_spaces = es->indent * 2 + 2;
+
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->ntuples);
 			appendStringInfo(es->str, "ntuples: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->execmemused);
 			appendStringInfo(es->str, "execmemused: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemused);
 			appendStringInfo(es->str, "workmemused: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->workmemwanted);
 			appendStringInfo(es->str, "workmemwanted: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalWorkfileCreated);
 			appendStringInfo(es->str, "totalWorkfileCreated: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->peakMemBalance);
 			appendStringInfo(es->str, "peakMemBalance: %s\n", aggbuf);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
 			appendStringInfo(es->str, "totalPartTableScanned: %s\n", aggbuf);
 
 			for (int sort_space_type = 0; sort_space_type < NUM_SORT_SPACE_TYPE; sort_space_type++) {
 				for (int sort_method = 0; sort_method < NUM_SORT_METHOD; sort_method++) {
-					appendStringInfoSpaces(es->str, es->indent * 2);
+					appendStringInfoSpaces(es->str, ns_spaces);
 					cdbexplain_formatAgg(aggbuf, sizeof(aggbuf), ns->totalPartTableScanned);
 					appendStringInfo(es->str, "totalPartTableScanned[%d][%d]: %s\n", sort_space_type, sort_method, aggbuf);
 				}
 			}
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			appendStringInfo(es->str, "segindex0=%d\n", ns->segindex0);
 
-			appendStringInfoSpaces(es->str, es->indent * 2);
+			appendStringInfoSpaces(es->str, ns_spaces);
 			appendStringInfo(es->str, "ninst=%d\n", ns->ninst);
 		}
 		else
