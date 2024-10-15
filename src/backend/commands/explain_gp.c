@@ -1455,8 +1455,8 @@ cdbexplain_formatSeg(char *outbuf, int bufsize, int segindex, int nInst)
 
 
 /*
- * cdbexplain_formatMemory
- *	  Convert memory size to string from (double) bytes.
+ * cdbexplain_formatAgg
+ *	  Convert CdbExplain_Agg to string.
  *
  *		outbuf:  		[output] pointer to a char buffer to be filled
  *		bufsize: 		[input] maximum number of characters to write to outbuf (must be set by the caller)
