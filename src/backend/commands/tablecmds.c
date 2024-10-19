@@ -15674,11 +15674,11 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 			 errmsg("SET DISTRIBUTED BY not supported in utility mode")));
 	/*
 	 * SET DISTRIBUTED BY only change the distribution policy, but should not
-	 * change numsegments, keep the old value.
+	 * change numsegments, keep the old value, if not explicitly specified.
 	 */
 	numsegments = rel->rd_cdbpolicy->numsegments;
 
-	if (Gp_role == GP_ROLE_DISPATCH && ldistro)
+	if (Gp_role == GP_ROLE_DISPATCH && ldistro && ldistro->numsegments == -1)
 		ldistro->numsegments = numsegments;
 
 	/* we only support partitioned/replicated tables */

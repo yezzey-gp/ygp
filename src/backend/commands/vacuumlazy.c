@@ -455,11 +455,6 @@ lazy_vacuum_aorel(Relation onerel, VacuumStmt *vacstmt)
 	LVRelStats *vacrelstats;
 	bool		update_relstats = true;
 
-	if (onerel->rd_node.spcNode == YEZZEYTABLESPACE_OID) {
-		// elog(WARNING, "Use REORGANIZE for offloaded (yezzey) relations. NO action performed");
-		// return;
-	}
-
 	vacrelstats = (LVRelStats *) palloc0(sizeof(LVRelStats));
 
 	switch (vacstmt->appendonly_phase)

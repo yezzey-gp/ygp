@@ -536,7 +536,8 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <list>	constraints_set_list
 %type <boolean> constraints_set_mode
 %type <str>		OptTableSpace OptConsTableSpace OptTableSpaceOwner
-%type <node>    DistributedBy OptDistributedBy 
+%type <node>    DistributedBy OptDistributedBy
+%type <ival>    optNumsegments
 %type <ival>	TabPartitionByType OptTabPartitionRangeInclusive
 %type <node>	OptTabPartitionBy TabSubPartitionBy TabSubPartition
 				tab_part_val tab_part_val_no_paran
@@ -4856,19 +4857,30 @@ OptConsTableSpace:   USING INDEX TABLESPACE name	{ $$ = $4; }
 ExistingIndex:   USING INDEX index_name				{ $$ = $3; }
 		;
 
-DistributedBy:   DISTRIBUTED BY  '(' distributed_by_list ')'
+optNumsegments:
+	SEGMENTS ICONST
+	{
+		$$ = $2;
+	}
+	| /*nothing*/
+	{
+		$$ = -1;
+	}
+	;
+
+DistributedBy:   DISTRIBUTED BY  '(' distributed_by_list ')' optNumsegments
 			{
 				DistributedBy *distributedBy = makeNode(DistributedBy);
 				distributedBy->ptype = POLICYTYPE_PARTITIONED;
-				distributedBy->numsegments = -1;
+				distributedBy->numsegments = $6;
 				distributedBy->keyCols = $4;
 				$$ = (Node *)distributedBy;
 			}
-			| DISTRIBUTED RANDOMLY
+			| DISTRIBUTED RANDOMLY optNumsegments
 			{
 				DistributedBy *distributedBy = makeNode(DistributedBy);
 				distributedBy->ptype = POLICYTYPE_PARTITIONED;
-				distributedBy->numsegments = -1;
+				distributedBy->numsegments = $3;
 				distributedBy->keyCols = NIL;
 				$$ = (Node *)distributedBy;
 			}
