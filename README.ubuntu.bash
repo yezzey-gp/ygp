@@ -36,6 +36,7 @@ apt-get install -y  python-pip
 apt-get install -y  python-psutil 
 apt-get install -y  python-yaml 
 apt-get install -y  zlib1g-dev
+ln -s /bin/python2.7 /usr/bin/python
 
 pip2 install conan
 
