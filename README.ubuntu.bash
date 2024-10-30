@@ -30,6 +30,7 @@ apt-get install -y  ninja-build
 apt-get install -y  openssh-client 
 apt-get install -y  openssh-server 
 apt-get install -y  openssl 
+apt-get install -y  python2-dev
 apt-get install -y  python-dev 
 apt-get install -y  python-pip 
 apt-get install -y  python-psutil 
