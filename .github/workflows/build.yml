@@ -37,7 +37,7 @@ jobs:
 
         export GPHOME=/usr/local/gpdb/
         export PATH=$PATH:/usr/local/gpdb/bin
-        make -d
+        make 
         make && make install
     
     - name: Check
