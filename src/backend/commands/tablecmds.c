@@ -5864,9 +5864,11 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation *rel_p,
 		case AT_ShrinkTable:	/* SHRINK TABLE */
 			switch (cmd->def->type) {
 				case T_ExpandStmtSpec:
+					ATExecExpandPartitionTablePrepare(rel, ((ExpandStmtSpec*)(cmd->def))->numseg);
 					ATExecExpandTable(wqueue, rel, cmd, ((ExpandStmtSpec*)(cmd->def))->numseg);
 					break;
 				default:
+					ATExecExpandPartitionTablePrepare(rel, intVal(cmd->def));
 					ATExecExpandTable(wqueue, rel, cmd, intVal(cmd->def));
 					break;
 			}
