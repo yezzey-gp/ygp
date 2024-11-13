@@ -355,6 +355,9 @@ class InvalidStatusError(Exception): pass
 class ValidationError(Exception): pass
 
 
+class ExpansionError(Exception): pass
+
+
 # -------------------------------------------------------------------------
 class gpshrinkStatus():
     """Class that manages gpshrink status file.
@@ -375,7 +378,7 @@ class gpshrinkStatus():
                                'PREPARE_SHRINK_SCHEMA_STARTED': 7,
                                'PREPARE_SHRINK_SCHEMA_DONE': 8,
                                'SHRINK_PREPARE_DONE': 9,
-                               'SHRINK_PERFOEM_STARTED':10,
+                               'SHRINK_PERFORM_STARTED':10,
                                'SHRINK_TABLE_STARTED': 11,
                                'SHRINK_TABLE_DONE': 12,
                                'SHRINK_CATALOG_STARTED': 13,
@@ -595,9 +598,10 @@ class gpshrink:
             try:
                 status_conn = dbconn.connect(dburl, encoding='UTF8')
                 # Get the last status entry
-                cursor = dbconn.query(status_conn, 'SELECT status FROM gpshrink.status ORDER BY updated DESC LIMIT 1')
+                cursor = dbconn.execSQL(status_conn, 'SELECT status FROM gpshrink.status ORDER BY updated DESC LIMIT 1')
                 if cursor.rowcount == 1:
                     gpshrink_db_status = cursor.fetchone()[0]
+                status_conn.commit()
 
             except Exception:
                 # shrink schema doesn't exists or there was a connection failure.
@@ -628,6 +632,7 @@ class gpshrink:
                     raise ShrinkError(
                         "Existing shrink state could not be determined, but a gpshrink schema already exists. Cannot proceed.")
             finally:
+                conn.commit()
                 conn.close()
 
         return gpshrink_db_status
@@ -806,6 +811,13 @@ class gpshrink:
         
         self.statusLogger.set_status('SHRINK_CATALOG_STARTED')
 
+        # Mark expansion segment primaries not in sync
+        for seg in self.gparray.getShrinkSegDbList():
+            if seg.isSegmentMirror() == True:
+                continue
+            if not self.gparray.get_mirroring_enabled():
+                seg.setSegmentMode(MODE_NOT_SYNC)
+
         # Update the catalog
         configurationInterface.getConfigurationProvider().updateSystemConfig(
             self.gparray,
@@ -823,6 +835,7 @@ class gpshrink:
         # increase expand version 
         self.conn = dbconn.connect(self.dburl, utility=True, encoding='UTF8')
         dbconn.execSQL(self.conn, "select gp_expand_bump_version()")
+        self.conn.commit()
         self.conn.close()
 
         self.statusLogger.set_status('SHRINK_CATALOG_DONE')
@@ -869,6 +882,7 @@ class gpshrink:
         else:
             dbconn.execSQL(self.conn, progress_view_simple_sql)
 
+        self.conn.commit()
         self.statusLogger.set_status('SETUP_SHRINK_SCHEMA_DONE')
 
     def prepare_schema(self):
@@ -883,6 +897,7 @@ class gpshrink:
         statusSQL = "INSERT INTO gpshrink.status VALUES ( 'SETUP', '%s' ) " % (nowStr)
 
         dbconn.execSQL(self.conn, statusSQL)
+        self.conn.commit()
 
         db_list = catalog.getDatabaseList(self.conn)
 
@@ -898,6 +913,7 @@ class gpshrink:
         nowStr = datetime.datetime.now()
         statusSQL = "INSERT INTO gpshrink.status VALUES ( 'SETUP DONE', '%s' ) " % (nowStr)
         dbconn.execSQL(self.conn, statusSQL)
+        self.conn.commit()
 
         self.conn.close()
 
@@ -945,6 +961,7 @@ class gpshrink:
 
             self.logger.debug(copySQL)
             dbconn.execSQL(table_conn, copySQL)
+            table_conn.commit()
             table_conn.close()
         except Exception as e:
             raise ShrinkError(e)
@@ -954,6 +971,7 @@ class gpshrink:
 
             self.logger.debug(copySQL)
             dbconn.execSQL(self.conn, copySQL)
+            self.conn.commit()
         except Exception as e:
             self.logger.debug(str(e))
             raise ShrinkError(e)
@@ -1039,6 +1057,7 @@ class gpshrink:
         cursor = dbconn.execSQL(table_conn, """
             SELECT DISTINCT parrelid::regclass AS relname FROM pg_partition;
         """)
+        table_conn.commit()
         for row in cursor:
             prepare_cmd = """
                 ALTER TABLE %s EXPAND PARTITION PREPARE;
@@ -1047,7 +1066,7 @@ class gpshrink:
             dbconn.execSQL(table_conn, prepare_cmd)
             table_conn.commit()
 
-        # We need populate all leaf table to gpexpand.status_detail
+        # We need populate all leaf table to gpshrink.status_detail
         get_status_detail_cmd = """
              SELECT
                 c.oid as table_oid,
@@ -1089,10 +1108,11 @@ class gpshrink:
             raise ExpansionError(e)
 
         try:
-            copySQL = """COPY gpexpand.status_detail FROM '%s'""" % (data_file)
+            copySQL = """COPY gpshrink.status_detail FROM '%s'""" % (data_file)
 
             self.logger.debug(copySQL)
             dbconn.execSQL(self.conn, copySQL)
+            self.conn.commit()
         except Exception, e:
             raise ExpansionError(e)
         finally:
@@ -1114,7 +1134,7 @@ class gpshrink:
 
     def perform_shrink(self):
         """Performs the actual table re-organizations"""
-        self.statusLogger.set_status('SHRINK_PERFOEM_STARTED')
+        self.statusLogger.set_status('SHRINK_PERFORM_STARTED')
         self.statusLogger.set_status('SHRINK_TABLE_STARTED')
 
         shrinkStart = datetime.datetime.now()
@@ -1130,10 +1150,12 @@ class gpshrink:
 
         sql = """UPDATE gpshrink.status_detail set status = '%s' WHERE status = '%s' """ % (undone_status, start_status)
         dbconn.execSQL(self.conn, sql)
+        self.conn.commit()
 
         # read schema and queue up commands
         sql = "SELECT * FROM gpshrink.status_detail WHERE status = 'NOT STARTED' ORDER BY rank"
-        cursor = dbconn.query(self.conn, sql)
+        cursor = dbconn.execSQL(self.conn, sql)
+        self.conn.commit()
 
         for row in cursor:
             self.logger.debug(row)
@@ -1176,6 +1198,7 @@ class gpshrink:
             sql = "INSERT INTO gpshrink.status VALUES ( 'SHRINK STOPPED', '%s' ) " % (
                 shrinkStopped)
             dbconn.execSQL(self.conn, sql)
+            self.conn.commit()
             logger.info('You can resume shrink by running gpshrink again')
         elif table_shrink_error:
             logger.warn('**************************************************')
@@ -1190,15 +1213,16 @@ class gpshrink:
                 sql = "INSERT INTO gpshrink.status VALUES ( 'SHRINK STOPPED', '%s' ) " % (
                     shrinkStopped)
                 dbconn.execSQL(self.conn, sql)
+                self.conn.commit()
             except:
                 pass
         else:
             sql = "INSERT INTO gpshrink.status VALUES ( 'SHRINK COMPLETE', '%s' ) " % (
                 shrinkStopped)
             dbconn.execSQL(self.conn, sql)
+            self.conn.commit()
             logger.info("SHRINK COMPLETED SUCCESSFULLY")
 
-        self.conn.commit()
         self.conn.close()
         self.statusLogger.set_status('SHRINK_TABLE_DONE')
 
@@ -1218,6 +1242,7 @@ class gpshrink:
             sql = "INSERT INTO gpshrink.status VALUES ( 'SHRINK STOPPED', '%s' ) " % (
                 shrinkStopped)
             dbconn.execSQL(self.conn, sql)
+            self.conn.commit()
             self.conn.close()
         except pg.OperationalError:
             pass
@@ -1290,11 +1315,10 @@ class ShrinkTable():
     def __init__(self, options, row=None, size = 0):
         self.options = options
         if row is not None:
-            (self.dbname, self.fq_name, self.table_oid,
-             self.root_partition_oid,
-             self.rank, self.external_writable, self.status,
-             self.shrink_started, self.shrink_finished,
-             self.source_bytes) = row
+            (self.table_oid, self.dbname, self.fq_name, 
+             self.root_partition_oid, self.rank, self.external_writable, 
+             self.status, self.shrink_started, self.shrink_finished,
+             self.source_bytes, self.rel_storage) = row
         self.size = size
 
     def add_table(self, conn):
@@ -1309,13 +1333,15 @@ class ShrinkTable():
         logger.info('Added table %s.%s' % (self.dbname.decode('utf-8'), self.fq_name.decode('utf-8')))
         logger.debug(insertSQL.decode('utf-8'))
         dbconn.execSQL(conn, insertSQL)
+        conn.commit()
 
     def mark_started(self, status_conn, table_conn, start_time, cancel_flag):
         if cancel_flag:
             return
         sql = "SELECT pg_relation_size(%s)" % (self.table_oid)
-        row = dbconn.queryRow(table_conn, sql)
-        src_bytes = int(row[0])
+        row = dbconn.execSQL(table_conn, sql)
+        src_bytes = int(row.fetchone()[0])
+        table_conn.commit()
         logger.debug(" Table: %s has %d bytes" % (self.fq_name, src_bytes))
 
         sql = """UPDATE gpshrink.status_detail
@@ -1328,6 +1354,7 @@ class ShrinkTable():
 
         logger.debug("Mark Started: " + sql)
         dbconn.execSQL(status_conn, sql)
+        status_conn.commit()
 
     def reset_started(self, status_conn):
         sql = """UPDATE gpshrink.status_detail
@@ -1338,6 +1365,7 @@ class ShrinkTable():
 
         logger.debug('Resetting detailed_status: %s' % sql)
         dbconn.execSQL(status_conn, sql)
+        status_conn.commit()
 
     def shrink(self, table_conn, cancel_flag):
         # shrink leaf partitions separately in parallel
@@ -1362,6 +1390,7 @@ class ShrinkTable():
                 sql = 'ANALYZE %s' % (self.fq_name)
                 logger.info('Analyzing %s' % (self.fq_name))
                 dbconn.execSQL(table_conn, sql)
+                table_conn.commit()
 
             return True
 
@@ -1376,6 +1405,7 @@ class ShrinkTable():
                                             self.dbname.replace("'", "''"), self.table_oid)
         logger.debug(sql)
         dbconn.execSQL(status_conn, sql)
+        status_conn.commit()
 
     def mark_does_not_exist(self, status_conn, finish_time):
         sql = """UPDATE gpshrink.status_detail
@@ -1385,6 +1415,7 @@ class ShrinkTable():
                                             self.dbname.replace("'", "''"), self.table_oid)
         logger.debug(sql)
         dbconn.execSQL(status_conn, sql)
+        status_conn.commit()
 
 def sig_handler(sig, arg):
     if _gp_shrink is not None:
@@ -1433,7 +1464,8 @@ class ShrinkCommand(SQLCommand):
         try:
             sql = """select * from pg_class c where c.oid = %d """ % (self.table.table_oid)
 
-            cursor = dbconn.query(table_conn, sql)
+            cursor = dbconn.execSQL(table_conn, sql)
+            table_conn.commit()
 
             if cursor.rowcount == 0:
                 logger.info('%s no longer exists in database %s' % (self.table.fq_name,
@@ -1627,7 +1659,7 @@ def main(options, args, parser):
             _gp_shrink.shutdown()
         sys.exit()
     except Exception as e:
-        logger.error('Exeception happens: %s', e)
+        logger.error('Exception happens: %s', e)
         if _gp_shrink is not None:
             _gp_shrink.shutdown()
         if not (gpshrink_db_status is None):

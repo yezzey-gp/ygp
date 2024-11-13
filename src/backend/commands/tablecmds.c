@@ -5862,7 +5862,14 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation *rel_p,
 			ATExecExpandPartitionTablePrepare(rel, getgpsegmentCount());
 			break;
 		case AT_ShrinkTable:	/* SHRINK TABLE */
-			ATExecExpandTable(wqueue, rel, cmd, intVal(cmd->def));
+			switch (cmd->def->type) {
+				case T_ExpandStmtSpec:
+					ATExecExpandTable(wqueue, rel, cmd, ((ExpandStmtSpec*)(cmd->def))->numseg);
+					break;
+				default:
+					ATExecExpandTable(wqueue, rel, cmd, intVal(cmd->def));
+					break;
+			}
 			break;
 			/* CDB: Partitioned Table commands */
 		case AT_PartAdd:				/* Add */
