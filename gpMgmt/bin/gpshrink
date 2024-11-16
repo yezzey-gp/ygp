@@ -908,7 +908,7 @@ class gpshrink:
             self.logger.info('Populating gpshrink.status_detail with data from database %s' % (
                 dbname))
             self._populate_regular_tables(dbname)
-            self._populate_partitioned_tables(dbname)
+            #self._populate_partitioned_tables(dbname)
 
         nowStr = datetime.datetime.now()
         statusSQL = "INSERT INTO gpshrink.status VALUES ( 'SETUP DONE', '%s' ) " % (nowStr)
@@ -944,8 +944,7 @@ class gpshrink:
            LEFT JOIN pg_partition_rule pr on (c.oid=pr.parchildrelid)
            LEFT JOIN pg_exttable pe on (c.oid=pe.reloid and pe.writable)
                 WHERE
-                   pp.parrelid is NULL
-               AND pr.parchildrelid is NULL
+               pr.parchildrelid is NULL
                AND n.nspname != 'pg_bitmapindex'
                AND c.relpersistence != 't'
                AND c.relpersistence != 'u'
