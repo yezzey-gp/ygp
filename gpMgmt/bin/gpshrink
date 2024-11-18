@@ -908,7 +908,6 @@ class gpshrink:
             self.logger.info('Populating gpshrink.status_detail with data from database %s' % (
                 dbname))
             self._populate_regular_tables(dbname)
-            #self._populate_partitioned_tables(dbname)
 
         nowStr = datetime.datetime.now()
         statusSQL = "INSERT INTO gpshrink.status VALUES ( 'SETUP DONE', '%s' ) " % (nowStr)
@@ -1026,97 +1025,6 @@ class gpshrink:
         """
         return final_sql.format(cte_sql=cte_sql,
                                 orig_sql=sql)
-
-    def _populate_partitioned_tables(self, dbname):
-        """
-        The policy of leaves can be different of the policy of root, But it must
-        follow below rules:
-        If a partitioned table is Hash distributed, then all its leaf partitions
-        must also be Hash partitioned on the same distribution key, with the
-        same 'numsegments', or randomly distributed with the same 'numsegments'.
-        If a partitioned table is Randomly distributed, then all the leaves must
-        be randomly distributed as well.
-
-        population of status_detail for partitioned tables, leaf partition can
-        has different policy with root partition, we need to expand leaf
-        partitions separately in parallel.
-
-        Step1:
-           BEGIN;
-           Lock all root/interior/leaf partitions
-           Change all numsegments of root/interior/leaf partitions to size of cluster;
-           Change all leaf partition to random distributed;
-           COMMIT;
-        Step2:
-           Change all leaf partition's policy back to parent's policy with set distributed
-           with(REORGANIZE=true)
-        """
-        table_conn = self.connect_database(dbname)
-
-        cursor = dbconn.execSQL(table_conn, """
-            SELECT DISTINCT parrelid::regclass AS relname FROM pg_partition;
-        """)
-        table_conn.commit()
-        for row in cursor:
-            prepare_cmd = """
-                ALTER TABLE %s EXPAND PARTITION PREPARE;
-            """ % (row[0])
-            self.logger.debug(prepare_cmd)
-            dbconn.execSQL(table_conn, prepare_cmd)
-            table_conn.commit()
-
-        # We need populate all leaf table to gpshrink.status_detail
-        get_status_detail_cmd = """
-             SELECT
-                c.oid as table_oid,
-                current_database() as dbname,
-                quote_ident(n.nspname) || '.' || quote_ident(c.relname) as fq_name,
-                d.oid as root_partition_oid,
-                2 as rank,
-                pe.writable is not null as external_writable,
-                '%s' as undone_status,
-                NULL as expansion_started,
-                NULL as expansion_finished,
-                0 as source_bytes,
-                c.relstorage as rel_storage
-            FROM
-                pg_class c
-                JOIN pg_inherits a on (a.inhrelid = c.oid)
-                JOIN pg_partitions pa on (c.oid = (quote_ident(pa.schemaname) || '.' || quote_ident(pa.partitiontablename))::regclass::oid)
-                JOIN pg_class d on (a.inhparent = d.oid)
-                JOIN pg_namespace n on (c.relnamespace = n.oid)
-                LEFT JOIN pg_exttable pe on (c.oid=pe.reloid and pe.writable)
-            where
-                c.relhassubclass = false
-        """ % undone_status
-
-        if not self.options.simple_progress:
-            get_status_detail_cmd = self.generate_sql_to_populate_table_size(get_status_detail_cmd)
-        self.logger.debug(get_status_detail_cmd)
-
-        try:
-            data_file = os.path.abspath('./status_detail.dat')
-            self.logger.debug('status_detail data file: %s' % data_file)
-            copySQL = """COPY (%s) TO '%s'""" % (get_status_detail_cmd, data_file)
-
-            self.logger.debug(copySQL)
-            dbconn.execSQL(table_conn, copySQL)
-            table_conn.commit()
-            table_conn.close()
-        except Exception, e:
-            raise ExpansionError(e)
-
-        try:
-            copySQL = """COPY gpshrink.status_detail FROM '%s'""" % (data_file)
-
-            self.logger.debug(copySQL)
-            dbconn.execSQL(self.conn, copySQL)
-            self.conn.commit()
-        except Exception, e:
-            raise ExpansionError(e)
-        finally:
-            os.unlink(data_file)
-
 
     def compute_shrink_size(self):
         """Compute we need to shrink the cluster to actual size """
