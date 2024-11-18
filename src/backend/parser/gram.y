@@ -742,7 +742,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	RANDOMLY READABLE READS REJECT_P REPLICATED RESOURCE
 	ROLLUP ROOTPARTITION
 
-	SCATTER SEGMENT SEGMENTS SETS SPLIT SQL SUBPARTITION
+	SCATTER SEGMENT SEGMENTS SETS SHRINK SPLIT SQL SUBPARTITION
 
 	THRESHOLD TIES
 
@@ -3040,6 +3040,14 @@ alter_table_cmd:
 				{
 					AlterTableCmd *n = makeNode(AlterTableCmd);
 					n->subtype = AT_ExpandPartitionTablePrepare;
+					$$ = (Node *)n;
+				}
+			/* ALTER TABLE <name> SHRINK TABLE TO <segmentnum>*/
+			| SHRINK TABLE TO SignedIconst
+				{
+					AlterTableCmd *n = makeNode(AlterTableCmd);
+					n->subtype = AT_ShrinkTable;
+					n->def = (Node *) makeInteger($4);
 					$$ = (Node *)n;
 				}
 			/* ALTER TABLE <name> OF <type_name> */
@@ -15968,6 +15976,7 @@ unreserved_keyword:
 			| SET
 			| SHARE
 			| SHOW
+			| SHRINK
 			| SIMPLE
 			| SNAPSHOT
 			| SPLIT
