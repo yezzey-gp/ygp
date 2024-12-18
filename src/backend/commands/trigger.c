@@ -68,6 +68,16 @@ int			SessionReplicationRole = SESSION_REPLICATION_ROLE_ORIGIN;
 
 /* How many levels deep into trigger execution are we? */
 static int	MyTriggerDepth = 0;
+
+/*
+ * Note that similar macros also exists in executor/execMain.c.  There does not
+ * appear to be any good header to put it into, given the structures that it
+ * uses, so we let them be duplicated.  Be sure to update both if one needs to
+ * be changed, however.
+ */
+#define GetUpdatedColumns(relinfo, estate) \
+	(rt_fetch((relinfo)->ri_RangeTableIndex, (estate)->es_range_table)->updatedCols)
+
 /* Local function prototypes */
 static void ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid);
 static void SetTriggerFlags(TriggerDesc *trigdesc, Trigger *trigger);
@@ -2407,7 +2417,7 @@ ExecBSUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 	TriggerDesc *trigdesc;
 	int			i;
 	TriggerData LocTriggerData;
-	Bitmapset  *modifiedCols;
+	Bitmapset  *updatedCols;
 
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
@@ -2422,7 +2432,7 @@ ExecBSUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 	if (!trigdesc->trig_update_before_statement)
 		return;
 
-	modifiedCols = GetModifiedColumns(relinfo, estate);
+	updatedCols = GetUpdatedColumns(relinfo, estate);
 
 	LocTriggerData.type = T_TriggerData;
 	LocTriggerData.tg_event = TRIGGER_EVENT_UPDATE |
@@ -2443,7 +2453,7 @@ ExecBSUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 								  TRIGGER_TYPE_UPDATE))
 			continue;
 		if (!TriggerEnabled(estate, relinfo, trigger, LocTriggerData.tg_event,
-							modifiedCols, NULL, NULL))
+							updatedCols, NULL, NULL))
 			continue;
 
 		LocTriggerData.tg_trigger = trigger;
@@ -2468,7 +2478,7 @@ ExecASUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 	if (trigdesc && trigdesc->trig_update_after_statement)
 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_UPDATE,
 							  false, NULL, NULL, NIL,
-							  GetModifiedColumns(relinfo, estate));
+							  GetUpdatedColumns(relinfo, estate));
 }
 
 TupleTableSlot *
@@ -2486,7 +2496,7 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 	HeapTuple	oldtuple;
 	TupleTableSlot *newSlot;
 	int			i;
-	Bitmapset  *modifiedCols;
+	Bitmapset  *updatedCols;
 	Bitmapset  *keyCols;
 	LockTupleMode lockmode;
 
@@ -2495,10 +2505,10 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 	 * been modified, then we can use a weaker lock, allowing for better
 	 * concurrency.
 	 */
-	modifiedCols = GetModifiedColumns(relinfo, estate);
+	updatedCols = GetUpdatedColumns(relinfo, estate);
 	keyCols = RelationGetIndexAttrBitmap(relinfo->ri_RelationDesc,
 										 INDEX_ATTR_BITMAP_KEY);
-	if (bms_overlap(keyCols, modifiedCols))
+	if (bms_overlap(keyCols, updatedCols))
 		lockmode = LockTupleExclusive;
 	else
 		lockmode = LockTupleNoKeyExclusive;
@@ -2556,7 +2566,7 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 								  TRIGGER_TYPE_UPDATE))
 			continue;
 		if (!TriggerEnabled(estate, relinfo, trigger, LocTriggerData.tg_event,
-							modifiedCols, trigtuple, newtuple))
+							updatedCols, trigtuple, newtuple))
 			continue;
 
 		LocTriggerData.tg_trigtuple = trigtuple;
@@ -2628,7 +2638,7 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 
 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_UPDATE,
 							  true, trigtuple, newtuple, recheckIndexes,
-							  GetModifiedColumns(relinfo, estate));
+							  GetUpdatedColumns(relinfo, estate));
 		if (trigtuple != fdw_trigtuple)
 			heap_freetuple(trigtuple);
 	}
