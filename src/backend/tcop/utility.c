@@ -86,6 +86,7 @@ static void ProcessUtilitySlow(Node *parsetree,
 				   const char *queryString,
 				   ProcessUtilityContext context,
 				   ParamListInfo params,
+				   QueryEnvironment *queryEnv,
 				   DestReceiver *dest,
 				   char *completionTag);
 static void ExecDropStmt(DropStmt *stmt, bool isTopLevel);
@@ -357,6 +358,7 @@ ProcessUtility(Node *parsetree,
 			   const char *queryString,
 			   ProcessUtilityContext context,
 			   ParamListInfo params,
+			   QueryEnvironment *queryEnv,
 			   DestReceiver *dest,
 			   char *completionTag)
 {
@@ -369,11 +371,11 @@ ProcessUtility(Node *parsetree,
 	 */
 	if (ProcessUtility_hook)
 		(*ProcessUtility_hook) (parsetree, queryString,
-								context, params,
+								context, params, queryEnv,
 								dest, completionTag);
 	else
 		standard_ProcessUtility(parsetree, queryString,
-								context, params,
+								context, params, queryEnv,
 								dest, completionTag);
 }
 
@@ -393,6 +395,7 @@ standard_ProcessUtility(Node *parsetree,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
+						QueryEnvironment *queryEnv,
 						DestReceiver *dest,
 						char *completionTag)
 {
@@ -785,7 +788,7 @@ standard_ProcessUtility(Node *parsetree,
 			break;
 
 		case T_ExplainStmt:
-			ExplainQuery((ExplainStmt *) parsetree, queryString, params, dest);
+			ExplainQuery((ExplainStmt *) parsetree, queryString, params, queryEnv, dest);
 			break;
 
 		case T_AlterSystemStmt:
@@ -981,7 +984,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsGrantObjectType(stmt->objtype))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecuteGrantStmt((GrantStmt *) parsetree);
@@ -994,7 +997,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->removeType))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecDropStmt(stmt, isTopLevel);
@@ -1007,7 +1010,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->renameType))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecRenameStmt(stmt);
@@ -1020,7 +1023,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->objectType))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecAlterObjectSchemaStmt(stmt, NULL);
@@ -1033,7 +1036,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->objectType))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecAlterOwnerStmt(stmt);
@@ -1049,7 +1052,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->objtype))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					CommentObject((CommentStmt *) parsetree);
@@ -1062,7 +1065,7 @@ standard_ProcessUtility(Node *parsetree,
 
 				if (EventTriggerSupportsObjectType(stmt->objtype))
 					ProcessUtilitySlow(parsetree, queryString,
-									   context, params,
+									   context, params, queryEnv,
 									   dest, completionTag);
 				else
 					ExecSecLabelStmt(stmt);
@@ -1072,7 +1075,7 @@ standard_ProcessUtility(Node *parsetree,
 		default:
 			/* All other statement types have event trigger support */
 			ProcessUtilitySlow(parsetree, queryString,
-							   context, params,
+							   context, params, queryEnv,
 							   dest, completionTag);
 			break;
 	}
@@ -1088,6 +1091,7 @@ ProcessUtilitySlow(Node *parsetree,
 				   const char *queryString,
 				   ProcessUtilityContext context,
 				   ParamListInfo params,
+				   QueryEnvironment *queryEnv,
 				   DestReceiver *dest,
 				   char *completionTag)
 {
@@ -1328,6 +1332,7 @@ ProcessUtilitySlow(Node *parsetree,
 										   queryString,
 										   PROCESS_UTILITY_SUBCOMMAND,
 										   params,
+										   NULL,
 										   None_Receiver,
 										   NULL);
 						}
@@ -1405,6 +1410,7 @@ ProcessUtilitySlow(Node *parsetree,
 											   queryString,
 											   PROCESS_UTILITY_SUBCOMMAND,
 											   params,
+											   NULL,
 											   None_Receiver,
 											   NULL);
 								EventTriggerAlterTableStart(parsetree);
@@ -1740,7 +1746,12 @@ ProcessUtilitySlow(Node *parsetree,
 
 			case T_CreateTableAsStmt:
 				address = ExecCreateTableAs((CreateTableAsStmt *) parsetree,
-								  queryString, params, completionTag);
+<<<<<<< HEAD
+								  queryString, params, queryEnv, completionTag);
+=======
+											queryString, params, queryEnv,
+											completionTag);
+>>>>>>> 18ce3a4ab22 (Add infrastructure to support EphemeralNamedRelation references.)
 				break;
 
 			case T_RefreshMatViewStmt:

@@ -2229,6 +2229,7 @@ range_table_walker(List *rtable,
 			case RTE_RELATION:
 			case RTE_VOID:
 			case RTE_CTE:
+			case RTE_NAMEDTUPLESTORE:
 				/* nothing to do */
 				break;
 			case RTE_SUBQUERY:
@@ -3119,6 +3120,8 @@ range_table_mutator(List *rtable,
 			case RTE_VOID:
 			case RTE_CTE:
 				/* we don't bother to copy eref, aliases, etc; OK? */
+			case RTE_NAMEDTUPLESTORE:
+				/* nothing to do */
 				break;
 			case RTE_SUBQUERY:
 				if (!(flags & QTW_IGNORE_RT_SUBQUERIES))

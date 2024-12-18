@@ -101,6 +101,7 @@
 #include "executor/nodeMergeAppend.h"
 #include "executor/nodeMergejoin.h"
 #include "executor/nodeModifyTable.h"
+#include "executor/nodeNamedtuplestorescan.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeRecursiveunion.h"
 #include "executor/nodeResult.h"
@@ -572,6 +573,11 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 												   estate, eflags);
 			}
 			END_MEMORY_ACCOUNT();
+			break;
+
+		case T_NamedTuplestoreScan:
+			result = (PlanState *) ExecInitNamedTuplestoreScan((NamedTuplestoreScan *) node,
+												   estate, eflags);
 			break;
 
 		case T_WorkTableScan:
@@ -1083,6 +1089,10 @@ ExecProcNode(PlanState *node)
 			result = ExecCteScan((CteScanState *) node);
 			break;
 
+		case T_NamedTuplestoreScanState:
+			result = ExecNamedTuplestoreScan((NamedTuplestoreScanState *) node);
+			break;
+
 		case T_WorkTableScanState:
 			result = ExecWorkTableScan((WorkTableScanState *) node);
 			break;
@@ -1443,6 +1453,10 @@ ExecEndNode(PlanState *node)
 
 		case T_CteScanState:
 			ExecEndCteScan((CteScanState *) node);
+			break;
+
+		case T_NamedTuplestoreScanState:
+			ExecEndNamedTuplestoreScan((NamedTuplestoreScanState *) node);
 			break;
 
 		case T_WorkTableScanState:

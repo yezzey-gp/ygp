@@ -71,19 +71,19 @@ extern PGDLLIMPORT explain_get_index_name_hook_type explain_get_index_name_hook;
 
 
 extern void ExplainQuery(ExplainStmt *stmt, const char *queryString,
-			 ParamListInfo params, DestReceiver *dest);
+			 ParamListInfo params, QueryEnvironment *queryEnv, DestReceiver *dest);
 
 extern void ExplainInitState(ExplainState *es);
 
 extern TupleDesc ExplainResultDesc(ExplainStmt *stmt);
 
 extern void ExplainOneUtility(Node *utilityStmt, IntoClause *into,
-				  ExplainState *es,
-				  const char *queryString, ParamListInfo params);
+				  ExplainState *es, const char *queryString,
+				  ParamListInfo params, QueryEnvironment *queryEnv);
 
 extern void ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into,
 			   ExplainState *es, const char *queryString,
-			   ParamListInfo params, const instr_time *planduration,
+			   ParamListInfo params, QueryEnvironment *queryEnv, const instr_time *planduration,
 			   int cursorOptions);
 extern ExplainState * NewExplainState(void);
 extern void ExplainPrintPlan(ExplainState *es, QueryDesc *queryDesc);

@@ -2681,6 +2681,10 @@ finalize_plan(PlannerInfo *root, Plan *plan, Bitmapset *valid_params,
 			context.paramids = bms_add_members(context.paramids, scan_params);
 			break;
 
+		case T_NamedTuplestoreScan:
+			context.paramids = bms_add_members(context.paramids, scan_params);
+			break;
+
 		case T_ForeignScan:
 			finalize_primnode((Node *) ((ForeignScan *) plan)->fdw_exprs,
 							  &context);

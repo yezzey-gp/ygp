@@ -483,6 +483,11 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
 			palloc0(queryDesc->plannedstmt->nParamExec * sizeof(ParamExecData));
 
 	/*
+	 * Fill in the query environment, if any, from queryDesc.
+	 */
+	estate->es_queryEnv = queryDesc->queryEnv;
+
+	/*
 	 * If non-read-only query, set the command ID to mark output tuples with
 	 */
 	switch (queryDesc->operation)

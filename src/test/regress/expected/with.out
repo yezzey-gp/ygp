@@ -2207,3 +2207,6 @@ select count(*) from rank_tbl where rank in (select rank from updated);
      9
 (1 row)
 
+-- check sane response to attempt to modify CTE relation
+WITH d AS (SELECT 42) INSERT INTO d VALUES (1);
+ERROR:  relation "d" cannot be the target of a modifying statement

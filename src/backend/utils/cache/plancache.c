@@ -90,10 +90,10 @@
 static CachedPlanSource *first_saved_plan = NULL;
 
 static void ReleaseGenericPlan(CachedPlanSource *plansource);
-static List *RevalidateCachedQuery(CachedPlanSource *plansource, IntoClause *intoClause);
+static List *RevalidateCachedQuery(CachedPlanSource *plansource, QueryEnvironment *queryEnv, IntoClause *intoClause);
 static bool CheckCachedPlan(CachedPlanSource *plansource);
 static CachedPlan *BuildCachedPlan(CachedPlanSource *plansource, List *qlist,
-				ParamListInfo boundParams, IntoClause *intoClause);
+				ParamListInfo boundParams, QueryEnvironment *queryEnvб IntoClause *intoClause);
 static bool choose_custom_plan(CachedPlanSource *plansource,
 				   ParamListInfo boundParams,
 				   IntoClause *intoClause);
@@ -157,7 +157,8 @@ InitPlanCache(void)
 CachedPlanSource *
 CreateCachedPlan(Node *raw_parse_tree,
 				 const char *query_string,
-				 const char *commandTag)
+				 const char *commandTag,
+				 QueryEnvironment *queryEnv)
 {
 	CachedPlanSource *plansource;
 	MemoryContext source_context;
@@ -558,7 +559,7 @@ ReleaseGenericPlan(CachedPlanSource *plansource)
  * GPDB: See GetCachedPlan() for why intoClause is added here.
  */
 static List *
-RevalidateCachedQuery(CachedPlanSource *plansource, IntoClause *intoClause)
+RevalidateCachedQuery(CachedPlanSource *plansource, QueryEnvironment *queryEnv, IntoClause *intoClause)
 {
 	bool		snapshot_set;
 	Node	   *rawtree;
@@ -682,12 +683,14 @@ RevalidateCachedQuery(CachedPlanSource *plansource, IntoClause *intoClause)
 		tlist = pg_analyze_and_rewrite_params(rawtree,
 											  plansource->query_string,
 											  plansource->parserSetup,
-											  plansource->parserSetupArg);
+											  plansource->parserSetupArg,
+											  queryEnv);
 	else
 		tlist = pg_analyze_and_rewrite(rawtree,
 									   plansource->query_string,
 									   plansource->param_types,
-									   plansource->num_params);
+									   plansource->num_params,
+									   queryEnv);
 
 	/* GPDB: For CTAS query, set its isCTAS to be true */
 	if (intoClause)
@@ -877,7 +880,7 @@ CheckCachedPlan(CachedPlanSource *plansource)
  */
 static CachedPlan *
 BuildCachedPlan(CachedPlanSource *plansource, List *qlist,
-				ParamListInfo boundParams, IntoClause *intoClause)
+				ParamListInfo boundParams, QueryEnvironment *queryEnv, IntoClause *intoClause)
 {
 	CachedPlan *plan;
 	List	   *plist;
@@ -900,7 +903,7 @@ BuildCachedPlan(CachedPlanSource *plansource, List *qlist,
 	 * safety, let's treat it as real and redo the RevalidateCachedQuery call.
 	 */
 	if (!plansource->is_valid)
-		qlist = RevalidateCachedQuery(plansource, intoClause);
+		qlist = RevalidateCachedQuery(plansource, queryEnv, intoClause);
 
 	/*
 	 * If we don't already have a copy of the querytree list that can be
@@ -1189,7 +1192,7 @@ cached_plan_cost(CachedPlan *plan, bool include_planner)
  */
 CachedPlan *
 GetCachedPlan(CachedPlanSource *plansource, ParamListInfo boundParams,
-			  bool useResOwner, IntoClause *intoClause)
+			  bool useResOwner, QueryEnvironment *queryEnv, IntoClause *intoClause)
 {
 	CachedPlan *plan = NULL;
 	List	   *qlist;
@@ -1203,7 +1206,7 @@ GetCachedPlan(CachedPlanSource *plansource, ParamListInfo boundParams,
 		elog(ERROR, "cannot apply ResourceOwner to non-saved cached plan");
 
 	/* Make sure the querytree list is valid and we have parse-time locks */
-	qlist = RevalidateCachedQuery(plansource, intoClause);
+	qlist = RevalidateCachedQuery(plansource, queryEnv, intoClause);
 
 	/* Decide whether to use a custom plan */
 	customplan = choose_custom_plan(plansource, boundParams, intoClause);
@@ -1219,7 +1222,7 @@ GetCachedPlan(CachedPlanSource *plansource, ParamListInfo boundParams,
 		else
 		{
 			/* Build a new generic plan */
-			plan = BuildCachedPlan(plansource, qlist, NULL, NULL);
+			plan = BuildCachedPlan(plansource, qlist, NULL, queryEnv, NULL);
 			/* Just make real sure plansource->gplan is clear */
 			ReleaseGenericPlan(plansource);
 			/* Link the new generic plan into the plansource */
@@ -1264,7 +1267,7 @@ GetCachedPlan(CachedPlanSource *plansource, ParamListInfo boundParams,
 	if (customplan)
 	{
 		/* Build a custom plan */
-		plan = BuildCachedPlan(plansource, qlist, boundParams, intoClause);
+		plan = BuildCachedPlan(plansource, qlist, boundParams, queryEnv, intoClause);
 		/* Accumulate total costs of custom plans, but 'ware overflow */
 		if (plansource->num_custom_plans < INT_MAX)
 		{
@@ -1480,7 +1483,8 @@ CachedPlanIsValid(CachedPlanSource *plansource)
  * within the cached plan, and may disappear next time the plan is updated.
  */
 List *
-CachedPlanGetTargetList(CachedPlanSource *plansource)
+CachedPlanGetTargetList(CachedPlanSource *plansource,
+						QueryEnvironment *queryEnv)
 {
 	Node	   *pstmt;
 
@@ -1496,7 +1500,7 @@ CachedPlanGetTargetList(CachedPlanSource *plansource)
 		return NIL;
 
 	/* Make sure the querytree list is valid and we have parse-time locks */
-	RevalidateCachedQuery(plansource, NULL);
+	RevalidateCachedQuery(plansource, queryEnv, NULL);
 
 	/* Get the primary statement and find out what it returns */
 	pstmt = PortalListGetPrimaryStmt(plansource->query_list);
