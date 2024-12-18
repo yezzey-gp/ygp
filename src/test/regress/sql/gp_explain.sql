@@ -161,6 +161,11 @@ set gp_enable_explain_rows_out=on;
 explain analyze SELECT * FROM explaintest;
 set gp_enable_explain_rows_out=DEFAULT;
 
+-- Test explain node summary.
+set gp_enable_explain_node_summary=on;
+explain analyze SELECT * FROM explaintest;
+set gp_enable_explain_node_summary=DEFAULT;
+
 --
 -- Test output of EXPLAIN ANALYZE for Bitmap index scan's actual rows.
 --

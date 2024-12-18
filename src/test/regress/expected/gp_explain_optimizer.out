@@ -380,6 +380,50 @@ explain analyze SELECT * FROM explaintest;
 (8 rows)
 
 set gp_enable_explain_rows_out=DEFAULT;
+-- Test explain node summary.
+set gp_enable_explain_node_summary=on;
+explain analyze SELECT * FROM explaintest;
+                                                                                                               QUERY PLAN                                                                                                                
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..431.00 rows=10 width=4) (actual time=0.476..0.484 rows=10 loops=1)
+   Node Summary:                  vmax       vsum       vcnt       imax
+     ntuples:                       10         10          1         -1
+     execmemused:                    0          0          0          0
+     workmemused:                    0          0          0          0
+     workmemwanted:                  0          0          0          0
+     totalWorkfileCreated:           0          0          0          0
+     peakMemBalance:              5336       5336          1         -1
+     totalPartTableScanned:          0          0          0          0
+     segindex0: -1
+     ninst: 1
+     StatInsts:
+       (segN) pstype starttime counter firsttuple startup total ntuples nloops execmemused workmemused workmemwanted workfileCreated firststart peakMemBalance numPartScanned sortMethod sortSpaceType sortSpaceUsed bnotes enotes
+       (seg-1) 241 0.00 0.00 0.00 10.00 1.00 0 0 0 0 0 0 5336.00 0 0 0 0 0 0 0
+   ->  Seq Scan on explaintest  (cost=0.00..431.00 rows=4 width=4) (actual time=0.017..0.018 rows=5 loops=1)
+         Node Summary:                  vmax       vsum       vcnt       imax
+           ntuples:                        5         10          3          0
+           execmemused:                    0          0          0          0
+           workmemused:                    0          0          0          0
+           workmemwanted:                  0          0          0          0
+           totalWorkfileCreated:           0          0          0          0
+           peakMemBalance:             15872      47616          3          0
+           totalPartTableScanned:          0          0          0          0
+           segindex0: 0
+           ninst: 3
+           StatInsts:
+             (segN) pstype starttime counter firsttuple startup total ntuples nloops execmemused workmemused workmemwanted workfileCreated firststart peakMemBalance numPartScanned sortMethod sortSpaceType sortSpaceUsed bnotes enotes
+             (seg0) 211 0.00 0.00 0.00 5.00 1.00 0 0 0 0 0 0 15872.00 0 0 0 0 0 0 0
+             (seg1) 211 0.00 0.00 0.00 1.00 1.00 0 0 0 0 0 0 15872.00 0 0 0 0 0 0 0
+             (seg2) 211 0.00 0.00 0.00 4.00 1.00 0 0 0 0 0 0 15872.00 0 0 0 0 0 0 0
+ Planning time: 6.834 ms
+   (slice0)    Executor memory: 27K bytes.
+   (slice1)    Executor memory: 25K bytes avg x 3 workers, 25K bytes max (seg0).
+ Memory used:  128000kB
+ Optimizer: Pivotal Optimizer (GPORCA)
+ Execution time: 0.900 ms
+(36 rows)
+
+set gp_enable_explain_node_summary=DEFAULT;
 --
 -- Test output of EXPLAIN ANALYZE for Bitmap index scan's actual rows.
 --
