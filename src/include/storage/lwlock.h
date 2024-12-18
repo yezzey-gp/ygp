@@ -14,7 +14,9 @@
 #ifndef LWLOCK_H
 #define LWLOCK_H
 
+#include "lib/ilist.h"
 #include "storage/s_lock.h"
+#include "port/atomics.h"
 
 struct PGPROC;
 
@@ -46,13 +48,16 @@ typedef struct LWLockTranche
 typedef struct LWLock
 {
 	slock_t		mutex;			/* Protects LWLock and queue of PGPROCs */
-	bool		releaseOK;		/* T if ok to release waiters */
-	char		exclusive;		/* # of exclusive holders (0 or 1) */
-	int			shared;			/* # of shared holders (0..MaxBackends) */
-	int			tranche;		/* tranche ID */
-	struct PGPROC *head;		/* head of list of waiting PGPROCs */
-	struct PGPROC *tail;		/* tail of list of waiting PGPROCs */
-	/* tail is undefined when head is NULL */
+	uint16		tranche;		/* tranche ID */
+	
+	pg_atomic_uint32 state;		/* state of exlusive/nonexclusive lockers */
+#ifdef LOCK_DEBUG
+	pg_atomic_uint32 nwaiters;	/* number of waiters */
+#endif
+	dlist_head	waiters;		/* list of waiting PGPROCs */
+#ifdef LOCK_DEBUG
+	struct PGPROC *owner;		/* last exlusive owner of the lock */
+#endif
 } LWLock;
 
 /*
@@ -67,11 +72,11 @@ typedef struct LWLock
  * (Of course, we have to also ensure that the array start address is suitably
  * aligned.)
  *
- * Even on a 32-bit platform, an lwlock will be more than 16 bytes, because
- * it contains 2 integers and 2 pointers, plus other stuff.  It should fit
- * into 32 bytes, though, unless slock_t is really big.  On a 64-bit platform,
- * it should fit into 32 bytes unless slock_t is larger than 4 bytes.  We
- * allow for that just in case.
+ * On a 32-bit platforms a LWLock will these days fit into 16 bytes, but since
+ * that didn't use to be the case and cramming more lwlocks into a cacheline
+ * might be detrimental performancewise we still use 32 byte alignment
+ * there. So, both on 32 and 64 bit platforms, it should fit into 32 bytes
+ * unless slock_t is really big.  We allow for that just in case.
  */
 #define LWLOCK_PADDED_SIZE	(sizeof(LWLock) <= 32 ? 32 : 64)
 
@@ -214,11 +219,13 @@ extern bool LWLockAcquire(LWLock *lock, LWLockMode mode);
 extern bool LWLockConditionalAcquire(LWLock *lock, LWLockMode mode);
 extern bool LWLockAcquireOrWait(LWLock *lock, LWLockMode mode);
 extern void LWLockRelease(LWLock *lock);
+extern void LWLockReleaseClearVar(LWLock *lock, uint64 *valptr, uint64 val);
 extern void LWLockReleaseAll(void);
 extern bool LWLockHeldByMe(LWLock *lock);
 extern bool LWLockHeldExclusiveByMe(LWLock *lock);
 
-extern bool LWLockAcquireWithVar(LWLock *lock, uint64 *valptr, uint64 val);
+extern bool LWLockIsExclusive(LWLock *l);
+
 extern bool LWLockWaitForVar(LWLock *lock, uint64 *valptr, uint64 oldval, uint64 *newval);
 extern void LWLockUpdateVar(LWLock *lock, uint64 *valptr, uint64 value);
 

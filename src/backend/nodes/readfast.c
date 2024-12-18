@@ -2399,8 +2399,6 @@ void readJoinInfo(Join *local_node)
 Bitmapset  *
 bitmapsetRead(void)
 {
-
-
 	Bitmapset *bms = NULL;
 	int nwords;
 	int i;
@@ -2415,9 +2413,6 @@ bitmapsetRead(void)
 	{
 		memcpy(&bms->words[i], read_str_ptr, sizeof(bitmapword)); read_str_ptr+=sizeof(bitmapword);
 	}
-
-
-
 
 	return bms;
 }
