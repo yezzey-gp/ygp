@@ -1978,6 +1978,7 @@ _equalCreateTrigStmt(const CreateTrigStmt *a, const CreateTrigStmt *b)
 	COMPARE_NODE_FIELD(columns);
 	COMPARE_NODE_FIELD(whenClause);
 	COMPARE_SCALAR_FIELD(isconstraint);
+	COMPARE_NODE_FIELD(transitionRels);
 	COMPARE_SCALAR_FIELD(deferrable);
 	COMPARE_SCALAR_FIELD(initdeferred);
 	COMPARE_NODE_FIELD(constrrel);
@@ -2743,6 +2744,16 @@ _equalXmlSerialize(const XmlSerialize *a, const XmlSerialize *b)
 	COMPARE_NODE_FIELD(expr);
 	COMPARE_NODE_FIELD(typeName);
 	COMPARE_LOCATION_FIELD(location);
+
+	return true;
+}
+
+static bool
+_equalTriggerTransition(const TriggerTransition *a, const TriggerTransition *b)
+{
+	COMPARE_STRING_FIELD(name);
+	COMPARE_SCALAR_FIELD(isNew);
+	COMPARE_SCALAR_FIELD(isTable);
 
 	return true;
 }
@@ -3532,6 +3543,10 @@ equal(const void *a, const void *b)
 		case T_PartitionRule:
 			retval = _equalPartitionRule(a, b);
 			break;
+		case T_TriggerTransition:
+			retval = _equalTriggerTransition(a, b);
+			break;
+
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(a));
