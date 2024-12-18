@@ -31,7 +31,7 @@ ALTER TABLE [ IF EXISTS ] [ ONLY ] name
 ALTER TABLE [ IF EXISTS ] name SET SCHEMA new_schema
 
 ALTER TABLE [ IF EXISTS ] [ONLY] name SET 
-     WITH (REORGANIZE=true|false) 
+     WITH (REORGANIZE=true|false, numsegment=value) 
    | DISTRIBUTED BY (column_name, [ ... ] ) 
    | DISTRIBUTED RANDOMLY 
    | DISTRIBUTED REPLICATED
